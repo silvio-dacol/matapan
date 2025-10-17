@@ -2,46 +2,53 @@
   "version": 1,
   "meta": {
     "date": "2025-10-16",
-    "base_currency": "EUR"
+    "base_currency": "EUR",
+    "normalize": "yes"
   },
-  "accounts": [
-    {
-      "name": "SEB Checking",
-      "type": "bank",
-      "currency": "SEK",
-      "balance": 24500.25
-    },
-    {
-      "name": "Revolut EUR",
-      "type": "bank",
-      "currency": "EUR",
-      "balance": 3100.5
-    }
-  ],
-  "investments": [
-    {
-      "name": "Broker 1",
-      "currency": "EUR",
-      "value": 125000.0
-    }
-  ],
-  "liabilities": [
-    {
-      "name": "Mortgage",
-      "type": "loan",
-      "currency": "SEK",
-      "balance": 1180000.0,
-      "interest_rate": 0.019
-    },
-    {
-      "name": "Credit Card",
-      "type": "revolving",
-      "currency": "SEK",
-      "balance": 8000.0
-    }
-  ],
   "fx_rates": {
     "EUR": 11.32,
     "USD": 10.94
-  }
+  },
+  "ECLI_basic": {
+    "rent_index": 11.32,
+    "groceries_index": 10.94,
+    "cost_of_living_index": 0
+  },
+  "financial_entries": [
+    {
+      "name": "SEB Account",
+      "type": "liquidity",
+      "currency": "SEK",
+      "balance": 24500.25,
+      "comment": ""
+    },
+    {
+      "name": "IBKR",
+      "type": "investments",
+      "currency": "EUR",
+      "balance": 5345.09,
+      "comment": ""
+    },
+    {
+      "name": "Volvo Credit Card",
+      "type": "liabilities",
+      "currency": "SEK",
+      "balance": 209.87,
+      "comment": ""
+    },
+    {
+      "name": "Volvo Credit Card",
+      "type": "pension",
+      "currency": "SEK",
+      "balance": 20998.8,
+      "comment": ""
+    },
+    {
+      "name": "House",
+      "type": "personal",
+      "currency": "EUR",
+      "balance": 304000,
+      "comment": ""
+    }
+  ]
 }
