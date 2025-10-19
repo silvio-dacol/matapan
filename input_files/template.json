@@ -1,20 +1,39 @@
 {
   "version": 1,
+
   "meta": {
     "date": "2025-10-16",
     "base_currency": "EUR",
-    "normalize": "yes"
+    "normalize": "yes",
+
+    "hicp": {
+      "base_year": "2024",
+      "base_month": "08",
+      "base_hicp": 126.72
+    },
+
+    "ECLI_weight": {
+      "rent_index_weight": 0.4,
+      "groceries_index_weight": 0.35,
+      "cost_of_living_index_weight": 0.25
+    }
   },
+
   "fx_rates": {
     "EUR": 11.32,
     "USD": 10.94
   },
-  "ECLI_basic": {
-    "rent_index": 11.32,
-    "groceries_index": 10.94,
-    "cost_of_living_index": 0
+
+  "inflation": {
+    "ECLI_basic": {
+      "rent_index": 11.32,
+      "groceries_index": 10.94,
+      "cost_of_living_index": 0
+    },
+    "current_hicp": 120
   },
-  "financial_entries": [
+
+  "net_worth_entries": [
     {
       "name": "SEB Account",
       "type": "liquidity",
@@ -30,14 +49,14 @@
       "comment": ""
     },
     {
-      "name": "Volvo Credit Card",
+      "name": "Credit Card",
       "type": "liabilities",
       "currency": "SEK",
       "balance": 209.87,
       "comment": ""
     },
     {
-      "name": "Volvo Credit Card",
+      "name": "INPS",
       "type": "pension",
       "currency": "SEK",
       "balance": 20998.8,
@@ -48,6 +67,23 @@
       "type": "personal",
       "currency": "EUR",
       "balance": 304000,
+      "comment": ""
+    }
+  ],
+
+  "cash_flow_entries": [
+    {
+      "name": "Engineer Job",
+      "type": "income",
+      "currency": "EUR",
+      "balance": 3560,
+      "comment": ""
+    },
+    {
+      "name": "Rent",
+      "type": "expense",
+      "currency": "EUR",
+      "balance": 900,
       "comment": ""
     }
   ]
