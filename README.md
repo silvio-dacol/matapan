@@ -1,3 +1,11 @@
+# Net-Worth App
+
+An app to track the net worth of an individual over the biggest belongings and monetary assets.
+
+## MVP
+
+Just replicate what you have already done on the Excel dashboard but make it a little more beautiful and automated.
+
 ## Real Money Normalization Model
 
 Goal: Convert nominal money into **real purchasing power**, adjusted for **inflation over time** and **cost of living across cities/countries**.

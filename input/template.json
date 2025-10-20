@@ -1,7 +1,7 @@
 {
   "version": 1,
 
-  "meta": {
+  "metadata": {
     "date": "2025-10-16",
     "base_currency": "EUR",
     "normalize": "yes",
@@ -30,6 +30,7 @@
       "groceries_index": 10.94,
       "cost_of_living_index": 0
     },
+
     "current_hicp": 120
   },
 
@@ -67,23 +68,6 @@
       "type": "personal",
       "currency": "EUR",
       "balance": 304000,
-      "comment": ""
-    }
-  ],
-
-  "cash_flow_entries": [
-    {
-      "name": "Engineer Job",
-      "type": "income",
-      "currency": "EUR",
-      "balance": 3560,
-      "comment": ""
-    },
-    {
-      "name": "Rent",
-      "type": "expense",
-      "currency": "EUR",
-      "balance": 900,
       "comment": ""
     }
   ]
