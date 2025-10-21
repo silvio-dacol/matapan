@@ -6,6 +6,61 @@ An app to track the net worth of an individual over the biggest belongings and m
 
 Just replicate what you have already done on the Excel dashboard but make it a little more beautiful and automated.
 
+## Backend CLI
+
+This repo includes a small Rust CLI that reads monthly JSON snapshots from `input/` (all `*.json` files except `template.json`), aggregates them, and writes an `output/dashboard.json` with per‑category totals and net‑worth over time.
+
+### Run
+
+- Build: `cargo build`
+- Execute (defaults shown):
+  - `cargo run -- --input input --output output/dashboard.json --pretty --latest-only`
+  - Omit `--latest-only` to aggregate the full time‑series.
+
+### Input format
+
+Use `input/template.json` as a guide. Each snapshot file should contain:
+
+- `metadata.date` in `YYYY-MM-DD`
+- `metadata.base_currency` (e.g., `EUR`)
+- `fx_rates` as a map: `CURRENCY -> units of base currency per 1 unit of CURRENCY` (with base `EUR`, example: `"SEK": 0.0875`). If an entry’s currency equals the base, the rate is `1.0`.
+- `net_worth_entries[]` with `name`, `type` (`liquidity|investments|personal|pension|liabilities`), `currency`, and `balance`.
+- Optional normalization fields to compute “real” money (inflation + cost‑of‑living):
+  - `metadata.normalize: "yes"`
+  - `metadata.hicp` with `base_year`, `base_month`, `base_hicp`
+  - `metadata.ECLI_weight` and `inflation.ECLI_basic`
+  - `inflation.current_hicp`
+
+### Output
+
+The CLI writes `output/dashboard.json` similar to:
+
+```
+{
+  "generated_at": "...",
+  "base_currency": "EUR",
+  "snapshots": [
+    {
+      "date": "2025-09-30",
+      "base_currency": "EUR",
+      "breakdown": {
+        "cash": 120073.0,
+        "investments": 52864.0,
+        "personal": 773.0,
+        "pension": 38976.0,
+        "liabilities": 2.0
+      },
+      "totals": { "assets": 212685.0, "liabilities": 2.0, "net_worth": 212683.0 },
+      "normalized": { "deflator": 0.966, "ecli_norm": 0.498, "breakdown": { "cash": 241000.0, ... } },
+      "warnings": []
+    }
+  ],
+  "latest": { ... }
+}
+```
+
+This file can be consumed directly by a frontend dashboard for the charts shown in the screenshots.
+
 ## Real Money Normalization Model
 
 Goal: Convert nominal money into **real purchasing power**, adjusted for **inflation over time** and **cost of living across cities/countries**.
