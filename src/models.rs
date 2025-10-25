@@ -3,10 +3,6 @@ use std::collections::HashMap;
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 
-// ===============
-// Input documents
-// ===============
-
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct InputDocument {
@@ -24,7 +20,9 @@ pub struct Metadata {
     pub date: String, // YYYY-MM-DD
     pub base_currency: String,
     #[serde(default)]
-    pub normalize: Option<String>,
+    pub adjust_to_inflation: Option<String>,
+    #[serde(default)]
+    pub normalize_to_new_york_ecli: Option<String>,
     #[serde(default)]
     pub hicp: Option<HicpBase>,
     #[serde(default)]
@@ -76,10 +74,6 @@ pub struct InputEntry {
     pub comment: String,
 }
 
-// ==================
-// Internal normalized
-// ==================
-
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
 pub enum Category {
@@ -114,7 +108,13 @@ pub struct SnapshotBreakdown {
 
 impl Default for SnapshotBreakdown {
     fn default() -> Self {
-        Self { cash: 0.0, investments: 0.0, personal: 0.0, pension: 0.0, liabilities: 0.0 }
+        Self {
+            cash: 0.0,
+            investments: 0.0,
+            personal: 0.0,
+            pension: 0.0,
+            liabilities: 0.0,
+        }
     }
 }
 
@@ -132,17 +132,28 @@ pub struct Snapshot {
     pub breakdown: SnapshotBreakdown,
     pub totals: SnapshotTotals,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub normalized: Option<SnapshotNormalized>,
-    #[serde(skip_serializing_if = "Vec::is_empty")] 
+    pub inflation_adjusted: Option<SnapshotAdjustment>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub new_york_normalized: Option<SnapshotAdjustment>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub real_purchasing_power: Option<SnapshotAdjustment>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub warnings: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct SnapshotNormalized {
+pub struct SnapshotAdjustment {
     pub breakdown: SnapshotBreakdown,
     pub totals: SnapshotTotals,
-    pub deflator: f64,
-    pub ecli_norm: f64,
+    pub scale: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub deflator: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ecli_norm: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub normalization_applied: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub notes: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -153,4 +164,3 @@ pub struct Dashboard {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub latest: Option<Snapshot>,
 }
-

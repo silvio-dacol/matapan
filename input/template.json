@@ -4,7 +4,8 @@
   "metadata": {
     "date": "2025-10-16",
     "base_currency": "EUR",
-    "normalize": "yes",
+    "adjust_to_inflation": "yes",
+    "normalize_to_new_york_ecli": "no",
 
     "hicp": {
       "base_year": "2024",
@@ -12,7 +13,7 @@
       "base_hicp": 126.72
     },
 
-    "ECLI_weight": {
+    "ecli_weight": {
       "rent_index_weight": 0.4,
       "groceries_index_weight": 0.35,
       "cost_of_living_index_weight": 0.25
@@ -25,10 +26,10 @@
   },
 
   "inflation": {
-    "ECLI_basic": {
-      "rent_index": 11.32,
-      "groceries_index": 10.94,
-      "cost_of_living_index": 0
+    "ecli_basic": {
+      "rent_index": 20.8,
+      "groceries_index": 56.1,
+      "cost_of_living_index": 56.2
     },
 
     "current_hicp": 120

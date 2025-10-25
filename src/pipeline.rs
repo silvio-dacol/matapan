@@ -155,14 +155,25 @@ fn to_snapshot(doc: &InputDocument) -> Result<Snapshot> {
         net_worth: assets - liabilities,
     };
 
-    let normalized = compute_normalized(doc, &breakdown, &totals)?;
+    let inflation_adjusted = compute_inflation_only(doc, &breakdown, &totals, &mut warnings)?;
+    let new_york_normalized = compute_new_york_only(doc, &breakdown, &totals, &mut warnings)?;
+    let real_purchasing_power = compute_real_purchasing_power(
+        doc,
+        &breakdown,
+        &totals,
+        inflation_adjusted.as_ref(),
+        new_york_normalized.as_ref(),
+        &mut warnings,
+    )?;
 
     Ok(Snapshot {
         date,
         base_currency,
         breakdown,
         totals,
-        normalized,
+        inflation_adjusted,
+        new_york_normalized,
+        real_purchasing_power,
         warnings,
     })
 }
@@ -183,26 +194,69 @@ fn fx_to_base(
         .or_else(|| rates.get(&currency.to_string()).copied())
 }
 
-fn compute_normalized(
+fn compute_inflation_only(
     doc: &InputDocument,
     b: &SnapshotBreakdown,
     _t: &SnapshotTotals,
-) -> Result<Option<SnapshotNormalized>> {
-    let normalize = doc
+    warnings: &mut Vec<String>,
+) -> Result<Option<SnapshotAdjustment>> {
+    let flag = doc
         .metadata
-        .normalize
+        .adjust_to_inflation
         .clone()
         .unwrap_or_else(|| "no".to_string());
-    if normalize.to_lowercase() != "yes" {
+    if flag.to_lowercase() != "yes" {
         return Ok(None);
     }
-
     let Some(hicp) = &doc.metadata.hicp else {
         return Ok(None);
     };
     let Some(curr_hicp) = doc.inflation.current_hicp else {
         return Ok(None);
     };
+
+    let deflator = hicp.base_hicp / curr_hicp; // Deflator < 1 when prices rose.
+
+    let scale = deflator;
+    let nb = SnapshotBreakdown {
+        cash: b.cash * scale,
+        investments: b.investments * scale,
+        personal: b.personal * scale,
+        pension: b.pension * scale,
+        liabilities: b.liabilities * scale,
+    };
+    let assets_adj = nb.cash + nb.investments + nb.personal + nb.pension;
+    let nt = SnapshotTotals {
+        assets: assets_adj,
+        liabilities: nb.liabilities,
+        net_worth: assets_adj - nb.liabilities,
+    };
+
+    Ok(Some(SnapshotAdjustment {
+        breakdown: nb,
+        totals: nt,
+        scale,
+        deflator: Some(deflator),
+        ecli_norm: None,
+        normalization_applied: None,
+        notes: Some("Inflation-only deflation using HICP".to_string()),
+    }))
+}
+
+fn compute_new_york_only(
+    doc: &InputDocument,
+    b: &SnapshotBreakdown,
+    _t: &SnapshotTotals,
+    warnings: &mut Vec<String>,
+) -> Result<Option<SnapshotAdjustment>> {
+    let flag = doc
+        .metadata
+        .normalize_to_new_york_ecli
+        .clone()
+        .unwrap_or_else(|| "no".to_string());
+    if flag.to_lowercase() != "yes" {
+        return Ok(None);
+    }
     let Some(ecli_basic) = &doc.inflation.ecli_basic else {
         return Ok(None);
     };
@@ -210,7 +264,6 @@ fn compute_normalized(
         return Ok(None);
     };
 
-    let deflator = hicp.base_hicp / curr_hicp;
     let ecli = weights.rent_index_weight * ecli_basic.rent_index
         + weights.groceries_index_weight * ecli_basic.groceries_index
         + weights.cost_of_living_index_weight * ecli_basic.cost_of_living_index;
@@ -219,8 +272,13 @@ fn compute_normalized(
     } else {
         ecli / 100.0
     };
-
-    let scale = deflator / ecli_norm;
+    if ecli_norm < 0.2 {
+        warnings.push(format!(
+            "ECLI_norm very low ({:.3}) — check index values",
+            ecli_norm
+        ));
+    }
+    let scale = 1.0 / ecli_norm; // Adjust to New York reference.
 
     let nb = SnapshotBreakdown {
         cash: b.cash * scale,
@@ -229,17 +287,90 @@ fn compute_normalized(
         pension: b.pension * scale,
         liabilities: b.liabilities * scale,
     };
-    let na = nb.cash + nb.investments + nb.personal + nb.pension;
+    let assets_adj = nb.cash + nb.investments + nb.personal + nb.pension;
     let nt = SnapshotTotals {
-        assets: na,
+        assets: assets_adj,
         liabilities: nb.liabilities,
-        net_worth: na - nb.liabilities,
+        net_worth: assets_adj - nb.liabilities,
     };
 
-    Ok(Some(SnapshotNormalized {
+    Ok(Some(SnapshotAdjustment {
         breakdown: nb,
         totals: nt,
-        deflator,
-        ecli_norm,
+        scale,
+        deflator: None,
+        ecli_norm: Some(ecli_norm),
+        normalization_applied: Some(true),
+        notes: Some("Cost-of-living normalization to New York".to_string()),
+    }))
+}
+
+fn compute_real_purchasing_power(
+    doc: &InputDocument,
+    b: &SnapshotBreakdown,
+    _t: &SnapshotTotals,
+    infl: Option<&SnapshotAdjustment>,
+    ny: Option<&SnapshotAdjustment>,
+    warnings: &mut Vec<String>,
+) -> Result<Option<SnapshotAdjustment>> {
+    // Require both flags & underlying data present.
+    let infl_flag = doc
+        .metadata
+        .adjust_to_inflation
+        .clone()
+        .unwrap_or_else(|| "no".to_string())
+        .to_lowercase()
+        == "yes";
+    let ny_flag = doc
+        .metadata
+        .normalize_to_new_york_ecli
+        .clone()
+        .unwrap_or_else(|| "no".to_string())
+        .to_lowercase()
+        == "yes";
+    if !(infl_flag && ny_flag) {
+        return Ok(None);
+    }
+    let Some(infl_adj) = infl else {
+        return Ok(None);
+    };
+    let Some(ny_adj) = ny else {
+        return Ok(None);
+    };
+
+    let deflator = infl_adj.deflator.unwrap_or(1.0);
+    let ecli_norm = ny_adj.ecli_norm.unwrap_or(1.0);
+    let scale = deflator / ecli_norm;
+    if scale > 5.0 {
+        warnings.push(format!(
+            "Real purchasing power scale unusually large ({:.2})",
+            scale
+        ));
+    }
+
+    let nb = SnapshotBreakdown {
+        cash: b.cash * scale,
+        investments: b.investments * scale,
+        personal: b.personal * scale,
+        pension: b.pension * scale,
+        liabilities: b.liabilities * scale,
+    };
+    let assets_adj = nb.cash + nb.investments + nb.personal + nb.pension;
+    let nt = SnapshotTotals {
+        assets: assets_adj,
+        liabilities: nb.liabilities,
+        net_worth: assets_adj - nb.liabilities,
+    };
+
+    Ok(Some(SnapshotAdjustment {
+        breakdown: nb,
+        totals: nt,
+        scale,
+        deflator: Some(deflator),
+        ecli_norm: Some(ecli_norm),
+        normalization_applied: Some(true),
+        notes: Some(
+            "Combined inflation deflation and New York cost-of-living normalization".to_string(),
+        ),
     }))
 }
