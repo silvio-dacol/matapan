@@ -14,7 +14,7 @@ This repo includes a small Rust CLI that reads monthly JSON snapshots from `inpu
 
 - Build: `cargo build`
 - Execute (defaults shown):
-  - `cargo run -- --input input --output output/dashboard.json --pretty --latest-only`
+  - `cargo run -- --input database --output output/dashboard.json --pretty --latest-only`
   - Omit `--latest-only` to aggregate the full time‑series.
 
 ### Input format
@@ -88,7 +88,7 @@ Goal: Convert nominal money into **real purchasing power**, adjusted for **infla
 
 ### Essential Cost of Living Index (ECLI)
 
-ECLI represents the essential cost of living in a city and the reference city is New York. So these are the translation in how much money you would need in New York for the same situation.
+ECLI represents the essential cost of living in a city and the reference city is New York. So these are the translation in the equivalent amount of money that would be needed in New York to maintain the same standard of living.
 
 These data are found at: https://www.numbeo.com/cost-of-living/rankings.jsp
 
