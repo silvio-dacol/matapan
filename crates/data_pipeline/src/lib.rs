@@ -120,9 +120,10 @@ fn load_documents(dir: &PathBuf) -> Result<Vec<InputDocument>> {
 
         // Skip template.json and dashboard.json files, and hidden files
         if let Some(filename) = path.file_name().and_then(|s| s.to_str()) {
-            if filename.eq_ignore_ascii_case("template.json") 
+            if filename.eq_ignore_ascii_case("template.json")
                 || filename.eq_ignore_ascii_case("dashboard.json")
-                || filename.starts_with(".") {
+                || filename.starts_with(".")
+            {
                 continue;
             }
         }
