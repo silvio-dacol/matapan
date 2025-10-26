@@ -36,7 +36,11 @@ pub fn run(cfg: Config) -> Result<()> {
                 snapshots: vec![snap.clone()],
                 latest: Some(snap),
             };
-            write_dashboard(&cfg.output_file, &dashboard, cfg.pretty)?;
+
+            // Round all values to 2 decimal places before writing
+            let rounded_dashboard = dashboard.rounded();
+
+            write_dashboard(&cfg.output_file, &rounded_dashboard, cfg.pretty)?;
             return Ok(());
         } else {
             return Err(anyhow!("No input documents found"));
@@ -64,7 +68,11 @@ pub fn run(cfg: Config) -> Result<()> {
         snapshots,
         latest,
     };
-    write_dashboard(&cfg.output_file, &dashboard, cfg.pretty)?;
+
+    // Round all values to 2 decimal places before writing
+    let rounded_dashboard = dashboard.rounded();
+
+    write_dashboard(&cfg.output_file, &rounded_dashboard, cfg.pretty)?;
     Ok(())
 }
 
@@ -110,14 +118,13 @@ fn load_documents(dir: &PathBuf) -> Result<Vec<InputDocument>> {
             continue;
         }
 
-        // Skip template.json files
-        if path
-            .file_name()
-            .and_then(|s| s.to_str())
-            .map(|s| s.eq_ignore_ascii_case("template.json"))
-            .unwrap_or(false)
-        {
-            continue;
+        // Skip template.json and dashboard.json files, and hidden files
+        if let Some(filename) = path.file_name().and_then(|s| s.to_str()) {
+            if filename.eq_ignore_ascii_case("template.json") 
+                || filename.eq_ignore_ascii_case("dashboard.json")
+                || filename.starts_with(".") {
+                continue;
+            }
         }
 
         // Read and parse the JSON file

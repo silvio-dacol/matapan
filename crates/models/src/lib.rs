@@ -3,6 +3,11 @@ use std::collections::HashMap;
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 
+/// Utility function to round a float to 2 decimal places
+fn round_to_2_decimals(value: f64) -> f64 {
+    (value * 100.0).round() / 100.0
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct InputDocument {
@@ -106,6 +111,19 @@ pub struct SnapshotBreakdown {
     pub liabilities: f64,
 }
 
+impl SnapshotBreakdown {
+    /// Round all financial values to 2 decimal places
+    pub fn rounded(&self) -> Self {
+        Self {
+            cash: round_to_2_decimals(self.cash),
+            investments: round_to_2_decimals(self.investments),
+            personal: round_to_2_decimals(self.personal),
+            pension: round_to_2_decimals(self.pension),
+            liabilities: round_to_2_decimals(self.liabilities),
+        }
+    }
+}
+
 impl Default for SnapshotBreakdown {
     fn default() -> Self {
         Self {
@@ -125,6 +143,17 @@ pub struct SnapshotTotals {
     pub net_worth: f64,
 }
 
+impl SnapshotTotals {
+    /// Round all financial values to 2 decimal places
+    pub fn rounded(&self) -> Self {
+        Self {
+            assets: round_to_2_decimals(self.assets),
+            liabilities: round_to_2_decimals(self.liabilities),
+            net_worth: round_to_2_decimals(self.net_worth),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct Snapshot {
     pub date: NaiveDate,
@@ -139,6 +168,22 @@ pub struct Snapshot {
     pub real_purchasing_power: Option<SnapshotAdjustment>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub warnings: Vec<String>,
+}
+
+impl Snapshot {
+    /// Round all financial values to 2 decimal places
+    pub fn rounded(&self) -> Self {
+        Self {
+            date: self.date,
+            base_currency: self.base_currency.clone(),
+            breakdown: self.breakdown.rounded(),
+            totals: self.totals.rounded(),
+            inflation_adjusted: self.inflation_adjusted.as_ref().map(|adj| adj.rounded()),
+            new_york_normalized: self.new_york_normalized.as_ref().map(|adj| adj.rounded()),
+            real_purchasing_power: self.real_purchasing_power.as_ref().map(|adj| adj.rounded()),
+            warnings: self.warnings.clone(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -156,6 +201,21 @@ pub struct SnapshotAdjustment {
     pub notes: Option<String>,
 }
 
+impl SnapshotAdjustment {
+    /// Round all financial values to 2 decimal places
+    pub fn rounded(&self) -> Self {
+        Self {
+            breakdown: self.breakdown.rounded(),
+            totals: self.totals.rounded(),
+            scale: round_to_2_decimals(self.scale),
+            deflator: self.deflator.map(round_to_2_decimals),
+            ecli_norm: self.ecli_norm.map(round_to_2_decimals),
+            normalization_applied: self.normalization_applied,
+            notes: self.notes.clone(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct Dashboard {
     pub generated_at: String,
@@ -163,4 +223,16 @@ pub struct Dashboard {
     pub snapshots: Vec<Snapshot>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub latest: Option<Snapshot>,
+}
+
+impl Dashboard {
+    /// Round all financial values to 2 decimal places
+    pub fn rounded(&self) -> Self {
+        Self {
+            generated_at: self.generated_at.clone(),
+            base_currency: self.base_currency.clone(),
+            snapshots: self.snapshots.iter().map(|s| s.rounded()).collect(),
+            latest: self.latest.as_ref().map(|s| s.rounded()),
+        }
+    }
 }
