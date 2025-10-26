@@ -1,0 +1,11 @@
+[package]
+name = "data_pipeline"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1"
+chrono = { version = "0.4", features = ["serde"] }
+serde_json = "1"
+models = { path = "../models" }
+data_normalization = { path = "../data_normalization" }

@@ -6,7 +6,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct InputDocument {
-    pub version: u32,
     pub metadata: Metadata,
     pub fx_rates: HashMap<String, f64>,
     pub inflation: Inflation,
@@ -32,8 +31,8 @@ pub struct Metadata {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct HicpBase {
-    pub base_year: String,
-    pub base_month: String,
+    // pub base_year: String,
+    // pub base_month: String,
     pub base_hicp: f64,
 }
 
@@ -70,8 +69,8 @@ pub struct InputEntry {
     pub kind: String,
     pub currency: String,
     pub balance: f64,
-    #[serde(default)]
-    pub comment: String,
+    // #[serde(default)]
+    // pub comment: String,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -84,6 +83,7 @@ pub enum Category {
     Liabilities,
 }
 
+// How categories are mapped from input entry types
 impl Category {
     pub fn from_str(s: &str) -> Option<Self> {
         match s.trim().to_lowercase().as_str() {

@@ -1,11 +1,11 @@
-[package]
-name = "net-worth"
-version = "0.1.0"
-edition = "2024"
+# When the workspace is divided, there is no need of package and dependencies here
 
-[dependencies]
-anyhow = "1"
-chrono = { version = "0.4", features = ["serde"] }
-clap = { version = "4", features = ["derive"] }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+[workspace]
+members = [
+    "crates/cli",
+    "crates/data_normalization", 
+    "crates/data_pipeline",
+    "crates/logger"
+, "crates/models"]
+
+resolver = "3"

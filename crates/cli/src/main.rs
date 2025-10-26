@@ -3,8 +3,7 @@ use std::path::PathBuf;
 use anyhow::Result;
 use clap::Parser;
 
-mod models;
-mod pipeline;
+use data_pipeline;
 
 #[derive(Parser, Debug)]
 #[command(name = "net-worth")]
@@ -30,12 +29,12 @@ struct Cli {
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    let cfg = pipeline::Config {
+    let cfg = data_pipeline::Config {
         input_dir: cli.input,
         output_file: cli.output,
         latest_only: cli.latest_only,
         pretty: cli.pretty,
     };
 
-    pipeline::run(cfg)
+    data_pipeline::run(cfg)
 }
