@@ -4,31 +4,29 @@ use models::*;
 /// Computes inflation-adjusted values using HICP (Harmonized Index of Consumer Prices)
 pub fn compute_inflation_only(
     doc: &InputDocument,
+    settings: Option<&Settings>,
     b: &SnapshotBreakdown,
     _t: &SnapshotTotals,
     _warnings: &mut Vec<String>,
 ) -> Result<Option<SnapshotAdjustment>> {
     // Check if inflation adjustment is enabled
-    let flag = doc
-        .metadata
-        .adjust_to_inflation
-        .clone()
-        .unwrap_or_else(|| "no".to_string());
-    if flag.to_lowercase() != "yes" {
+    if !doc.is_inflation_enabled(settings) {
         return Ok(None);
     }
 
-    // Ensure required HICP data is available
-    let Some(hicp) = &doc.metadata.hicp else {
+    // Get HICP base value from document or settings
+    let Some(base_hicp) = doc.get_hicp_base(settings) else {
         return Ok(None);
     };
-    let Some(curr_hicp) = doc.inflation.current_hicp else {
+
+    // Get current HICP from document
+    let Some(curr_hicp) = doc.get_current_hicp() else {
         return Ok(None);
     };
 
     // Calculate deflator: ratio of base HICP to current HICP
     // Deflator < 1 when prices have risen (inflation)
-    let deflator = hicp.base_hicp / curr_hicp;
+    let deflator = base_hicp / curr_hicp;
 
     let scale = deflator;
 

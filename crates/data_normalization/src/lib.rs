@@ -8,6 +8,7 @@ use models::*;
 /// Returns (inflation_adjusted, new_york_normalized, real_purchasing_power)
 pub fn compute_adjustments(
     doc: &InputDocument,
+    settings: Option<&Settings>,
     breakdown: &SnapshotBreakdown,
     totals: &SnapshotTotals,
     warnings: &mut Vec<String>,
@@ -16,30 +17,19 @@ pub fn compute_adjustments(
     Option<SnapshotAdjustment>,
     Option<SnapshotAdjustment>,
 )> {
-    // Check what adjustments are enabled
-    let inflation_enabled = doc
-        .metadata
-        .adjust_to_inflation
-        .as_ref()
-        .map(|s| s.to_lowercase() == "yes")
-        .unwrap_or(false);
-
-    let ny_enabled = doc
-        .metadata
-        .normalize_to_new_york_ecli
-        .as_ref()
-        .map(|s| s.to_lowercase() == "yes")
-        .unwrap_or(false);
+    // Check what adjustments are enabled using document and settings
+    let inflation_enabled = doc.is_inflation_enabled(settings);
+    let ny_enabled = doc.is_ecli_enabled(settings);
 
     // Compute individual adjustments based on what's enabled
     let inflation_adjusted = if inflation_enabled {
-        hicp::compute_inflation_only(doc, breakdown, totals, warnings)?
+        hicp::compute_inflation_only(doc, settings, breakdown, totals, warnings)?
     } else {
         None
     };
 
     let new_york_normalized = if ny_enabled {
-        ecli::compute_new_york_only(doc, breakdown, totals, warnings)?
+        ecli::compute_new_york_only(doc, settings, breakdown, totals, warnings)?
     } else {
         None
     };

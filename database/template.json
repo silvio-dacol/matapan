@@ -1,38 +1,23 @@
 {
-  "version": 1,
-
   "metadata": {
-    "date": "2025-10-16",
-    "base_currency": "EUR",
-    "adjust_to_inflation": "yes",
-    "normalize_to_new_york_ecli": "no",
+    "version": 1,
+    "date": "2025-10-10",
 
-    "hicp": {
-      "base_year": "2024",
-      "base_month": "08",
-      "base_hicp": 126.72
+    "fx_rates": {
+      "EUR": 1.0,
+      "SEK": 0.090902,
+      "CNY": 0.11963
     },
 
-    "ecli_weight": {
-      "rent_index_weight": 0.4,
-      "groceries_index_weight": 0.35,
-      "cost_of_living_index_weight": 0.25
-    }
-  },
-
-  "fx_rates": {
-    "EUR": 11.32,
-    "USD": 10.94
-  },
-
-  "inflation": {
-    "ecli_basic": {
+    "ecli": {
+      "cost_of_living_index": 56.2,
       "rent_index": 20.8,
       "groceries_index": 56.1,
-      "cost_of_living_index": 56.2
+      "restaurant_price_index": 0,
+      "local_purchasing_power_index": 0
     },
 
-    "current_hicp": 120
+    "hicp": 120.43
   },
 
   "net_worth_entries": [
@@ -52,7 +37,7 @@
     },
     {
       "name": "Credit Card",
-      "type": "liabilities",
+      "type": "credit_card_debt",
       "currency": "SEK",
       "balance": 209.87,
       "comment": ""

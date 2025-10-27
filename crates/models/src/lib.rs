@@ -10,35 +10,148 @@ fn round_to_2_decimals(value: f64) -> f64 {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub struct InputDocument {
-    pub metadata: Metadata,
-    pub fx_rates: HashMap<String, f64>,
-    pub inflation: Inflation,
+pub struct Settings {
+    pub base_currency: String,
     #[serde(default)]
-    pub net_worth_entries: Vec<InputEntry>,
+    pub normalize_to_hicp: Option<String>,
+    #[serde(default)]
+    pub normalize_to_ecli: Option<String>,
+    #[serde(default)]
+    pub hicp: Option<HicpBase>,
+    #[serde(default)]
+    pub ecli: Option<EcliWeight>,
+    #[serde(default)]
+    pub categories: Option<CategoryConfig>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub struct Metadata {
-    pub date: String, // YYYY-MM-DD
-    pub base_currency: String,
-    #[serde(default)]
-    pub adjust_to_inflation: Option<String>,
-    #[serde(default)]
-    pub normalize_to_new_york_ecli: Option<String>,
-    #[serde(default)]
-    pub hicp: Option<HicpBase>,
-    #[serde(default)]
-    pub ecli_weight: Option<EcliWeight>,
+pub struct CategoryConfig {
+    pub assets: Vec<String>,
+    pub liabilities: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct HicpBase {
-    // pub base_year: String,
-    // pub base_month: String,
+    #[serde(default)]
+    pub base_year: Option<String>,
+    #[serde(default)]
+    pub base_month: Option<String>,
     pub base_hicp: f64,
+}
+
+impl HicpBase {
+    pub fn base_hicp(&self) -> f64 {
+        self.base_hicp
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct InputDocument {
+    pub metadata: Metadata,
+    #[serde(default)]
+    pub net_worth_entries: Vec<InputEntry>,
+}
+
+impl InputDocument {
+    /// Gets fx_rates from metadata
+    pub fn get_fx_rates(&self) -> HashMap<String, f64> {
+        self.metadata.fx_rates.clone().unwrap_or_default()
+    }
+
+    /// Gets base currency from metadata or settings default
+    pub fn get_base_currency(&self, settings: Option<&Settings>) -> String {
+        self.metadata
+            .base_currency
+            .clone()
+            .or_else(|| settings.map(|s| s.base_currency.clone()))
+            .unwrap_or_else(|| "EUR".to_string())
+    }
+
+    /// Checks if inflation adjustment is enabled
+    pub fn is_inflation_enabled(&self, settings: Option<&Settings>) -> bool {
+        self.metadata
+            .adjust_to_inflation
+            .as_ref()
+            .or_else(|| self.metadata.normalize_to_hicp.as_ref())
+            .or_else(|| settings.and_then(|s| s.normalize_to_hicp.as_ref()))
+            .map(|s| s.to_lowercase() == "yes")
+            .unwrap_or(false)
+    }
+
+    /// Checks if ECLI normalization is enabled
+    pub fn is_ecli_enabled(&self, settings: Option<&Settings>) -> bool {
+        self.metadata
+            .normalize_to_new_york_ecli
+            .as_ref()
+            .or_else(|| self.metadata.normalize_to_ecli.as_ref())
+            .or_else(|| settings.and_then(|s| s.normalize_to_ecli.as_ref()))
+            .map(|s| s.to_lowercase() == "yes")
+            .unwrap_or(false)
+    }
+
+    /// Gets HICP base value from metadata or settings
+    pub fn get_hicp_base(&self, settings: Option<&Settings>) -> Option<f64> {
+        self.metadata
+            .hicp
+            .or_else(|| settings.and_then(|s| s.hicp.as_ref().map(|h| h.base_hicp())))
+    }
+
+    /// Gets ECLI weights from settings, with fallback to defaults
+    pub fn get_ecli_weights(&self, settings: Option<&Settings>) -> Option<EcliWeight> {
+        settings
+            .and_then(|s| s.ecli.clone())
+            .or_else(|| {
+                // Provide default weights for 2024_08 format compatibility
+                if self.metadata.ecli.is_some() {
+                    Some(EcliWeight {
+                        rent_index_weight: 0.4,
+                        groceries_index_weight: 0.35,
+                        cost_of_living_index_weight: 0.25,
+                        restaurant_price_index_weight: 0.0,
+                        local_purchasing_power_index_weight: 0.0,
+                    })
+                } else {
+                    None
+                }
+            })
+    }
+
+    /// Gets current HICP from metadata
+    pub fn get_current_hicp(&self) -> Option<f64> {
+        self.metadata.hicp
+    }
+
+    /// Gets ECLI basic data from metadata
+    pub fn get_ecli_basic(&self) -> Option<EcliBasic> {
+        self.metadata.ecli.clone()
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct Metadata {
+    #[serde(default)]
+    pub version: Option<u32>,
+    pub date: String, // YYYY-MM-DD
+    #[serde(default)]
+    pub base_currency: Option<String>,
+    #[serde(default)]
+    pub adjust_to_inflation: Option<String>,
+    #[serde(default)]
+    pub normalize_to_new_york_ecli: Option<String>,
+    #[serde(default)]
+    pub normalize_to_hicp: Option<String>,
+    #[serde(default)]
+    pub normalize_to_ecli: Option<String>,
+    #[serde(default)]
+    pub hicp: Option<f64>,
+    #[serde(default)]
+    pub fx_rates: Option<HashMap<String, f64>>,
+    #[serde(default)]
+    pub ecli: Option<EcliBasic>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -47,15 +160,10 @@ pub struct EcliWeight {
     pub rent_index_weight: f64,
     pub groceries_index_weight: f64,
     pub cost_of_living_index_weight: f64,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub struct Inflation {
     #[serde(default)]
-    pub ecli_basic: Option<EcliBasic>,
+    pub restaurant_price_index_weight: f64,
     #[serde(default)]
-    pub current_hicp: Option<f64>,
+    pub local_purchasing_power_index_weight: f64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -74,8 +182,8 @@ pub struct InputEntry {
     pub kind: String,
     pub currency: String,
     pub balance: f64,
-    // #[serde(default)]
-    // pub comment: String,
+    #[serde(default)]
+    pub comment: String,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -96,7 +204,7 @@ impl Category {
             "investments" => Some(Category::Investments),
             "personal" => Some(Category::Personal),
             "pension" | "retirement" => Some(Category::Pension),
-            "liabilities" | "debt" => Some(Category::Liabilities),
+            "liabilities" | "debt" | "credit_card_debt" => Some(Category::Liabilities),
             _ => None,
         }
     }

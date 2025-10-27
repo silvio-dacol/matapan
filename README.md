@@ -8,38 +8,144 @@ Just replicate what you have already done on the Excel dashboard but make it a l
 
 ## Backend CLI
 
-This repo includes a small Rust CLI that reads monthly JSON snapshots from `input/` (all `*.json` files except `template.json`), aggregates them, and writes an `output/dashboard.json` with per‑category totals and net‑worth over time.
+This repo includes a small Rust CLI that reads monthly JSON snapshots from `database/` (all `*.json` files except `template.json`), aggregates them, and writes an `output/dashboard.json` with per‑category totals and net‑worth over time.
+
+The CLI now supports a global `settings.json` configuration file that provides default values for normalization settings, base currency, and category mappings.
 
 ### Run
 
 - Build: `cargo build`
 - Execute (defaults shown):
   - `cargo run -- --input database --output output/dashboard.json --pretty --latest-only`
+  - `cargo run -- --input database --output output/dashboard.json --settings settings.json --pretty`
   - Omit `--latest-only` to aggregate the full time‑series.
+  - Use `--settings` to specify a configuration file with default values.
+
+### Configuration
+
+The CLI supports an optional `settings.json` file that provides global defaults and configuration:
+
+```json
+{
+  "base_currency": "EUR",
+  "normalize_to_hicp": "yes",
+  "normalize_to_ecli": "yes",
+  "hicp": {
+    "base_year": "2024",
+    "base_month": "08",
+    "base_hicp": 126.72
+  },
+  "ecli": {
+    "cost_of_living_index_weight": 0.25,
+    "rent_index_weight": 0.4,
+    "groceries_index_weight": 0.35,
+    "restaurant_price_index_weight": 0.0,
+    "local_purchasing_power_index_weight": 0.0
+  },
+  "categories": {
+    "assets": ["liquidity", "investments", "personal", "retirement"],
+    "liabilities": ["loans", "credit_card_debt"]
+  }
+}
+```
+
+These settings provide defaults that can be overridden by individual snapshot files.
+
+### CLI Options
+
+```
+USAGE:
+    cargo run -- [OPTIONS]
+
+OPTIONS:
+    -i, --input <PATH>       Input folder containing JSON snapshots [default: input]
+    -o, --output <PATH>      Output file for aggregated dashboard JSON [default: output/dashboard.json]
+    -s, --settings <PATH>    Settings file for default configuration [optional]
+        --latest-only        Only process the latest dated file
+        --pretty             Pretty print JSON output [default: true]
+    -h, --help              Print help information
+```
+
+**Examples:**
+
+```bash
+# Process all files with settings
+cargo run -- --input database --output output/dashboard.json --settings settings.json --pretty
+
+# Process only latest file without settings
+cargo run -- --input database --output output/latest.json --latest-only
+
+# Process all files, compact output
+cargo run -- --input database --output output/compact.json --no-pretty
+```
 
 ### Input format
 
-Use `input/template.json` as a guide. Each snapshot file should contain:
+Use `database/template.json` as a guide. Each snapshot file should contain:
+
+**Required fields:**
 
 - `metadata.date` in `YYYY-MM-DD`
-- `metadata.base_currency` (e.g., `EUR`)
-- `fx_rates` as a map: `CURRENCY -> units of base currency per 1 unit of CURRENCY` (with base `EUR`, example: `"SEK": 0.0875`). If an entry’s currency equals the base, the rate is `1.0`.
-- `net_worth_entries[]` with `name`, `type` (`liquidity|investments|personal|pension|liabilities`), `currency`, and `balance`.
-- Optional normalization fields to compute “real” money (inflation + cost‑of‑living):
-  - `metadata.normalize: "yes"`
-  - `metadata.hicp` with `base_year`, `base_month`, `base_hicp`
-  - `metadata.ECLI_weight` and `inflation.ECLI_basic`
-  - `inflation.current_hicp`
+- `net_worth_entries[]` with `name`, `type` (`liquidity|investments|personal|pension|liabilities`), `currency`, and `balance`
+
+**Optional fields (can use defaults from settings.json):**
+
+- `metadata.base_currency` (e.g., `EUR`) - defaults from settings
+- `fx_rates` as a map: `CURRENCY -> units of base currency per 1 unit of CURRENCY` (with base `EUR`, example: `"SEK": 0.0875`). If an entry's currency equals the base, the rate is `1.0`.
+- Normalization flags: `metadata.adjust_to_inflation` and `metadata.normalize_to_new_york_ecli` (both `"yes"|"no"`)
+- `metadata.hicp` with `base_year`, `base_month`, `base_hicp` - can use settings defaults
+- `metadata.ecli_weight` with weight configurations - can use settings defaults
+- `inflation.ecli_basic` with current city indices
+- `inflation.current_hicp` for the snapshot date
+
+**File structure (new format):**
+
+```json
+{
+  "version": 1,
+  "metadata": {
+    "date": "2024-10-10",
+    "base_currency": "EUR",
+    "adjust_to_inflation": "yes",
+    "normalize_to_new_york_ecli": "yes",
+    "hicp": {
+      "base_year": "2024",
+      "base_month": "08",
+      "base_hicp": 126.72
+    },
+    "ecli_weight": {
+      "rent_index_weight": 0.4,
+      "groceries_index_weight": 0.35,
+      "cost_of_living_index_weight": 0.25
+    }
+  },
+  "fx_rates": {
+    "EUR": 1.0,
+    "SEK": 0.087188
+  },
+  "inflation": {
+    "ecli_basic": {
+      "rent_index": 7.7,
+      "groceries_index": 35.7,
+      "cost_of_living_index": 31.8
+    },
+    "current_hicp": 126.72
+  },
+  "net_worth_entries": [...]
+}
+```
+
+**Backward compatibility:** The CLI also supports the legacy format where `fx_rates`, `ecli`, and `hicp` were nested inside `metadata`.
 
 ### Output
 
-The CLI writes `output/dashboard.json` containing per-date snapshots. Each snapshot now provides up to **three distinct adjustment views** in addition to the raw nominal figures:
+The CLI writes `output/dashboard.json` containing per-date snapshots. Each snapshot includes the original nominal values plus up to **three distinct adjustment views** based on configuration:
 
-1. `inflation_adjusted` – HICP deflation only (removes general inflation over time).
-2. `new_york_normalized` – Cost-of-living normalization only (expresses how much New York purchasing power the money represents).
-3. `real_purchasing_power` – Combined: `Money × Deflator / ECLI_norm` (inflation deflated AND geographically normalized).
+1. `inflation_adjusted` – HICP deflation only (removes general inflation over time)
+2. `new_york_normalized` – Cost-of-living normalization only (shows New York purchasing power equivalent)
+3. `real_purchasing_power` – Combined: `Money × Deflator / ECLI_norm` (inflation deflated AND geographically normalized)
 
-Only the views whose required data & flags are present are included. Example (all three present):
+Only the views whose required data & flags are present (either in files or settings) are included. The adjustments use the settings as defaults when data is missing from individual files. Example (all three present):
 
 ```
 {
@@ -78,6 +184,8 @@ This file can be consumed directly by a frontend dashboard for charts (nominal v
 ## Real Money Normalization Model
 
 Goal: Convert nominal money into **real purchasing power**, adjusted for **inflation over time** and **cost of living across cities/countries**.
+
+The system supports flexible configuration through `settings.json` which provides defaults for normalization parameters. Individual snapshot files can override these settings as needed.
 
 ### Base Assumptions
 
@@ -147,6 +255,8 @@ Where:
 - Works globally, even if you move country
 - Keeps money comparable over time
 - Useful for salary, savings, FIRE tracking, geo-arbitrage analysis
+- Configuration through `settings.json` allows consistent normalization across all snapshots
+- Individual files can override settings for specific periods or locations
 
 ### Example (Gothenburg → Shanghai)
 

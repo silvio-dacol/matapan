@@ -17,6 +17,10 @@ struct Cli {
     #[arg(short, long, default_value = "output/dashboard.json")]
     output: PathBuf,
 
+    /// Settings file for default configuration
+    #[arg(short, long)]
+    settings: Option<PathBuf>,
+
     /// Only process the latest dated file
     #[arg(long, default_value_t = false)]
     latest_only: bool,
@@ -32,6 +36,7 @@ fn main() -> Result<()> {
     let cfg = data_pipeline::Config {
         input_dir: cli.input,
         output_file: cli.output,
+        settings_file: cli.settings,
         latest_only: cli.latest_only,
         pretty: cli.pretty,
     };

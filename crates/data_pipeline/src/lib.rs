@@ -11,12 +11,20 @@ use models::*;
 pub struct Config {
     pub input_dir: PathBuf,
     pub output_file: PathBuf,
+    pub settings_file: Option<PathBuf>,
     pub latest_only: bool,
     pub pretty: bool,
 }
 
 /// Main pipeline function that processes net worth documents and generates dashboard output
 pub fn run(cfg: Config) -> Result<()> {
+    // Load settings if provided
+    let settings = if let Some(settings_path) = &cfg.settings_file {
+        Some(load_settings(settings_path)?)
+    } else {
+        None
+    };
+
     // Load all JSON documents from the input directory
     let mut docs = load_documents(&cfg.input_dir)?;
 
@@ -29,10 +37,10 @@ pub fn run(cfg: Config) -> Result<()> {
     // Handle the case where only the latest snapshot is requested
     if cfg.latest_only {
         if let Some(last) = docs.pop() {
-            let snap = to_snapshot(&last)?;
+            let snap = to_snapshot(&last, settings.as_ref())?;
             let dashboard = Dashboard {
                 generated_at: Utc::now().to_rfc3339(),
-                base_currency: last.metadata.base_currency.clone(),
+                base_currency: last.get_base_currency(settings.as_ref()),
                 snapshots: vec![snap.clone()],
                 latest: Some(snap),
             };
@@ -50,15 +58,16 @@ pub fn run(cfg: Config) -> Result<()> {
     // Process all documents into snapshots
     let mut snapshots = Vec::new();
     for doc in docs.iter() {
-        let snap = to_snapshot(doc)?;
+        let snap = to_snapshot(doc, settings.as_ref())?;
         snapshots.push(snap);
     }
 
-    // Determine the base currency from the latest snapshot, defaulting to EUR
+    // Determine the base currency from the latest snapshot, defaulting to settings or EUR
     let latest = snapshots.last().cloned();
     let base_currency = latest
         .as_ref()
         .map(|s| s.base_currency.clone())
+        .or_else(|| settings.as_ref().map(|s| s.base_currency.clone()))
         .unwrap_or_else(|| "EUR".to_string());
 
     // Create the final dashboard and write to output
@@ -94,6 +103,15 @@ fn write_dashboard(path: &PathBuf, dashboard: &Dashboard, pretty: bool) -> Resul
     // Write JSON to file
     fs::write(path, json).with_context(|| format!("Writing output file: {}", path.display()))?;
     Ok(())
+}
+
+/// Loads settings from a JSON file
+fn load_settings(path: &PathBuf) -> Result<Settings> {
+    let raw = fs::read_to_string(path)
+        .with_context(|| format!("Reading settings file: {}", path.display()))?;
+    let settings: Settings = serde_json::from_str(&raw)
+        .with_context(|| format!("Parsing settings JSON in {}", path.display()))?;
+    Ok(settings)
 }
 
 /// Loads and parses all JSON documents from the specified directory
@@ -147,12 +165,15 @@ fn parse_date(s: &str) -> Result<NaiveDate> {
 }
 
 /// Converts an input document into a snapshot with calculated totals and adjustments
-fn to_snapshot(doc: &InputDocument) -> Result<Snapshot> {
+fn to_snapshot(doc: &InputDocument, settings: Option<&Settings>) -> Result<Snapshot> {
     let date = parse_date(&doc.metadata.date)?;
-    let base_currency = doc.metadata.base_currency.clone();
+    let base_currency = doc.get_base_currency(settings);
 
     let mut breakdown = SnapshotBreakdown::default();
     let mut warnings: Vec<String> = Vec::new();
+
+    // Get fx_rates from document (handles both old and new formats)
+    let fx_rates = doc.get_fx_rates();
 
     // Process each net worth entry and categorize by type
     for e in &doc.net_worth_entries {
@@ -166,7 +187,7 @@ fn to_snapshot(doc: &InputDocument) -> Result<Snapshot> {
         };
 
         // Convert currency to base currency using exchange rates
-        let rate = fx_to_base(&e.currency, &base_currency, &doc.fx_rates);
+        let rate = fx_to_base(&e.currency, &base_currency, &fx_rates);
         if rate.is_none() && e.currency.to_uppercase() != base_currency.to_uppercase() {
             warnings.push(format!(
                 "Missing FX rate {}->{} for entry '{}' — assuming 1.0",
@@ -197,7 +218,7 @@ fn to_snapshot(doc: &InputDocument) -> Result<Snapshot> {
 
     // Calculate various adjustments (inflation, cost-of-living, etc.)
     let (inflation_adjusted, new_york_normalized, real_purchasing_power) =
-        compute_adjustments(doc, &breakdown, &totals, &mut warnings)?;
+        compute_adjustments(doc, settings, &breakdown, &totals, &mut warnings)?;
 
     Ok(Snapshot {
         date,

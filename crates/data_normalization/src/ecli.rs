@@ -4,25 +4,23 @@ use models::*;
 /// Computes cost-of-living normalized values relative to New York using ECLI indices
 pub fn compute_new_york_only(
     doc: &InputDocument,
+    settings: Option<&Settings>,
     b: &SnapshotBreakdown,
     _t: &SnapshotTotals,
     warnings: &mut Vec<String>,
 ) -> Result<Option<SnapshotAdjustment>> {
     // Check if New York cost-of-living normalization is enabled
-    let flag = doc
-        .metadata
-        .normalize_to_new_york_ecli
-        .clone()
-        .unwrap_or_else(|| "no".to_string());
-    if flag.to_lowercase() != "yes" {
+    if !doc.is_ecli_enabled(settings) {
         return Ok(None);
     }
 
-    // Ensure required ECLI data is available
-    let Some(ecli_basic) = &doc.inflation.ecli_basic else {
+    // Get ECLI basic data from document (handles both old and new formats)
+    let Some(ecli_basic) = doc.get_ecli_basic() else {
         return Ok(None);
     };
-    let Some(weights) = &doc.metadata.ecli_weight else {
+
+    // Get ECLI weights from document or settings
+    let Some(weights) = doc.get_ecli_weights(settings) else {
         return Ok(None);
     };
 

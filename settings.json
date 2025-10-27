@@ -1,0 +1,24 @@
+{
+  "base_currency": "EUR",
+  "normalize_to_hicp": "yes",
+  "normalize_to_ecli": "yes",
+
+  "hicp": {
+    "base_year": "2024",
+    "base_month": "08",
+    "base_hicp": 126.72
+  },
+
+  "ecli": {
+    "cost_of_living_index_weight": 0.25,
+    "rent_index_weight": 0.4,
+    "groceries_index_weight": 0.35,
+    "restaurant_price_index_weight": 0.0,
+    "local_purchasing_power_index_weight": 0.0
+  },
+
+  "categories": {
+    "assets": ["liquidity", "investments", "personal", "retirement"],
+    "liabilities": ["loans", "credit_card_debt"]
+  }
+}
