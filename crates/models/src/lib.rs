@@ -101,22 +101,20 @@ impl InputDocument {
 
     /// Gets ECLI weights from settings, with fallback to defaults
     pub fn get_ecli_weights(&self, settings: Option<&Settings>) -> Option<EcliWeight> {
-        settings
-            .and_then(|s| s.ecli.clone())
-            .or_else(|| {
-                // Provide default weights for 2024_08 format compatibility
-                if self.metadata.ecli.is_some() {
-                    Some(EcliWeight {
-                        rent_index_weight: 0.4,
-                        groceries_index_weight: 0.35,
-                        cost_of_living_index_weight: 0.25,
-                        restaurant_price_index_weight: 0.0,
-                        local_purchasing_power_index_weight: 0.0,
-                    })
-                } else {
-                    None
-                }
-            })
+        settings.and_then(|s| s.ecli.clone()).or_else(|| {
+            // Provide default weights for 2024_08 format compatibility
+            if self.metadata.ecli.is_some() {
+                Some(EcliWeight {
+                    rent_index_weight: 0.4,
+                    groceries_index_weight: 0.35,
+                    cost_of_living_index_weight: 0.25,
+                    restaurant_price_index_weight: 0.0,
+                    local_purchasing_power_index_weight: 0.0,
+                })
+            } else {
+                None
+            }
+        })
     }
 
     /// Gets current HICP from metadata
