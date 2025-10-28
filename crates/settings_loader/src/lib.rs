@@ -70,7 +70,7 @@ pub fn load_settings_with_fallback(path: Option<&PathBuf>) -> Result<Option<Sett
             }
         }
     }
-    
+
     // Try default location
     match load_default_settings() {
         Ok(settings) => Ok(Some(settings)),
