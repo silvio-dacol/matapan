@@ -190,6 +190,7 @@ dependencies = [
  "data_normalization",
  "models",
  "serde_json",
+ "settings_loader",
 ]
 
 [[package]]
@@ -372,6 +373,16 @@ dependencies = [
  "ryu",
  "serde",
  "serde_core",
+]
+
+[[package]]
+name = "settings_loader"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "models",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

@@ -7,6 +7,7 @@ use serde_json::Value;
 
 use data_normalization::compute_adjustments;
 use models::*;
+use settings_loader;
 
 pub struct Config {
     pub input_dir: PathBuf,
@@ -19,11 +20,7 @@ pub struct Config {
 /// Main pipeline function that processes net worth documents and generates dashboard output
 pub fn run(cfg: Config) -> Result<()> {
     // Load settings if provided
-    let settings = if let Some(settings_path) = &cfg.settings_file {
-        Some(load_settings(settings_path)?)
-    } else {
-        None
-    };
+    let settings = settings_loader::load_optional_settings(cfg.settings_file.as_ref())?;
 
     // Load all JSON documents from the input directory
     let mut docs = load_documents(&cfg.input_dir)?;
@@ -103,15 +100,6 @@ fn write_dashboard(path: &PathBuf, dashboard: &Dashboard, pretty: bool) -> Resul
     // Write JSON to file
     fs::write(path, json).with_context(|| format!("Writing output file: {}", path.display()))?;
     Ok(())
-}
-
-/// Loads settings from a JSON file
-fn load_settings(path: &PathBuf) -> Result<Settings> {
-    let raw = fs::read_to_string(path)
-        .with_context(|| format!("Reading settings file: {}", path.display()))?;
-    let settings: Settings = serde_json::from_str(&raw)
-        .with_context(|| format!("Parsing settings JSON in {}", path.display()))?;
-    Ok(settings)
 }
 
 /// Loads and parses all JSON documents from the specified directory

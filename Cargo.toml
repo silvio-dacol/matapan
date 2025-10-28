@@ -6,6 +6,6 @@ members = [
     "crates/data_normalization", 
     "crates/data_pipeline",
     "crates/logger"
-, "crates/models"]
+, "crates/models", "crates/settings_loader"]
 
 resolver = "3"
