@@ -53,6 +53,8 @@ pub fn compute_inflation_only(
         scale,
         deflator: Some(deflator),
         ecli_norm: None,
+        ny_advantage_pct: None,
+        badge: None,
         normalization_applied: None,
         notes: Some("Inflation-only deflation using HICP".to_string()),
     }))

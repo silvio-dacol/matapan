@@ -8,6 +8,11 @@ fn round_to_2_decimals(value: f64) -> f64 {
     (value * 100.0).round() / 100.0
 }
 
+/// Utility function to round a float to 1 decimal place
+fn round_to_1_decimal(value: f64) -> f64 {
+    (value * 10.0).round() / 10.0
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct Settings {
@@ -301,6 +306,12 @@ pub struct SnapshotAdjustment {
     pub deflator: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ecli_norm: Option<f64>,
+    /// Percentage advantage vs New York (positive means cheaper than NY). Example: +10.5 means 10.5% more purchasing power.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ny_advantage_pct: Option<f64>,
+    /// Compact human phrase / badge: "Relative to New York: +10.5% purchasing power"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub badge: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub normalization_applied: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -316,6 +327,8 @@ impl SnapshotAdjustment {
             scale: round_to_2_decimals(self.scale),
             deflator: self.deflator.map(round_to_2_decimals),
             ecli_norm: self.ecli_norm.map(round_to_2_decimals),
+            ny_advantage_pct: self.ny_advantage_pct.map(round_to_1_decimal),
+            badge: self.badge.clone(),
             normalization_applied: self.normalization_applied,
             notes: self.notes.clone(),
         }

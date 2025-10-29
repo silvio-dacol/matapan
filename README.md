@@ -16,8 +16,8 @@ The CLI now supports a global `settings.json` configuration file that provides d
 
 - Build: `cargo build`
 - Execute (defaults shown):
-  - `cargo run -- --input database --output output/dashboard.json --pretty --latest-only`
-  - `cargo run -- --input database --output output/dashboard.json --settings settings.json --pretty`
+  - `cargo run -- --input database --output dashboard.json --pretty --latest-only`
+  - `cargo run -- --input database --output dashboard.json --settings settings.json --pretty`
   - Omit `--latest-only` to aggregate the full time‑series.
   - Use `--settings` to specify a configuration file with default values.
 
@@ -142,7 +142,7 @@ Use `database/template.json` as a guide. Each snapshot file should contain:
 The CLI writes `output/dashboard.json` containing per-date snapshots. Each snapshot includes the original nominal values plus up to **three distinct adjustment views** based on configuration:
 
 1. `inflation_adjusted` – HICP deflation only (removes general inflation over time)
-2. `new_york_normalized` – Cost-of-living normalization only (shows New York purchasing power equivalent)
+2. `new_york_normalized` – New York Purchasing Power Equivalent (cost-of-living normalization only)
 3. `real_purchasing_power` – Combined: `Money × Deflator / ECLI_norm` (inflation deflated AND geographically normalized)
 
 Only the views whose required data & flags are present (either in files or settings) are included. The adjustments use the settings as defaults when data is missing from individual files. Example (all three present):
@@ -161,8 +161,10 @@ Only the views whose required data & flags are present (either in files or setti
     "notes": "Inflation-only deflation using HICP"
   },
   "new_york_normalized": {
-    "scale": 2.008,               // 1 / ECLI_norm
-    "ecli_norm": 0.498,
+    "scale": 2.008,               // 1 / ECLI_norm  (NY Equivalent multiplier)
+    "ecli_norm": 0.498,           // Local essential cost-of-living index / 100
+    "ny_advantage_pct": 100.8,    // (scale - 1)*100 ; >0 means cheaper than NY
+    "badge": "Relative to New York: +100.8% purchasing power",
     "breakdown": { "cash": 241000.0, ... },
     "totals": { "assets": 420,000.0, ... },
     "notes": "Cost-of-living normalization to New York"
@@ -232,10 +234,12 @@ Let `Money_EUR(t)` be the nominal amount converted to the base currency.
 InflationAdjusted(t) = Money_EUR(t) × Deflator(t)
 ```
 
-2. New York cost-of-living normalization only:
+2. New York purchasing power equivalent (cost-of-living only):
 
 ```
-NYNormalized(t) = Money_EUR(t) / ECLI_norm(city)
+NYEquivalent(t) = Money_EUR(t) / ECLI_norm(city)
+ny_advantage_pct = (1 / ECLI_norm(city) - 1) * 100
+badge: "Relative to New York: ±X.Y% purchasing power"
 ```
 
 3. Combined real purchasing power:
@@ -272,10 +276,12 @@ Inflation-only (Gothenburg):
 InflationAdjusted = 2920 × 0.966 = 2822 EUR
 ```
 
-NY normalization only (Gothenburg):
+NY equivalent (Gothenburg):
 
 ```
-NYNormalized = 2920 / 0.498 = 5863 EUR
+NYEquivalent = 2920 / 0.498 = 5863 EUR
+ny_advantage_pct = (1/0.498 - 1)*100 ≈ +100.8%
+badge: Relative to New York: +100.8% purchasing power
 ```
 
 Combined real purchasing power (Gothenburg):

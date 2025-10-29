@@ -47,6 +47,13 @@ pub fn compute_new_york_only(
     // Scale factor adjusts values to New York reference (higher ECLI = more expensive)
     let scale = 1.0 / ecli_norm;
 
+    // Advantage percentage vs New York: (scale - 1) * 100
+    let ny_advantage_pct = (scale - 1.0) * 100.0;
+    let badge = format!(
+        "Relative to New York: {:+.1}% purchasing power",
+        ny_advantage_pct
+    );
+
     // Apply cost-of-living adjustment to all categories
     let nb = SnapshotBreakdown {
         cash: b.cash * scale,
@@ -70,6 +77,8 @@ pub fn compute_new_york_only(
         scale,
         deflator: None,
         ecli_norm: Some(ecli_norm),
+        ny_advantage_pct: Some(ny_advantage_pct),
+        badge: Some(badge),
         normalization_applied: Some(true),
         notes: Some("Cost-of-living normalization to New York".to_string()),
     }))

@@ -9,8 +9,8 @@ use models::*;
 pub fn compute_adjustments(
     doc: &InputDocument,
     settings: Option<&Settings>,
-    breakdown: &SnapshotBreakdown,
     totals: &SnapshotTotals,
+    breakdown: &SnapshotBreakdown,
     warnings: &mut Vec<String>,
 ) -> Result<(
     Option<SnapshotAdjustment>,
@@ -95,6 +95,11 @@ fn compute_combined_adjustment(
         scale,
         deflator: Some(deflator),
         ecli_norm: Some(ecli_norm),
+        ny_advantage_pct: Some((1.0 / ecli_norm - 1.0) * 100.0),
+        badge: Some(format!(
+            "Relative to New York: {:+.1}% purchasing power (inflation-adjusted)",
+            (1.0 / ecli_norm - 1.0) * 100.0
+        )),
         normalization_applied: Some(true),
         notes: Some(
             "Combined inflation deflation and New York cost-of-living normalization".to_string(),
