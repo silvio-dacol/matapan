@@ -206,7 +206,7 @@ fn to_snapshot(doc: &InputDocument, settings: Option<&Settings>) -> Result<Snaps
 
     // Calculate various adjustments (inflation, cost-of-living, etc.)
     let (inflation_adjusted, new_york_normalized, real_purchasing_power) =
-        compute_adjustments(doc, settings, &breakdown, &totals, &mut warnings)?;
+        compute_adjustments(doc, settings, &totals, &breakdown, &mut warnings)?;
 
     Ok(Snapshot {
         date,
