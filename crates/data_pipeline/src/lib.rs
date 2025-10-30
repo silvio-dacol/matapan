@@ -126,7 +126,10 @@ fn load_documents(dir: &PathBuf) -> Result<Vec<InputDocument>> {
         // Skip template.json and dashboard.json files, and hidden files
         if let Some(filename) = path.file_name().and_then(|s| s.to_str()) {
             let name_lower = filename.to_ascii_lowercase();
-            if name_lower == "template.json" || name_lower == "dashboard.json" || filename.starts_with('.') {
+            if name_lower == "template.json"
+                || name_lower == "dashboard.json"
+                || filename.starts_with('.')
+            {
                 continue;
             }
         }
@@ -202,7 +205,7 @@ fn to_snapshot(doc: &InputDocument, settings: Option<&Settings>) -> Result<Snaps
     };
 
     // Calculate various adjustments (inflation, cost-of-living, etc.)
-    let (inflation_adjusted, new_york_normalized, real_purchasing_power) =
+    let (inflation_adjusted, real_purchasing_power) =
         compute_adjustments(doc, settings, &totals, &breakdown, &mut warnings)?;
 
     Ok(Snapshot {
@@ -211,7 +214,6 @@ fn to_snapshot(doc: &InputDocument, settings: Option<&Settings>) -> Result<Snaps
         breakdown,
         totals,
         inflation_adjusted,
-        new_york_normalized,
         real_purchasing_power,
         warnings,
     })
@@ -230,7 +232,8 @@ fn fx_to_base(
 
     // Look up exchange rate (1 unit of 'currency' equals 'rate' units of base currency)
     // Try exact match first, then uppercase
-    rates.get(currency)
+    rates
+        .get(currency)
         .or_else(|| rates.get(&currency.to_uppercase()))
         .copied()
 }

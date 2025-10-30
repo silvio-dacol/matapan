@@ -1,7 +1,6 @@
 {
   "base_currency": "EUR",
-  "normalize_to_hicp": "yes",
-  "normalize_to_ecli": "yes",
+  "normalize": "yes",
 
   "hicp": {
     "base_year": "2024",

@@ -20,6 +20,9 @@ fn round_to_1_decimal(value: f64) -> f64 {
 pub struct Settings {
     pub base_currency: String,
     #[serde(default)]
+    pub normalize: Option<String>,
+    // Legacy fields kept for backward compatibility
+    #[serde(default)]
     pub normalize_to_hicp: Option<String>,
     #[serde(default)]
     pub normalize_to_ecli: Option<String>,
@@ -80,6 +83,16 @@ impl InputDocument {
     /// Checks if inflation adjustment is enabled
     pub fn is_inflation_enabled(&self, settings: Option<&Settings>) -> bool {
         let check = |s: &String| s.eq_ignore_ascii_case("yes");
+        // Check new unified 'normalize' field first
+        if let Some(settings) = settings {
+            if settings.normalize.as_ref().map_or(false, check) {
+                return true;
+            }
+        }
+        if self.metadata.normalize.as_ref().map_or(false, check) {
+            return true;
+        }
+        // Fallback to legacy fields for backward compatibility
         self.metadata
             .adjust_to_inflation
             .as_ref()
@@ -97,6 +110,16 @@ impl InputDocument {
     /// Checks if ECLI normalization is enabled
     pub fn is_ecli_enabled(&self, settings: Option<&Settings>) -> bool {
         let check = |s: &String| s.eq_ignore_ascii_case("yes");
+        // Check new unified 'normalize' field first
+        if let Some(settings) = settings {
+            if settings.normalize.as_ref().map_or(false, check) {
+                return true;
+            }
+        }
+        if self.metadata.normalize.as_ref().map_or(false, check) {
+            return true;
+        }
+        // Fallback to legacy fields for backward compatibility
         self.metadata
             .normalize_to_new_york_ecli
             .as_ref()
@@ -157,6 +180,9 @@ pub struct Metadata {
     pub date: String, // YYYY-MM-DD
     #[serde(default)]
     pub base_currency: Option<String>,
+    #[serde(default)]
+    pub normalize: Option<String>,
+    // Legacy fields kept for backward compatibility
     #[serde(default)]
     pub adjust_to_inflation: Option<String>,
     #[serde(default)]
@@ -303,8 +329,6 @@ pub struct Snapshot {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub inflation_adjusted: Option<SnapshotAdjustment>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub new_york_normalized: Option<SnapshotAdjustment>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub real_purchasing_power: Option<SnapshotAdjustment>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub warnings: Vec<String>,
@@ -319,7 +343,6 @@ impl Snapshot {
             breakdown: self.breakdown.rounded(),
             totals: self.totals.rounded(),
             inflation_adjusted: self.inflation_adjusted.as_ref().map(|adj| adj.rounded()),
-            new_york_normalized: self.new_york_normalized.as_ref().map(|adj| adj.rounded()),
             real_purchasing_power: self.real_purchasing_power.as_ref().map(|adj| adj.rounded()),
             warnings: self.warnings.clone(),
         }

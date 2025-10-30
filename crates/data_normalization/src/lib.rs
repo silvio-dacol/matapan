@@ -5,18 +5,14 @@ use anyhow::Result;
 use models::*;
 
 /// Computes the appropriate normalization adjustments based on document settings
-/// Returns (inflation_adjusted, new_york_normalized, real_purchasing_power)
+/// Returns (inflation_adjusted, real_purchasing_power)
 pub fn compute_adjustments(
     doc: &InputDocument,
     settings: Option<&Settings>,
     totals: &SnapshotTotals,
     breakdown: &SnapshotBreakdown,
     warnings: &mut Vec<String>,
-) -> Result<(
-    Option<SnapshotAdjustment>,
-    Option<SnapshotAdjustment>,
-    Option<SnapshotAdjustment>,
-)> {
+) -> Result<(Option<SnapshotAdjustment>, Option<SnapshotAdjustment>)> {
     // Check what adjustments are enabled using document and settings
     let inflation_enabled = doc.is_inflation_enabled(settings);
     let ny_enabled = doc.is_ecli_enabled(settings);
@@ -28,15 +24,11 @@ pub fn compute_adjustments(
         None
     };
 
-    let new_york_normalized = if ny_enabled {
-        ecli::compute_new_york_only(doc, settings, breakdown, totals, warnings)?
-    } else {
-        None
-    };
-
     // Compute real purchasing power only if BOTH are enabled and successful
     let real_purchasing_power = if inflation_enabled && ny_enabled {
-        match (&inflation_adjusted, &new_york_normalized) {
+        // We need to compute NY data for the combined adjustment
+        let ny_temp = ecli::compute_new_york_only(doc, settings, breakdown, totals, warnings)?;
+        match (&inflation_adjusted, &ny_temp) {
             (Some(infl), Some(ny)) => compute_combined_adjustment(breakdown, infl, ny, warnings)?,
             _ => None,
         }
@@ -44,11 +36,7 @@ pub fn compute_adjustments(
         None
     };
 
-    Ok((
-        inflation_adjusted,
-        new_york_normalized,
-        real_purchasing_power,
-    ))
+    Ok((inflation_adjusted, real_purchasing_power))
 }
 
 /// Helper function to combine inflation and NY adjustments
