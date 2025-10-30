@@ -58,7 +58,8 @@ fn compute_combined_adjustment(
     ny_adj: &SnapshotAdjustment,
     warnings: &mut Vec<String>,
 ) -> Result<Option<SnapshotAdjustment>> {
-    let deflator = inflation_adj.deflator.unwrap_or(1.0);
+    // Extract deflator and ecli_norm, using scale as fallback
+    let deflator = inflation_adj.deflator.unwrap_or(inflation_adj.scale);
     let ecli_norm = ny_adj.ecli_norm.unwrap_or(1.0);
 
     // Combined scale: inflation deflation divided by cost-of-living normalization

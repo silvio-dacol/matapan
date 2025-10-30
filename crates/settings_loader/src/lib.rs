@@ -52,38 +52,5 @@ pub fn load_default_settings() -> Result<Settings> {
 
 /// Loads settings from an optional path, returning None if no path is provided
 pub fn load_optional_settings(path: Option<&PathBuf>) -> Result<Option<Settings>> {
-    match path {
-        Some(settings_path) => Ok(Some(load_settings(settings_path)?)),
-        None => Ok(None),
-    }
-}
-
-/// Tries to load settings from the provided path, falling back to default location if the path is None
-/// or if the file doesn't exist. Returns None only if no settings file is found anywhere.
-pub fn load_settings_with_fallback(path: Option<&PathBuf>) -> Result<Option<Settings>> {
-    // First try the provided path
-    if let Some(settings_path) = path {
-        match load_settings(settings_path) {
-            Ok(settings) => return Ok(Some(settings)),
-            Err(_) => {
-                // If the provided path fails, fall back to checking default location
-            }
-        }
-    }
-
-    // Try default location
-    match load_default_settings() {
-        Ok(settings) => Ok(Some(settings)),
-        Err(_) => Ok(None), // No settings file found, return None
-    }
-}
-
-/// Checks if a settings file exists at the given path
-pub fn settings_file_exists<P: AsRef<Path>>(path: P) -> bool {
-    path.as_ref().exists() && path.as_ref().is_file()
-}
-
-/// Checks if the default settings file (settings.json) exists
-pub fn default_settings_exist() -> bool {
-    settings_file_exists("settings.json")
+    path.map(load_settings).transpose()
 }

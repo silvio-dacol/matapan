@@ -3,7 +3,6 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result, anyhow};
 use chrono::{NaiveDate, Utc};
-use serde_json::Value;
 
 use data_normalization::compute_adjustments;
 use models::*;
@@ -120,32 +119,30 @@ fn load_documents(dir: &PathBuf) -> Result<Vec<InputDocument>> {
         }
 
         // Only process JSON files
-        if path.extension().and_then(|s| s.to_str()).unwrap_or("") != "json" {
+        if !path.extension().is_some_and(|ext| ext == "json") {
             continue;
         }
 
         // Skip template.json and dashboard.json files, and hidden files
         if let Some(filename) = path.file_name().and_then(|s| s.to_str()) {
-            if filename.eq_ignore_ascii_case("template.json")
-                || filename.eq_ignore_ascii_case("dashboard.json")
-                || filename.starts_with(".")
-            {
+            let name_lower = filename.to_ascii_lowercase();
+            if name_lower == "template.json" || name_lower == "dashboard.json" || filename.starts_with('.') {
                 continue;
             }
         }
 
-        // Read and parse the JSON file
+        // Read and parse the JSON file directly without intermediate Value
         let raw =
             fs::read_to_string(&path).with_context(|| format!("Reading {}", path.display()))?;
-        let json_val: Value = serde_json::from_str(&raw)
+        let doc: InputDocument = serde_json::from_str(&raw)
             .with_context(|| format!("Parsing JSON in {}", path.display()))?;
-        let doc: InputDocument = serde_json::from_value(json_val)?;
         docs.push(doc);
     }
     Ok(docs)
 }
 
 /// Parses date strings in multiple formats (YYYY-MM-DD or YYYY/MM/DD)
+#[inline]
 fn parse_date(s: &str) -> Result<NaiveDate> {
     NaiveDate::parse_from_str(s, "%Y-%m-%d")
         .or_else(|_| NaiveDate::parse_from_str(s, "%Y/%m/%d"))
@@ -158,7 +155,7 @@ fn to_snapshot(doc: &InputDocument, settings: Option<&Settings>) -> Result<Snaps
     let base_currency = doc.get_base_currency(settings);
 
     let mut breakdown = SnapshotBreakdown::default();
-    let mut warnings: Vec<String> = Vec::new();
+    let mut warnings = Vec::new();
 
     // Get fx_rates from document (handles both old and new formats)
     let fx_rates = doc.get_fx_rates();
@@ -232,9 +229,8 @@ fn fx_to_base(
     }
 
     // Look up exchange rate (1 unit of 'currency' equals 'rate' units of base currency)
-    // Accept both upper and lower case keys for flexibility
-    rates
-        .get(&currency.to_uppercase())
+    // Try exact match first, then uppercase
+    rates.get(currency)
+        .or_else(|| rates.get(&currency.to_uppercase()))
         .copied()
-        .or_else(|| rates.get(&currency.to_string()).copied())
 }

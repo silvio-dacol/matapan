@@ -14,21 +14,15 @@ pub fn compute_inflation_only(
         return Ok(None);
     }
 
-    // Get HICP base value from document or settings
-    let Some(base_hicp) = doc.get_hicp_base(settings) else {
-        return Ok(None);
-    };
-
-    // Get current HICP from document
-    let Some(curr_hicp) = doc.get_current_hicp() else {
-        return Ok(None);
+    // Get HICP values from document or settings
+    let (base_hicp, curr_hicp) = match (doc.get_hicp_base(settings), doc.get_current_hicp()) {
+        (Some(base), Some(curr)) => (base, curr),
+        _ => return Ok(None),
     };
 
     // Calculate deflator: ratio of base HICP to current HICP
     // Deflator < 1 when prices have risen (inflation)
-    let deflator = base_hicp / curr_hicp;
-
-    let scale = deflator;
+    let scale = base_hicp / curr_hicp;
 
     // Apply inflation adjustment to all categories
     let nb = SnapshotBreakdown {
@@ -51,7 +45,7 @@ pub fn compute_inflation_only(
         breakdown: nb,
         totals: nt,
         scale,
-        deflator: Some(deflator),
+        deflator: Some(scale),
         ecli_norm: None,
         ny_advantage_pct: None,
         badge: None,

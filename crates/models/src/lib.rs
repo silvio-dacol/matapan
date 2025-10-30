@@ -4,11 +4,13 @@ use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 
 /// Utility function to round a float to 2 decimal places
+#[inline]
 fn round_to_2_decimals(value: f64) -> f64 {
     (value * 100.0).round() / 100.0
 }
 
 /// Utility function to round a float to 1 decimal place
+#[inline]
 fn round_to_1_decimal(value: f64) -> f64 {
     (value * 10.0).round() / 10.0
 }
@@ -77,24 +79,18 @@ impl InputDocument {
 
     /// Checks if inflation adjustment is enabled
     pub fn is_inflation_enabled(&self, settings: Option<&Settings>) -> bool {
-        self.metadata
-            .adjust_to_inflation
-            .as_ref()
-            .or_else(|| self.metadata.normalize_to_hicp.as_ref())
-            .or_else(|| settings.and_then(|s| s.normalize_to_hicp.as_ref()))
-            .map(|s| s.to_lowercase() == "yes")
-            .unwrap_or(false)
+        let check = |s: &String| s.eq_ignore_ascii_case("yes");
+        self.metadata.adjust_to_inflation.as_ref().map_or(false, check)
+            || self.metadata.normalize_to_hicp.as_ref().map_or(false, check)
+            || settings.and_then(|s| s.normalize_to_hicp.as_ref()).map_or(false, check)
     }
 
     /// Checks if ECLI normalization is enabled
     pub fn is_ecli_enabled(&self, settings: Option<&Settings>) -> bool {
-        self.metadata
-            .normalize_to_new_york_ecli
-            .as_ref()
-            .or_else(|| self.metadata.normalize_to_ecli.as_ref())
-            .or_else(|| settings.and_then(|s| s.normalize_to_ecli.as_ref()))
-            .map(|s| s.to_lowercase() == "yes")
-            .unwrap_or(false)
+        let check = |s: &String| s.eq_ignore_ascii_case("yes");
+        self.metadata.normalize_to_new_york_ecli.as_ref().map_or(false, check)
+            || self.metadata.normalize_to_ecli.as_ref().map_or(false, check)
+            || settings.and_then(|s| s.normalize_to_ecli.as_ref()).map_or(false, check)
     }
 
     /// Gets HICP base value from metadata or settings
@@ -106,30 +102,32 @@ impl InputDocument {
 
     /// Gets ECLI weights from settings, with fallback to defaults
     pub fn get_ecli_weights(&self, settings: Option<&Settings>) -> Option<EcliWeight> {
-        settings.and_then(|s| s.ecli.clone()).or_else(|| {
-            // Provide default weights for 2024_08 format compatibility
-            if self.metadata.ecli.is_some() {
-                Some(EcliWeight {
-                    rent_index_weight: 0.4,
-                    groceries_index_weight: 0.35,
-                    cost_of_living_index_weight: 0.25,
-                    restaurant_price_index_weight: 0.0,
-                    local_purchasing_power_index_weight: 0.0,
-                })
-            } else {
-                None
+        if let Some(s) = settings {
+            if let Some(ref ecli) = s.ecli {
+                return Some(ecli.clone());
             }
+        }
+        
+        // Provide default weights for 2024_08 format compatibility
+        self.metadata.ecli.as_ref().map(|_| EcliWeight {
+            rent_index_weight: 0.4,
+            groceries_index_weight: 0.35,
+            cost_of_living_index_weight: 0.25,
+            restaurant_price_index_weight: 0.0,
+            local_purchasing_power_index_weight: 0.0,
         })
     }
 
     /// Gets current HICP from metadata
+    #[inline]
     pub fn get_current_hicp(&self) -> Option<f64> {
         self.metadata.hicp
     }
 
     /// Gets ECLI basic data from metadata
-    pub fn get_ecli_basic(&self) -> Option<EcliBasic> {
-        self.metadata.ecli.clone()
+    #[inline]
+    pub fn get_ecli_basic(&self) -> Option<&EcliBasic> {
+        self.metadata.ecli.as_ref()
     }
 }
 
@@ -202,7 +200,20 @@ pub enum Category {
 // How categories are mapped from input entry types
 impl Category {
     pub fn from_str(s: &str) -> Option<Self> {
-        match s.trim().to_lowercase().as_str() {
+        let s_lower = s.trim();
+        
+        // Fast path for common exact matches
+        match s_lower {
+            "cash" | "Cash" => return Some(Category::Cash),
+            "investments" | "Investments" => return Some(Category::Investments),
+            "personal" | "Personal" => return Some(Category::Personal),
+            "pension" | "Pension" => return Some(Category::Pension),
+            "liabilities" | "Liabilities" => return Some(Category::Liabilities),
+            _ => {}
+        }
+        
+        // Fallback to case-insensitive matching
+        match s_lower.to_ascii_lowercase().as_str() {
             "liquidity" | "cash" => Some(Category::Cash),
             "investments" => Some(Category::Investments),
             "personal" => Some(Category::Personal),
