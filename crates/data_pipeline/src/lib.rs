@@ -208,9 +208,21 @@ fn to_snapshot(doc: &InputDocument, settings: Option<&Settings>) -> Result<Snaps
     let (inflation_adjusted, real_purchasing_power) =
         compute_adjustments(doc, settings, &totals, &breakdown, &mut warnings)?;
 
+    // Extract metadata for the period
+    let fx_rates_opt = if fx_rates.is_empty() {
+        None
+    } else {
+        Some(fx_rates)
+    };
+    let hicp_opt = doc.metadata.hicp;
+    let ecli_opt = doc.metadata.ecli.clone();
+
     Ok(Snapshot {
         date,
         base_currency,
+        fx_rates: fx_rates_opt,
+        hicp: hicp_opt,
+        ecli: ecli_opt,
         breakdown,
         totals,
         inflation_adjusted,

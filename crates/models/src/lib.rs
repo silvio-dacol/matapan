@@ -211,7 +211,7 @@ pub struct EcliWeight {
     pub local_purchasing_power_index_weight: f64,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct EcliBasic {
     pub rent_index: f64,
@@ -324,6 +324,12 @@ impl SnapshotTotals {
 pub struct Snapshot {
     pub date: NaiveDate,
     pub base_currency: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fx_rates: Option<HashMap<String, f64>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hicp: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ecli: Option<EcliBasic>,
     pub breakdown: SnapshotBreakdown,
     pub totals: SnapshotTotals,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -340,6 +346,9 @@ impl Snapshot {
         Self {
             date: self.date,
             base_currency: self.base_currency.clone(),
+            fx_rates: self.fx_rates.clone(),
+            hicp: self.hicp,
+            ecli: self.ecli.clone(),
             breakdown: self.breakdown.rounded(),
             totals: self.totals.rounded(),
             inflation_adjusted: self.inflation_adjusted.as_ref().map(|adj| adj.rounded()),
