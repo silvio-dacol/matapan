@@ -216,9 +216,11 @@ fn to_snapshot(doc: &InputDocument, settings: Option<&Settings>) -> Result<Snaps
     };
     let hicp_opt = doc.metadata.hicp;
     let ecli_opt = doc.metadata.ecli.clone();
+    let reference_month = doc.metadata.reference_month.clone();
 
     Ok(Snapshot {
         date,
+        reference_month,
         base_currency,
         fx_rates: fx_rates_opt,
         hicp: hicp_opt,

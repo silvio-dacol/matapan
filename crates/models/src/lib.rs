@@ -21,11 +21,6 @@ pub struct Settings {
     pub base_currency: String,
     #[serde(default)]
     pub normalize: Option<String>,
-    // Legacy fields kept for backward compatibility
-    #[serde(default)]
-    pub normalize_to_hicp: Option<String>,
-    #[serde(default)]
-    pub normalize_to_ecli: Option<String>,
     #[serde(default)]
     pub hicp: Option<HicpBase>,
     #[serde(default)]
@@ -83,7 +78,7 @@ impl InputDocument {
     /// Checks if inflation adjustment is enabled
     pub fn is_inflation_enabled(&self, settings: Option<&Settings>) -> bool {
         let check = |s: &String| s.eq_ignore_ascii_case("yes");
-        // Check new unified 'normalize' field first
+        // Check unified 'normalize' field
         if let Some(settings) = settings {
             if settings.normalize.as_ref().map_or(false, check) {
                 return true;
@@ -102,15 +97,12 @@ impl InputDocument {
                 .normalize_to_hicp
                 .as_ref()
                 .map_or(false, check)
-            || settings
-                .and_then(|s| s.normalize_to_hicp.as_ref())
-                .map_or(false, check)
     }
 
     /// Checks if ECLI normalization is enabled
     pub fn is_ecli_enabled(&self, settings: Option<&Settings>) -> bool {
         let check = |s: &String| s.eq_ignore_ascii_case("yes");
-        // Check new unified 'normalize' field first
+        // Check unified 'normalize' field
         if let Some(settings) = settings {
             if settings.normalize.as_ref().map_or(false, check) {
                 return true;
@@ -128,9 +120,6 @@ impl InputDocument {
                 .metadata
                 .normalize_to_ecli
                 .as_ref()
-                .map_or(false, check)
-            || settings
-                .and_then(|s| s.normalize_to_ecli.as_ref())
                 .map_or(false, check)
     }
 
@@ -177,6 +166,8 @@ impl InputDocument {
 pub struct Metadata {
     #[serde(default)]
     pub version: Option<u32>,
+    #[serde(default)]
+    pub reference_month: Option<String>,
     pub date: String, // YYYY-MM-DD
     #[serde(default)]
     pub base_currency: Option<String>,
@@ -323,6 +314,8 @@ impl SnapshotTotals {
 #[derive(Debug, Clone, Serialize)]
 pub struct Snapshot {
     pub date: NaiveDate,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reference_month: Option<String>,
     pub base_currency: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fx_rates: Option<HashMap<String, f64>>,
@@ -345,6 +338,7 @@ impl Snapshot {
     pub fn rounded(&self) -> Self {
         Self {
             date: self.date,
+            reference_month: self.reference_month.clone(),
             base_currency: self.base_currency.clone(),
             fx_rates: self.fx_rates.clone(),
             hicp: self.hicp,
