@@ -80,17 +80,35 @@ impl InputDocument {
     /// Checks if inflation adjustment is enabled
     pub fn is_inflation_enabled(&self, settings: Option<&Settings>) -> bool {
         let check = |s: &String| s.eq_ignore_ascii_case("yes");
-        self.metadata.adjust_to_inflation.as_ref().map_or(false, check)
-            || self.metadata.normalize_to_hicp.as_ref().map_or(false, check)
-            || settings.and_then(|s| s.normalize_to_hicp.as_ref()).map_or(false, check)
+        self.metadata
+            .adjust_to_inflation
+            .as_ref()
+            .map_or(false, check)
+            || self
+                .metadata
+                .normalize_to_hicp
+                .as_ref()
+                .map_or(false, check)
+            || settings
+                .and_then(|s| s.normalize_to_hicp.as_ref())
+                .map_or(false, check)
     }
 
     /// Checks if ECLI normalization is enabled
     pub fn is_ecli_enabled(&self, settings: Option<&Settings>) -> bool {
         let check = |s: &String| s.eq_ignore_ascii_case("yes");
-        self.metadata.normalize_to_new_york_ecli.as_ref().map_or(false, check)
-            || self.metadata.normalize_to_ecli.as_ref().map_or(false, check)
-            || settings.and_then(|s| s.normalize_to_ecli.as_ref()).map_or(false, check)
+        self.metadata
+            .normalize_to_new_york_ecli
+            .as_ref()
+            .map_or(false, check)
+            || self
+                .metadata
+                .normalize_to_ecli
+                .as_ref()
+                .map_or(false, check)
+            || settings
+                .and_then(|s| s.normalize_to_ecli.as_ref())
+                .map_or(false, check)
     }
 
     /// Gets HICP base value from metadata or settings
@@ -107,7 +125,7 @@ impl InputDocument {
                 return Some(ecli.clone());
             }
         }
-        
+
         // Provide default weights for 2024_08 format compatibility
         self.metadata.ecli.as_ref().map(|_| EcliWeight {
             rent_index_weight: 0.4,
@@ -201,7 +219,7 @@ pub enum Category {
 impl Category {
     pub fn from_str(s: &str) -> Option<Self> {
         let s_lower = s.trim();
-        
+
         // Fast path for common exact matches
         match s_lower {
             "cash" | "Cash" => return Some(Category::Cash),
@@ -211,7 +229,7 @@ impl Category {
             "liabilities" | "Liabilities" => return Some(Category::Liabilities),
             _ => {}
         }
-        
+
         // Fallback to case-insensitive matching
         match s_lower.to_ascii_lowercase().as_str() {
             "liquidity" | "cash" => Some(Category::Cash),
