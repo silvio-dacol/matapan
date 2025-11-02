@@ -121,7 +121,7 @@ mod tests {
         // Settings don't have normalize enabled either
         let mut settings = mock_settings(100.0);
         settings.normalize = None;
-        
+
         let breakdown = test_breakdown();
         let totals = test_totals();
         let mut warnings = Vec::new();
