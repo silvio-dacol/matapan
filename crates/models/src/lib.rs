@@ -15,6 +15,12 @@ fn round_to_1_decimal(value: f64) -> f64 {
     (value * 10.0).round() / 10.0
 }
 
+/// Utility function to round a float to 4 decimal places
+#[inline]
+fn round_to_4_decimals(value: f64) -> f64 {
+    (value * 10000.0).round() / 10000.0
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct Settings {
@@ -123,11 +129,11 @@ impl InputDocument {
                 .map_or(false, check)
     }
 
-    /// Gets HICP base value from metadata or settings
+    /// Gets HICP base value from settings or metadata
     pub fn get_hicp_base(&self, settings: Option<&Settings>) -> Option<f64> {
-        self.metadata
-            .hicp
-            .or_else(|| settings.and_then(|s| s.hicp.as_ref().map(|h| h.base_hicp())))
+        settings
+            .and_then(|s| s.hicp.as_ref().map(|h| h.base_hicp()))
+            .or_else(|| self.metadata.hicp)
     }
 
     /// Gets ECLI weights from settings, with fallback to defaults
@@ -374,14 +380,14 @@ pub struct SnapshotAdjustment {
 }
 
 impl SnapshotAdjustment {
-    /// Round all financial values to 2 decimal places
+    /// Round all financial values to 2 decimal places, scale factors to 4 decimals
     pub fn rounded(&self) -> Self {
         Self {
             breakdown: self.breakdown.rounded(),
             totals: self.totals.rounded(),
-            scale: round_to_2_decimals(self.scale),
-            deflator: self.deflator.map(round_to_2_decimals),
-            ecli_norm: self.ecli_norm.map(round_to_2_decimals),
+            scale: round_to_4_decimals(self.scale),
+            deflator: self.deflator.map(round_to_4_decimals),
+            ecli_norm: self.ecli_norm.map(round_to_4_decimals),
             ny_advantage_pct: self.ny_advantage_pct.map(round_to_1_decimal),
             badge: self.badge.clone(),
             normalization_applied: self.normalization_applied,
