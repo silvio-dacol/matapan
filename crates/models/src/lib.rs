@@ -58,7 +58,7 @@ impl HicpBase {
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct InputDocument {
     pub metadata: Metadata,
@@ -167,7 +167,7 @@ impl InputDocument {
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct Metadata {
     #[serde(default)]
@@ -216,7 +216,7 @@ pub struct EcliBasic {
     pub cost_of_living_index: f64,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct InputEntry {
     pub name: String,
@@ -265,7 +265,7 @@ impl Category {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SnapshotBreakdown {
     pub cash: f64,
     pub investments: f64,
@@ -299,7 +299,7 @@ impl Default for SnapshotBreakdown {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SnapshotTotals {
     pub assets: f64,
     pub liabilities: f64,
@@ -317,7 +317,7 @@ impl SnapshotTotals {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Snapshot {
     pub date: NaiveDate,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -335,7 +335,7 @@ pub struct Snapshot {
     pub inflation_adjusted: Option<SnapshotAdjustment>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub real_purchasing_power: Option<SnapshotAdjustment>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub warnings: Vec<String>,
 }
 
@@ -358,7 +358,7 @@ impl Snapshot {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SnapshotAdjustment {
     pub breakdown: SnapshotBreakdown,
     pub totals: SnapshotTotals,
@@ -396,7 +396,7 @@ impl SnapshotAdjustment {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Dashboard {
     pub generated_at: String,
     pub base_currency: String,
