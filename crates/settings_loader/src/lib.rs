@@ -18,15 +18,18 @@
 //! use settings_loader;
 //! use std::path::PathBuf;
 //!
-//! // Load settings from a specific path
-//! let settings = settings_loader::load_settings("config/my_settings.json")?;
+//! fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     // Load settings from a specific path
+//!     let settings = settings_loader::load_settings("config/my_settings.json")?;
 //!
-//! // Load from default location
-//! let settings = settings_loader::load_default_settings()?;
+//!     // Load from default location
+//!     let settings = settings_loader::load_default_settings()?;
 //!
-//! // Load optional settings (returns None if file doesn't exist)
-//! let path = Some(PathBuf::from("settings.json"));
-//! let settings = settings_loader::load_optional_settings(path.as_ref())?;
+//!     // Load optional settings (returns None if file doesn't exist)
+//!     let path = Some(PathBuf::from("settings.json"));
+//!     let settings = settings_loader::load_optional_settings(path.as_ref())?;
+//!     Ok(())
+//! }
 //! ```
 
 use std::fs;

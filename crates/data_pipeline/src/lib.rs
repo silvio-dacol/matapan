@@ -251,3 +251,98 @@ fn fx_to_base(
         .or_else(|| rates.get(&currency.to_uppercase()))
         .copied()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    #[test]
+    fn test_fx_to_base_same_currency() {
+        let rates = HashMap::new();
+        let result = fx_to_base("EUR", "EUR", &rates);
+        assert_eq!(result, Some(1.0));
+
+        // Case insensitive
+        let result = fx_to_base("eur", "EUR", &rates);
+        assert_eq!(result, Some(1.0));
+    }
+
+    #[test]
+    fn test_fx_to_base_conversion() {
+        let mut rates = HashMap::new();
+        rates.insert("USD".to_string(), 0.85);
+        rates.insert("GBP".to_string(), 1.15);
+
+        let result = fx_to_base("USD", "EUR", &rates);
+        assert_eq!(result, Some(0.85));
+
+        let result = fx_to_base("GBP", "EUR", &rates);
+        assert_eq!(result, Some(1.15));
+    }
+
+    #[test]
+    fn test_fx_to_base_missing_rate() {
+        let rates = HashMap::new();
+        let result = fx_to_base("JPY", "EUR", &rates);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_fx_to_base_case_insensitive_lookup() {
+        let mut rates = HashMap::new();
+        rates.insert("USD".to_string(), 0.85);
+
+        let result = fx_to_base("usd", "EUR", &rates);
+        assert_eq!(result, Some(0.85));
+    }
+
+    #[test]
+    fn test_parse_date_dash_format() {
+        let result = parse_date("2024-09-10");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().to_string(), "2024-09-10");
+    }
+
+    #[test]
+    fn test_parse_date_slash_format() {
+        let result = parse_date("2024/09/10");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().to_string(), "2024-09-10");
+    }
+
+    #[test]
+    fn test_parse_date_invalid() {
+        let result = parse_date("invalid-date");
+        assert!(result.is_err());
+
+        let result = parse_date("2024-13-01"); // Invalid month
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_category_from_str() {
+        use models::Category;
+
+        assert_eq!(Category::from_str("cash"), Some(Category::Cash));
+        assert_eq!(Category::from_str("Cash"), Some(Category::Cash));
+        assert_eq!(Category::from_str("liquidity"), Some(Category::Cash));
+
+        assert_eq!(
+            Category::from_str("investments"),
+            Some(Category::Investments)
+        );
+        assert_eq!(Category::from_str("Investments"), Some(Category::Investments));
+
+        assert_eq!(Category::from_str("pension"), Some(Category::Pension));
+        assert_eq!(Category::from_str("retirement"), Some(Category::Pension));
+
+        assert_eq!(
+            Category::from_str("liabilities"),
+            Some(Category::Liabilities)
+        );
+        assert_eq!(Category::from_str("debt"), Some(Category::Liabilities));
+
+        assert_eq!(Category::from_str("unknown"), None);
+    }
+}

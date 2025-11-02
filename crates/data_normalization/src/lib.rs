@@ -95,3 +95,202 @@ fn compute_combined_adjustment(
         ),
     }))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Helper to create a basic test breakdown
+    fn test_breakdown() -> SnapshotBreakdown {
+        SnapshotBreakdown {
+            cash: 10000.0,
+            investments: 20000.0,
+            personal: 5000.0,
+            pension: 15000.0,
+            liabilities: 2000.0,
+        }
+    }
+
+    // Helper to create test totals
+    fn test_totals() -> SnapshotTotals {
+        SnapshotTotals {
+            assets: 50000.0,
+            liabilities: 2000.0,
+            net_worth: 48000.0,
+        }
+    }
+
+    #[test]
+    fn test_compute_combined_adjustment_normal_scale() {
+        let breakdown = test_breakdown();
+        let mut warnings = Vec::new();
+
+        // Mock inflation adjustment (deflator = 0.9)
+        let inflation_adj = SnapshotAdjustment {
+            breakdown: breakdown.clone(),
+            totals: test_totals(),
+            scale: 0.9,
+            deflator: Some(0.9),
+            ecli_norm: None,
+            ny_advantage_pct: None,
+            badge: None,
+            normalization_applied: None,
+            notes: None,
+        };
+
+        // Mock NY adjustment (ecli_norm = 0.3)
+        let ny_adj = SnapshotAdjustment {
+            breakdown: breakdown.clone(),
+            totals: test_totals(),
+            scale: 3.33,
+            deflator: None,
+            ecli_norm: Some(0.3),
+            ny_advantage_pct: Some(233.0),
+            badge: None,
+            normalization_applied: None,
+            notes: None,
+        };
+
+        let result =
+            compute_combined_adjustment(&breakdown, &inflation_adj, &ny_adj, &mut warnings)
+                .unwrap();
+
+        assert!(result.is_some());
+        let adj = result.unwrap();
+
+        // Combined scale should be deflator / ecli_norm = 0.9 / 0.3 = 3.0
+        assert!((adj.scale - 3.0).abs() < 0.01);
+        assert_eq!(adj.deflator, Some(0.9));
+        assert_eq!(adj.ecli_norm, Some(0.3));
+
+        // Check that breakdown values are scaled correctly
+        assert!((adj.breakdown.cash - 30000.0).abs() < 1.0);
+        assert!(warnings.is_empty());
+    }
+
+    #[test]
+    fn test_compute_combined_adjustment_warns_on_high_scale() {
+        let breakdown = test_breakdown();
+        let mut warnings = Vec::new();
+
+        // Create scenario with very high combined scale
+        let inflation_adj = SnapshotAdjustment {
+            breakdown: breakdown.clone(),
+            totals: test_totals(),
+            scale: 1.0,
+            deflator: Some(1.0),
+            ecli_norm: None,
+            ny_advantage_pct: None,
+            badge: None,
+            normalization_applied: None,
+            notes: None,
+        };
+
+        let ny_adj = SnapshotAdjustment {
+            breakdown: breakdown.clone(),
+            totals: test_totals(),
+            scale: 10.0,
+            deflator: None,
+            ecli_norm: Some(0.1), // Very low cost of living = high scale
+            ny_advantage_pct: None,
+            badge: None,
+            normalization_applied: None,
+            notes: None,
+        };
+
+        let result =
+            compute_combined_adjustment(&breakdown, &inflation_adj, &ny_adj, &mut warnings)
+                .unwrap();
+
+        assert!(result.is_some());
+        assert_eq!(warnings.len(), 1);
+        assert!(warnings[0].contains("unusually large"));
+    }
+
+    #[test]
+    fn test_compute_combined_adjustment_calculates_ny_advantage() {
+        let breakdown = test_breakdown();
+        let mut warnings = Vec::new();
+
+        let inflation_adj = SnapshotAdjustment {
+            breakdown: breakdown.clone(),
+            totals: test_totals(),
+            scale: 1.0,
+            deflator: Some(1.0),
+            ecli_norm: None,
+            ny_advantage_pct: None,
+            badge: None,
+            normalization_applied: None,
+            notes: None,
+        };
+
+        let ny_adj = SnapshotAdjustment {
+            breakdown: breakdown.clone(),
+            totals: test_totals(),
+            scale: 4.0,
+            deflator: None,
+            ecli_norm: Some(0.25), // 25% of NY cost = 4x purchasing power
+            ny_advantage_pct: None,
+            badge: None,
+            normalization_applied: None,
+            notes: None,
+        };
+
+        let result =
+            compute_combined_adjustment(&breakdown, &inflation_adj, &ny_adj, &mut warnings)
+                .unwrap();
+
+        let adj = result.unwrap();
+
+        // NY advantage should be (1/0.25 - 1) * 100 = 300%
+        assert!((adj.ny_advantage_pct.unwrap() - 300.0).abs() < 0.1);
+        assert!(adj.badge.is_some());
+        assert!(adj.badge.unwrap().contains("+300"));
+    }
+
+    #[test]
+    fn test_compute_combined_adjustment_totals_consistency() {
+        let breakdown = test_breakdown();
+        let mut warnings = Vec::new();
+
+        let inflation_adj = SnapshotAdjustment {
+            breakdown: breakdown.clone(),
+            totals: test_totals(),
+            scale: 0.8,
+            deflator: Some(0.8),
+            ecli_norm: None,
+            ny_advantage_pct: None,
+            badge: None,
+            normalization_applied: None,
+            notes: None,
+        };
+
+        let ny_adj = SnapshotAdjustment {
+            breakdown: breakdown.clone(),
+            totals: test_totals(),
+            scale: 2.5,
+            deflator: None,
+            ecli_norm: Some(0.4),
+            ny_advantage_pct: None,
+            badge: None,
+            normalization_applied: None,
+            notes: None,
+        };
+
+        let result =
+            compute_combined_adjustment(&breakdown, &inflation_adj, &ny_adj, &mut warnings)
+                .unwrap();
+
+        let adj = result.unwrap();
+
+        // Verify totals match breakdown calculations
+        let expected_assets = adj.breakdown.cash
+            + adj.breakdown.investments
+            + adj.breakdown.personal
+            + adj.breakdown.pension;
+        let expected_net_worth = expected_assets - adj.breakdown.liabilities;
+
+        assert!((adj.totals.assets - expected_assets).abs() < 0.01);
+        assert!((adj.totals.net_worth - expected_net_worth).abs() < 0.01);
+    }
+}
