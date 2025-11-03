@@ -344,13 +344,13 @@ cargo run --bin server
 
 ### Available Endpoints
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/health` | Health check |
-| `GET` | `/api/dashboard` | Full time series with all snapshots |
-| `GET` | `/api/dashboard/latest` | Most recent snapshot only |
-| `GET` | `/api/snapshots/:date/entries` | Account-level details with FX conversion |
-| `POST` | `/api/cache/invalidate` | Refresh cache after regenerating dashboard.json |
+| Method | Endpoint                       | Description                                     |
+| ------ | ------------------------------ | ----------------------------------------------- |
+| `GET`  | `/health`                      | Health check                                    |
+| `GET`  | `/api/dashboard`               | Full time series with all snapshots             |
+| `GET`  | `/api/dashboard/latest`        | Most recent snapshot only                       |
+| `GET`  | `/api/snapshots/:date/entries` | Account-level details with FX conversion        |
+| `POST` | `/api/cache/invalidate`        | Refresh cache after regenerating dashboard.json |
 
 ### Typical Workflow
 

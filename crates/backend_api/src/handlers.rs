@@ -130,7 +130,7 @@ pub async fn health_check() -> impl IntoResponse {
 /// Useful after regenerating dashboard.json without restarting the server
 pub async fn invalidate_cache(State(repo): State<RepositoryState>) -> impl IntoResponse {
     repo.invalidate_cache().await;
-    
+
     Json(serde_json::json!({
         "status": "success",
         "message": "Cache invalidated. Fresh data will be loaded on next request."
