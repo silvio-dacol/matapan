@@ -57,8 +57,8 @@ Expected response:
 
 ```json
 {
-  "status": "healthy",
-  "service": "net-worth-api"
+  "service": "net-worth-api",
+  "status": "healthy"
 }
 ```
 
@@ -74,12 +74,6 @@ curl http://localhost:3000/api/dashboard
 curl http://localhost:3000/api/dashboard/latest
 ```
 
-### Get Summary
-
-```powershell
-curl http://localhost:3000/api/dashboard/summary
-```
-
 ### Get Detailed Entries for a Date
 
 ```powershell
@@ -93,7 +87,6 @@ curl http://localhost:3000/api/snapshots/2025-09-01/entries/enriched
 | `GET /health`                               | Health check                      |
 | `GET /api/dashboard`                        | Full dashboard with all snapshots |
 | `GET /api/dashboard/latest`                 | Most recent snapshot only         |
-| `GET /api/dashboard/summary`                | Reduced payload for quick access  |
 | `GET /api/snapshots/:date/entries`          | Raw entries for a specific date   |
 | `GET /api/snapshots/:date/entries/enriched` | Entries with FX conversion        |
 

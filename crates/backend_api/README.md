@@ -62,24 +62,6 @@ Returns only the most recent snapshot.
 }
 ```
 
-#### `GET /api/dashboard/summary?view=real_purchasing_power`
-
-Returns a reduced payload optimized for quick summary cards.
-
-**Query Parameters:**
-
-- `view` (optional): `"real_purchasing_power"` or `"inflation_adjusted"`
-
-**Response:**
-
-```json
-{
-  "generated_at": "2025-11-02T10:30:00Z",
-  "base_currency": "EUR",
-  "latest": {...}
-}
-```
-
 ### Snapshot Detail Endpoints
 
 #### `GET /api/snapshots/:date/entries`

@@ -22,7 +22,6 @@ pub fn create_router(repo: Arc<dyn DashboardRepository>) -> Router {
         // Dashboard endpoints
         .route("/api/dashboard", get(handlers::get_dashboard))
         .route("/api/dashboard/latest", get(handlers::get_latest_snapshot))
-        .route("/api/dashboard/summary", get(handlers::get_summary))
         // Snapshot entries endpoints
         .route(
             "/api/snapshots/:date/entries",
