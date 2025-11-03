@@ -25,6 +25,9 @@ pub trait DashboardRepository: Send + Sync {
 
     /// Get the generation timestamp of the dashboard
     async fn get_generated_at(&self) -> Result<String>;
+
+    /// Invalidate any cached data (forces reload on next fetch)
+    async fn invalidate_cache(&self);
 }
 
 /// File-based implementation that reads from dashboard.json
@@ -80,12 +83,6 @@ impl FileDashboardRepository {
 
         Ok(document)
     }
-
-    /// Invalidate the cache (useful after regenerating dashboard.json)
-    pub async fn invalidate_cache(&self) {
-        let mut cache = self.cache.write().await;
-        *cache = None;
-    }
 }
 
 #[async_trait]
@@ -119,5 +116,10 @@ impl DashboardRepository for FileDashboardRepository {
     async fn get_generated_at(&self) -> Result<String> {
         let dashboard = self.load_dashboard().await?;
         Ok(dashboard.generated_at)
+    }
+
+    async fn invalidate_cache(&self) {
+        let mut cache = self.cache.write().await;
+        *cache = None;
     }
 }

@@ -50,7 +50,7 @@ Open your browser or use curl/Postman to test:
 ### Health Check
 
 ```powershell
-curl http://localhost:3000/health
+Invoke-WebRequest http://localhost:3000/health
 ```
 
 Expected response:
@@ -65,30 +65,99 @@ Expected response:
 ### Get Full Dashboard
 
 ```powershell
-curl http://localhost:3000/api/dashboard
+Invoke-WebRequest http://localhost:3000/api/dashboard
 ```
 
 ### Get Latest Snapshot
 
 ```powershell
-curl http://localhost:3000/api/dashboard/latest
+Invoke-WebRequest http://localhost:3000/api/dashboard/latest
 ```
 
 ### Get Detailed Entries for a Date
 
 ```powershell
-curl http://localhost:3000/api/snapshots/2025-09-01/entries/enriched
+Invoke-WebRequest http://localhost:3000/api/snapshots/2025-09-01/entries
 ```
+
+### Refresh Cache After Regenerating Data
+
+```powershell
+# After running the CLI to regenerate dashboard.json
+Invoke-WebRequest -Uri http://localhost:3000/api/cache/invalidate -Method POST
+```
+
+Expected response:
+
+```json
+{
+  "status": "success",
+  "message": "Cache invalidated. Fresh data will be loaded on next request."
+}
+```
+
+**Why use this?** When you regenerate `dashboard.json` with the CLI, the API server caches the old data in memory. This endpoint clears the cache so the API serves fresh data **without restarting the server**.
 
 ## Available Endpoints
 
-| Endpoint                                    | Description                       |
-| ------------------------------------------- | --------------------------------- |
-| `GET /health`                               | Health check                      |
-| `GET /api/dashboard`                        | Full dashboard with all snapshots |
-| `GET /api/dashboard/latest`                 | Most recent snapshot only         |
-| `GET /api/snapshots/:date/entries`          | Raw entries for a specific date   |
-| `GET /api/snapshots/:date/entries/enriched` | Entries with FX conversion        |
+| Endpoint                           | Description                                  |
+| ---------------------------------- | -------------------------------------------- |
+| `GET /health`                      | Health check                                 |
+| `GET /api/dashboard`               | Full dashboard with all snapshots            |
+| `GET /api/dashboard/latest`        | Most recent snapshot only                    |
+| `GET /api/snapshots/:date/entries` | Account details with FX conversion           |
+| `POST /api/cache/invalidate`       | Refresh cached data (after CLI regeneration) |
+
+## Typical Workflow
+
+### Adding New Data and Refreshing
+
+```powershell
+# 1. Add new monthly data to database/
+# Edit database/2025_10.json with your new entries
+
+# 2. Regenerate the dashboard
+cargo run --bin cli -- --input database --output dashboard.json --settings settings.json --pretty
+
+# 3. Refresh the API cache (no restart needed!)
+Invoke-WebRequest -Uri http://localhost:3000/api/cache/invalidate -Method POST
+
+# 4. Frontend automatically gets fresh data on next request
+```
+
+### Frontend Auto-Refresh Options
+
+**Option 1: Manual Refresh Button**
+
+```typescript
+async function refreshData() {
+  await fetch("http://localhost:3000/api/cache/invalidate", { method: "POST" });
+  // Then reload your dashboard data
+  const data = await fetch("http://localhost:3000/api/dashboard").then((r) =>
+    r.json()
+  );
+}
+```
+
+**Option 2: Periodic Polling**
+
+```typescript
+// Check for updates every 60 seconds
+setInterval(async () => {
+  const data = await fetch("http://localhost:3000/api/dashboard");
+  const etag = data.headers.get("etag");
+  // Compare etag with previous value, reload if changed
+}, 60000);
+```
+
+**Option 3: Check on Page Load**
+
+```typescript
+// Simply fetch on every page load - cache handles efficiency
+const dashboard = await fetch("http://localhost:3000/api/dashboard").then((r) =>
+  r.json()
+);
+```
 
 ## Next Steps
 

@@ -66,37 +66,6 @@ Returns only the most recent snapshot.
 
 #### `GET /api/snapshots/:date/entries`
 
-Returns raw entry-level data for a specific snapshot.
-
-**Parameters:**
-
-- `date`: Date in `YYYY-MM-DD` format (e.g., `2025-09-01`)
-
-**Response:**
-
-```json
-{
-  "metadata": {
-    "date": "2025-09-01",
-    "base_currency": "EUR",
-    "fx_rates": {...},
-    "hicp": 118.5
-  },
-  "net_worth_entries": [
-    {
-      "name": "Cash Intesa Sanpaolo",
-      "type": "cash",
-      "currency": "EUR",
-      "balance": 25000.00,
-      "comment": ""
-    },
-    ...
-  ]
-}
-```
-
-#### `GET /api/snapshots/:date/entries/enriched`
-
 Returns entry-level data with FX conversions applied.
 
 **Response:**
@@ -215,7 +184,7 @@ Use `breakdown` from any snapshot:
 
 ### Detailed Tables
 
-Use `GET /api/snapshots/:date/entries/enriched`:
+Use `GET /api/snapshots/:date/entries`:
 
 - Shows individual accounts with FX-converted balances
 - Group by `type` field for category sections

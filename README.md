@@ -6,6 +6,31 @@ An app to track the net worth of an individual over the biggest belongings and m
 
 Just replicate what you have already done on the Excel dashboard but make it a little more beautiful and automated.
 
+## Quick Start
+
+### 1. Generate Dashboard Data (CLI)
+
+```powershell
+cargo run --bin cli -- --input database --output dashboard.json --settings settings.json --pretty
+```
+
+### 2. Start API Server
+
+```powershell
+.\run-api.ps1
+# Or: cargo run --bin server
+```
+
+### 3. Test the API
+
+```powershell
+Invoke-WebRequest http://localhost:3000/health
+```
+
+See [docs/API_QUICKSTART.md](docs/API_QUICKSTART.md) for detailed API documentation.
+
+---
+
 ## Backend CLI
 
 This repo includes a small Rust CLI that reads monthly JSON snapshots from `database/` (all `*.json` files except `template.json`), aggregates them, and writes an `output/dashboard.json` with per‑category totals and net‑worth over time.
@@ -14,10 +39,10 @@ The CLI now supports a global `settings.json` configuration file that provides d
 
 ### Run
 
-- Build: `cargo build`
+- Build: `cargo build --bin cli`
 - Execute (defaults shown):
-  - `cargo run -- --input database --output dashboard.json --pretty --latest-only`
-  - `cargo run -- --input database --output dashboard.json --settings settings.json --pretty`
+  - `cargo run --bin cli -- --input database --output dashboard.json --pretty --latest-only`
+  - `cargo run --bin cli -- --input database --output dashboard.json --settings settings.json --pretty`
   - Omit `--latest-only` to aggregate the full time‑series.
   - Use `--settings` to specify a configuration file with default values.
 
@@ -55,7 +80,7 @@ These settings provide defaults that can be overridden by individual snapshot fi
 
 ```
 USAGE:
-    cargo run -- [OPTIONS]
+    cargo run --bin cli -- [OPTIONS]
 
 OPTIONS:
     -i, --input <PATH>       Input folder containing JSON snapshots [default: input]
@@ -70,13 +95,13 @@ OPTIONS:
 
 ```bash
 # Process all files with settings
-cargo run -- --input database --output output/dashboard.json --settings settings.json --pretty
+cargo run --bin cli -- --input database --output output/dashboard.json --settings settings.json --pretty
 
 # Process only latest file without settings
-cargo run -- --input database --output output/latest.json --latest-only
+cargo run --bin cli -- --input database --output output/latest.json --latest-only
 
 # Process all files, compact output
-cargo run -- --input database --output output/compact.json --no-pretty
+cargo run --bin cli -- --input database --output output/compact.json --no-pretty
 ```
 
 ### Input format
@@ -297,3 +322,69 @@ RealMoney = 2920 × 0.966 / 0.36 = 7832 EUR
 ```
 
 Moving could increases purchasing power!
+
+---
+
+## Backend API Server
+
+A REST API built with Axum to serve the dashboard data for frontend consumption.
+
+### Quick Start
+
+```powershell
+# Start the server (default port 3000)
+.\run-api.ps1
+
+# Or with custom port
+.\run-api.ps1 -Port 8080
+
+# Or using cargo directly
+cargo run --bin server
+```
+
+### Available Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/health` | Health check |
+| `GET` | `/api/dashboard` | Full time series with all snapshots |
+| `GET` | `/api/dashboard/latest` | Most recent snapshot only |
+| `GET` | `/api/snapshots/:date/entries` | Account-level details with FX conversion |
+| `POST` | `/api/cache/invalidate` | Refresh cache after regenerating dashboard.json |
+
+### Typical Workflow
+
+```powershell
+# 1. Regenerate dashboard data
+cargo run --bin cli -- --input database --output dashboard.json --settings settings.json --pretty
+
+# 2. Refresh API cache (no restart needed!)
+Invoke-WebRequest -Uri http://localhost:3000/api/cache/invalidate -Method POST
+
+# 3. Frontend gets fresh data on next request
+```
+
+### Architecture
+
+- **Repository Pattern**: Abstract trait for data access, ready for PostgreSQL migration
+- **File-based Storage**: Currently reads from `dashboard.json` and `database/*.json`
+- **In-memory Caching**: Fast responses with manual invalidation support
+- **CORS Enabled**: Ready for frontend development
+- **ETag Support**: Efficient caching on the client side
+
+### Documentation
+
+- **[API Quick Start Guide](docs/API_QUICKSTART.md)** - Getting started with the API
+- **[Backend API README](crates/backend_api/README.md)** - Detailed endpoint documentation
+- **[TypeScript Types](docs/api-types.ts)** - Type definitions for frontend integration
+- **[Sample React Components](docs/sample-components.tsx)** - Example frontend code
+
+### Frontend Integration
+
+The API is designed to provide all data needed for dashboard visualizations:
+
+- **Time-series charts**: Use `/api/dashboard` to get all snapshots
+- **Summary cards**: Use `/api/dashboard/latest` for current totals
+- **Detailed tables**: Use `/api/snapshots/:date/entries` for account breakdowns
+
+All endpoints return data with both nominal and normalized views (inflation-adjusted and purchasing-power-adjusted).

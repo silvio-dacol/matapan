@@ -1,4 +1,4 @@
-use axum::{routing::get, Router};
+use axum::{routing::{get, post}, Router};
 use std::sync::Arc;
 use tower_http::{
     cors::{Any, CorsLayer},
@@ -22,15 +22,13 @@ pub fn create_router(repo: Arc<dyn DashboardRepository>) -> Router {
         // Dashboard endpoints
         .route("/api/dashboard", get(handlers::get_dashboard))
         .route("/api/dashboard/latest", get(handlers::get_latest_snapshot))
-        // Snapshot entries endpoints
+        // Snapshot entries endpoint
         .route(
             "/api/snapshots/:date/entries",
             get(handlers::get_snapshot_entries),
         )
-        .route(
-            "/api/snapshots/:date/entries/enriched",
-            get(handlers::get_snapshot_entries_enriched),
-        )
+        // Cache management
+        .route("/api/cache/invalidate", post(handlers::invalidate_cache))
         // Add shared state
         .with_state(repo)
         // Add middleware

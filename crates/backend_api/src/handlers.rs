@@ -37,21 +37,6 @@ pub async fn get_latest_snapshot(State(repo): State<RepositoryState>) -> Result<
     Ok(Json(snapshot))
 }
 
-/// GET /api/snapshots/:date/entries
-/// Returns raw entry-level data for a specific snapshot date
-/// Date format: YYYY-MM-DD
-pub async fn get_snapshot_entries(
-    State(repo): State<RepositoryState>,
-    Path(date_str): Path<String>,
-) -> Result<impl IntoResponse> {
-    let date = NaiveDate::parse_from_str(&date_str, "%Y-%m-%d")
-        .map_err(|_| ApiError::InvalidDateFormat(date_str.clone()))?;
-
-    let document = repo.fetch_entries_by_date(date).await?;
-
-    Ok(Json(document))
-}
-
 /// Response for the entries endpoint with enriched data
 #[derive(Debug, Serialize)]
 pub struct EntriesResponse {
@@ -79,9 +64,9 @@ pub struct EntryMetadata {
     pub hicp: Option<f64>,
 }
 
-/// GET /api/snapshots/:date/entries/enriched
-/// Returns enriched entry-level data with FX conversion
-pub async fn get_snapshot_entries_enriched(
+/// GET /api/snapshots/:date/entries
+/// Returns entry-level data with FX conversion
+pub async fn get_snapshot_entries(
     State(repo): State<RepositoryState>,
     Path(date_str): Path<String>,
 ) -> Result<impl IntoResponse> {
@@ -137,5 +122,17 @@ pub async fn health_check() -> impl IntoResponse {
     Json(serde_json::json!({
         "status": "healthy",
         "service": "net-worth-api"
+    }))
+}
+
+/// POST /api/cache/invalidate
+/// Invalidates the cache and forces reload of dashboard data
+/// Useful after regenerating dashboard.json without restarting the server
+pub async fn invalidate_cache(State(repo): State<RepositoryState>) -> impl IntoResponse {
+    repo.invalidate_cache().await;
+    
+    Json(serde_json::json!({
+        "status": "success",
+        "message": "Cache invalidated. Fresh data will be loaded on next request."
     }))
 }
