@@ -116,7 +116,7 @@ impl DashboardRepository for FileDashboardRepository {
         dashboard
             .snapshots
             .iter()
-            .find(|s| s.date == date)
+            .find(|s| s.data_updated_at == date)
             .cloned()
             .ok_or_else(|| ApiError::SnapshotNotFound(date.to_string()))
     }
@@ -127,7 +127,7 @@ impl DashboardRepository for FileDashboardRepository {
 
     async fn get_generated_at(&self) -> Result<String> {
         let dashboard = self.load_dashboard().await?;
-        Ok(dashboard.generated_at)
+        Ok(dashboard.metadata.generated_at)
     }
 
     async fn invalidate_cache(&self) {

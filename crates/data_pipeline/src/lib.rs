@@ -34,9 +34,19 @@ pub fn run(cfg: Config) -> Result<()> {
     if cfg.latest_only {
         if let Some(last) = docs.pop() {
             let snap = to_snapshot(&last, settings.as_ref())?;
-            let dashboard = Dashboard {
+            let base_currency = last.get_base_currency(settings.as_ref());
+
+            let metadata = models::DashboardMetadata {
                 generated_at: Utc::now().to_rfc3339(),
-                base_currency: last.get_base_currency(settings.as_ref()),
+                base_currency,
+                normalize: settings.as_ref().and_then(|s| s.normalize.clone()),
+                hicp: settings.as_ref().and_then(|s| s.hicp.clone()),
+                ecli: settings.as_ref().and_then(|s| s.ecli.clone()),
+                categories: settings.as_ref().and_then(|s| s.categories.clone()),
+            };
+
+            let dashboard = Dashboard {
+                metadata,
                 snapshots: vec![snap.clone()],
                 latest: Some(snap),
             };
@@ -58,18 +68,26 @@ pub fn run(cfg: Config) -> Result<()> {
         snapshots.push(snap);
     }
 
-    // Determine the base currency from the latest snapshot, defaulting to settings or EUR
-    let latest = snapshots.last().cloned();
-    let base_currency = latest
+    // Determine the base currency from settings or use EUR as default
+    let base_currency = settings
         .as_ref()
         .map(|s| s.base_currency.clone())
-        .or_else(|| settings.as_ref().map(|s| s.base_currency.clone()))
         .unwrap_or_else(|| "EUR".to_string());
 
-    // Create the final dashboard and write to output
-    let dashboard = Dashboard {
+    // Create metadata from settings
+    let metadata = models::DashboardMetadata {
         generated_at: Utc::now().to_rfc3339(),
         base_currency,
+        normalize: settings.as_ref().and_then(|s| s.normalize.clone()),
+        hicp: settings.as_ref().and_then(|s| s.hicp.clone()),
+        ecli: settings.as_ref().and_then(|s| s.ecli.clone()),
+        categories: settings.as_ref().and_then(|s| s.categories.clone()),
+    };
+
+    // Create the final dashboard and write to output
+    let latest = snapshots.last().cloned();
+    let dashboard = Dashboard {
+        metadata,
         snapshots,
         latest,
     };
@@ -154,7 +172,7 @@ fn parse_date(s: &str) -> Result<NaiveDate> {
 
 /// Converts an input document into a snapshot with calculated totals and adjustments
 fn to_snapshot(doc: &InputDocument, settings: Option<&Settings>) -> Result<Snapshot> {
-    let date = parse_date(&doc.metadata.date)?;
+    let data_updated_at = parse_date(&doc.metadata.date)?;
     let base_currency = doc.get_base_currency(settings);
 
     let mut breakdown = SnapshotBreakdown::default();
@@ -219,9 +237,8 @@ fn to_snapshot(doc: &InputDocument, settings: Option<&Settings>) -> Result<Snaps
     let reference_month = doc.metadata.reference_month.clone();
 
     Ok(Snapshot {
-        date,
+        data_updated_at,
         reference_month,
-        base_currency,
         fx_rates: fx_rates_opt,
         hicp: hicp_opt,
         ecli: ecli_opt,
@@ -332,7 +349,10 @@ mod tests {
             Category::from_str("investments"),
             Some(Category::Investments)
         );
-        assert_eq!(Category::from_str("Investments"), Some(Category::Investments));
+        assert_eq!(
+            Category::from_str("Investments"),
+            Some(Category::Investments)
+        );
 
         assert_eq!(Category::from_str("pension"), Some(Category::Pension));
         assert_eq!(Category::from_str("retirement"), Some(Category::Pension));

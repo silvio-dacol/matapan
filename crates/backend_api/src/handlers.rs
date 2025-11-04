@@ -18,7 +18,7 @@ pub async fn get_dashboard(State(repo): State<RepositoryState>) -> Result<impl I
     let dashboard = repo.fetch_dashboard().await?;
     let dashboard = dashboard.rounded(); // Round all values to 2 decimals
 
-    let generated_at = dashboard.generated_at.clone();
+    let generated_at = dashboard.metadata.generated_at.clone();
     let etag = format!("\"{}\"", generated_at);
 
     let mut headers = HeaderMap::new();

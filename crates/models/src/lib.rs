@@ -35,14 +35,14 @@ pub struct Settings {
     pub categories: Option<CategoryConfig>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct CategoryConfig {
     pub assets: Vec<String>,
     pub liabilities: Vec<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct HicpBase {
     #[serde(default)]
@@ -196,7 +196,7 @@ pub struct Metadata {
     pub ecli: Option<EcliBasic>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct EcliWeight {
     pub rent_index_weight: f64,
@@ -319,10 +319,9 @@ impl SnapshotTotals {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Snapshot {
-    pub date: NaiveDate,
+    pub data_updated_at: NaiveDate,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reference_month: Option<String>,
-    pub base_currency: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fx_rates: Option<HashMap<String, f64>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -343,9 +342,8 @@ impl Snapshot {
     /// Round all financial values to 2 decimal places
     pub fn rounded(&self) -> Self {
         Self {
-            date: self.date,
+            data_updated_at: self.data_updated_at,
             reference_month: self.reference_month.clone(),
-            base_currency: self.base_currency.clone(),
             fx_rates: self.fx_rates.clone(),
             hicp: self.hicp,
             ecli: self.ecli.clone(),
@@ -393,9 +391,22 @@ impl SnapshotAdjustment {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Dashboard {
+pub struct DashboardMetadata {
     pub generated_at: String,
     pub base_currency: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub normalize: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hicp: Option<HicpBase>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ecli: Option<EcliWeight>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub categories: Option<CategoryConfig>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Dashboard {
+    pub metadata: DashboardMetadata,
     pub snapshots: Vec<Snapshot>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub latest: Option<Snapshot>,
@@ -405,8 +416,7 @@ impl Dashboard {
     /// Round all financial values to 2 decimal places
     pub fn rounded(&self) -> Self {
         Self {
-            generated_at: self.generated_at.clone(),
-            base_currency: self.base_currency.clone(),
+            metadata: self.metadata.clone(),
             snapshots: self.snapshots.iter().map(|s| s.rounded()).collect(),
             latest: self.latest.as_ref().map(|s| s.rounded()),
         }
