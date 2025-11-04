@@ -5,7 +5,7 @@ use models::*;
 pub fn compute_inflation_only(
     doc: &InputDocument,
     settings: Option<&Settings>,
-    b: &SnapshotBreakdown,
+    _b: &SnapshotBreakdown,
     _t: &SnapshotTotals,
     _warnings: &mut Vec<String>,
 ) -> Result<Option<SnapshotAdjustment>> {
@@ -24,26 +24,7 @@ pub fn compute_inflation_only(
     // Deflator < 1 when prices have risen (inflation)
     let scale = base_hicp / curr_hicp;
 
-    // Apply inflation adjustment to all categories
-    let nb = SnapshotBreakdown {
-        cash: b.cash * scale,
-        investments: b.investments * scale,
-        personal: b.personal * scale,
-        pension: b.pension * scale,
-        liabilities: b.liabilities * scale,
-    };
-
-    // Recalculate totals with adjusted values
-    let assets_adj = nb.cash + nb.investments + nb.personal + nb.pension;
-    let nt = SnapshotTotals {
-        assets: assets_adj,
-        liabilities: nb.liabilities,
-        net_worth: assets_adj - nb.liabilities,
-    };
-
     Ok(Some(SnapshotAdjustment {
-        breakdown: nb,
-        totals: nt,
         scale,
         deflator: Some(scale),
         ecli_norm: None,
@@ -156,12 +137,11 @@ mod tests {
         // Let's just test that we get a valid result
         assert!(adj.scale > 0.0);
         assert_eq!(adj.deflator, Some(adj.scale));
-        assert!(adj.breakdown.cash > 0.0);
     }
 
     #[test]
-    fn test_inflation_adjustment_totals_consistency() {
-        // Test that totals are calculated consistently from breakdown
+    fn test_inflation_adjustment_scale_calculation() {
+        // Test that scale is calculated correctly
         let doc = mock_document(127.0, true);
         let settings = mock_settings(126.0);
         let breakdown = test_breakdown();
@@ -175,20 +155,15 @@ mod tests {
         assert!(result.is_some());
         let adj = result.unwrap();
 
-        // Verify totals match breakdown
-        let expected_assets = adj.breakdown.cash
-            + adj.breakdown.investments
-            + adj.breakdown.personal
-            + adj.breakdown.pension;
-        let expected_net_worth = expected_assets - adj.breakdown.liabilities;
-
-        assert!((adj.totals.assets - expected_assets).abs() < 0.01);
-        assert!((adj.totals.net_worth - expected_net_worth).abs() < 0.01);
+        // Scale should be base_hicp / current_hicp = 126.0 / 127.0
+        let expected_scale = 126.0 / 127.0;
+        assert!((adj.scale - expected_scale).abs() < 0.0001);
+        assert_eq!(adj.deflator, Some(adj.scale));
     }
 
     #[test]
-    fn test_inflation_adjustment_proportional_scaling() {
-        // Test that all categories are scaled by the same factor
+    fn test_inflation_adjustment_metadata() {
+        // Test that metadata fields are set correctly
         let doc = mock_document(130.0, true);
         let settings = mock_settings(120.0);
         let breakdown = test_breakdown();
@@ -202,13 +177,14 @@ mod tests {
         assert!(result.is_some());
         let adj = result.unwrap();
 
-        // All categories should be scaled by the same factor
-        let scale = adj.scale;
-        assert!((adj.breakdown.cash - breakdown.cash * scale).abs() < 0.01);
-        assert!((adj.breakdown.investments - breakdown.investments * scale).abs() < 0.01);
-        assert!((adj.breakdown.personal - breakdown.personal * scale).abs() < 0.01);
-        assert!((adj.breakdown.pension - breakdown.pension * scale).abs() < 0.01);
-        assert!((adj.breakdown.liabilities - breakdown.liabilities * scale).abs() < 0.01);
+        // Check metadata fields
+        assert!(adj.scale > 0.0);
+        assert!(adj.deflator.is_some());
+        assert!(adj.ecli_norm.is_none());
+        assert!(adj.ny_advantage_pct.is_none());
+        assert!(adj.badge.is_none());
+        assert!(adj.notes.is_some());
+        assert!(adj.notes.unwrap().contains("HICP"));
     }
 
     #[test]

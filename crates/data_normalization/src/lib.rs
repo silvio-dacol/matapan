@@ -41,7 +41,7 @@ pub fn compute_adjustments(
 
 /// Helper function to combine inflation and NY adjustments
 fn compute_combined_adjustment(
-    original_breakdown: &SnapshotBreakdown,
+    _original_breakdown: &SnapshotBreakdown,
     inflation_adj: &SnapshotAdjustment,
     ny_adj: &SnapshotAdjustment,
     warnings: &mut Vec<String>,
@@ -61,26 +61,7 @@ fn compute_combined_adjustment(
         ));
     }
 
-    // Apply combined adjustment to all categories
-    let nb = SnapshotBreakdown {
-        cash: original_breakdown.cash * scale,
-        investments: original_breakdown.investments * scale,
-        personal: original_breakdown.personal * scale,
-        pension: original_breakdown.pension * scale,
-        liabilities: original_breakdown.liabilities * scale,
-    };
-
-    // Recalculate totals with adjusted values
-    let assets_adj = nb.cash + nb.investments + nb.personal + nb.pension;
-    let nt = SnapshotTotals {
-        assets: assets_adj,
-        liabilities: nb.liabilities,
-        net_worth: assets_adj - nb.liabilities,
-    };
-
     Ok(Some(SnapshotAdjustment {
-        breakdown: nb,
-        totals: nt,
         scale,
         deflator: Some(deflator),
         ecli_norm: Some(ecli_norm),
@@ -111,15 +92,6 @@ mod tests {
         }
     }
 
-    // Helper to create test totals
-    fn test_totals() -> SnapshotTotals {
-        SnapshotTotals {
-            assets: 50000.0,
-            liabilities: 2000.0,
-            net_worth: 48000.0,
-        }
-    }
-
     #[test]
     fn test_compute_combined_adjustment_normal_scale() {
         let breakdown = test_breakdown();
@@ -127,8 +99,6 @@ mod tests {
 
         // Mock inflation adjustment (deflator = 0.9)
         let inflation_adj = SnapshotAdjustment {
-            breakdown: breakdown.clone(),
-            totals: test_totals(),
             scale: 0.9,
             deflator: Some(0.9),
             ecli_norm: None,
@@ -140,8 +110,6 @@ mod tests {
 
         // Mock NY adjustment (ecli_norm = 0.3)
         let ny_adj = SnapshotAdjustment {
-            breakdown: breakdown.clone(),
-            totals: test_totals(),
             scale: 3.33,
             deflator: None,
             ecli_norm: Some(0.3),
@@ -162,9 +130,6 @@ mod tests {
         assert!((adj.scale - 3.0).abs() < 0.01);
         assert_eq!(adj.deflator, Some(0.9));
         assert_eq!(adj.ecli_norm, Some(0.3));
-
-        // Check that breakdown values are scaled correctly
-        assert!((adj.breakdown.cash - 30000.0).abs() < 1.0);
         assert!(warnings.is_empty());
     }
 
@@ -175,8 +140,6 @@ mod tests {
 
         // Create scenario with very high combined scale
         let inflation_adj = SnapshotAdjustment {
-            breakdown: breakdown.clone(),
-            totals: test_totals(),
             scale: 1.0,
             deflator: Some(1.0),
             ecli_norm: None,
@@ -187,8 +150,6 @@ mod tests {
         };
 
         let ny_adj = SnapshotAdjustment {
-            breakdown: breakdown.clone(),
-            totals: test_totals(),
             scale: 10.0,
             deflator: None,
             ecli_norm: Some(0.1), // Very low cost of living = high scale
@@ -213,8 +174,6 @@ mod tests {
         let mut warnings = Vec::new();
 
         let inflation_adj = SnapshotAdjustment {
-            breakdown: breakdown.clone(),
-            totals: test_totals(),
             scale: 1.0,
             deflator: Some(1.0),
             ecli_norm: None,
@@ -225,8 +184,6 @@ mod tests {
         };
 
         let ny_adj = SnapshotAdjustment {
-            breakdown: breakdown.clone(),
-            totals: test_totals(),
             scale: 4.0,
             deflator: None,
             ecli_norm: Some(0.25), // 25% of NY cost = 4x purchasing power
@@ -249,13 +206,11 @@ mod tests {
     }
 
     #[test]
-    fn test_compute_combined_adjustment_totals_consistency() {
+    fn test_compute_combined_adjustment_metadata() {
         let breakdown = test_breakdown();
         let mut warnings = Vec::new();
 
         let inflation_adj = SnapshotAdjustment {
-            breakdown: breakdown.clone(),
-            totals: test_totals(),
             scale: 0.8,
             deflator: Some(0.8),
             ecli_norm: None,
@@ -266,8 +221,6 @@ mod tests {
         };
 
         let ny_adj = SnapshotAdjustment {
-            breakdown: breakdown.clone(),
-            totals: test_totals(),
             scale: 2.5,
             deflator: None,
             ecli_norm: Some(0.4),
@@ -283,14 +236,13 @@ mod tests {
 
         let adj = result.unwrap();
 
-        // Verify totals match breakdown calculations
-        let expected_assets = adj.breakdown.cash
-            + adj.breakdown.investments
-            + adj.breakdown.personal
-            + adj.breakdown.pension;
-        let expected_net_worth = expected_assets - adj.breakdown.liabilities;
-
-        assert!((adj.totals.assets - expected_assets).abs() < 0.01);
-        assert!((adj.totals.net_worth - expected_net_worth).abs() < 0.01);
+        // Verify metadata fields are set
+        assert!((adj.scale - 2.0).abs() < 0.01); // 0.8 / 0.4 = 2.0
+        assert_eq!(adj.deflator, Some(0.8));
+        assert_eq!(adj.ecli_norm, Some(0.4));
+        assert!(adj.ny_advantage_pct.is_some());
+        assert!(adj.badge.is_some());
+        assert!(adj.normalization_applied.is_some());
+        assert!(adj.notes.is_some());
     }
 }

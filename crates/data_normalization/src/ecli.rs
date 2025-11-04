@@ -5,7 +5,7 @@ use models::*;
 pub fn compute_new_york_only(
     doc: &InputDocument,
     settings: Option<&Settings>,
-    b: &SnapshotBreakdown,
+    _b: &SnapshotBreakdown,
     _t: &SnapshotTotals,
     warnings: &mut Vec<String>,
 ) -> Result<Option<SnapshotAdjustment>> {
@@ -43,29 +43,10 @@ pub fn compute_new_york_only(
     // Scale factor adjusts values to New York reference (higher ECLI = more expensive)
     let scale = 1.0 / ecli_norm;
 
-    // Apply cost-of-living adjustment to all categories
-    let nb = SnapshotBreakdown {
-        cash: b.cash * scale,
-        investments: b.investments * scale,
-        personal: b.personal * scale,
-        pension: b.pension * scale,
-        liabilities: b.liabilities * scale,
-    };
-
-    // Recalculate totals with adjusted values
-    let assets_adj = nb.cash + nb.investments + nb.personal + nb.pension;
-    let nt = SnapshotTotals {
-        assets: assets_adj,
-        liabilities: nb.liabilities,
-        net_worth: assets_adj - nb.liabilities,
-    };
-
     // Advantage percentage vs New York: (scale - 1) * 100
     let ny_advantage_pct = (scale - 1.0) * 100.0;
 
     Ok(Some(SnapshotAdjustment {
-        breakdown: nb,
-        totals: nt,
         scale,
         deflator: None,
         ecli_norm: Some(ecli_norm),

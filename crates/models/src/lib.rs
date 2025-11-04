@@ -360,8 +360,6 @@ impl Snapshot {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SnapshotAdjustment {
-    pub breakdown: SnapshotBreakdown,
-    pub totals: SnapshotTotals,
     pub scale: f64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub deflator: Option<f64>,
@@ -380,11 +378,9 @@ pub struct SnapshotAdjustment {
 }
 
 impl SnapshotAdjustment {
-    /// Round all financial values to 2 decimal places, scale factors to 4 decimals
+    /// Round all scale factors to 4 decimals
     pub fn rounded(&self) -> Self {
         Self {
-            breakdown: self.breakdown.rounded(),
-            totals: self.totals.rounded(),
             scale: round_to_4_decimals(self.scale),
             deflator: self.deflator.map(round_to_4_decimals),
             ecli_norm: self.ecli_norm.map(round_to_4_decimals),
