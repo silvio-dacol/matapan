@@ -48,6 +48,17 @@ impl FileDashboardRepository {
 
     /// Load dashboard from file, using cache if available and fresh
     async fn load_dashboard(&self) -> Result<Dashboard> {
+        // TODO: For development, always load fresh from file.
+        // For production with many users, consider enabling cache.
+
+        // Load from file (always fresh)
+        let content = tokio::fs::read_to_string(&self.dashboard_path).await?;
+        let dashboard: Dashboard = serde_json::from_str(&content)?;
+
+        Ok(dashboard)
+
+        // ALTERNATIVE: To enable caching, uncomment the code below and comment out the lines above
+        /*
         // Check cache first
         {
             let cache = self.cache.read().await;
@@ -67,6 +78,7 @@ impl FileDashboardRepository {
         }
 
         Ok(dashboard)
+        */
     }
 
     /// Load a raw input document from the database directory
