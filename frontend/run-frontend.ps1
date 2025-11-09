@@ -31,10 +31,13 @@ try {
 }
 
 Write-Host ""
-Write-Host "Starting frontend on http://localhost:3000..." -ForegroundColor Cyan
+Write-Host "Starting frontend on http://localhost:3001..." -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Press Ctrl+C to stop the server" -ForegroundColor Gray
 Write-Host ""
 
-# Start the dev server
-npm run dev
+# Ensure PORT env variable is set for tooling that respects it
+$env:PORT = 3001
+
+# Start the dev server explicitly on port 3001 to avoid clashing with backend
+npm run dev:3001
