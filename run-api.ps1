@@ -2,7 +2,7 @@
 # Simple PowerShell script to run the API server with sensible defaults
 
 param(
-    [string]$DashboardPath = "dashboard.json",
+    [string]$DashboardPath = "dashboard/dashboard.json",
     [string]$DatabaseDir = "database",
     [string]$ServerHost = "127.0.0.1",
     [int]$Port = 3000

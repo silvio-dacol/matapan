@@ -31,7 +31,7 @@ try {
 }
 
 Write-Host ""
-Write-Host "Starting frontend on http://localhost:3001..." -ForegroundColor Cyan
+Write-Host "Starting frontend on http://localhost:3000..." -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Press Ctrl+C to stop the server" -ForegroundColor Gray
 Write-Host ""
