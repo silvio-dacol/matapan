@@ -4,8 +4,27 @@ Track net worth over time with inflation adjustment and cost-of-living normaliza
 
 ## Quick Start
 
+### Full Stack (Frontend + Backend)
+
 ```powershell
 # 1. Generate dashboard data from monthly snapshots
+cargo run --bin cli -- --input database --output dashboard/dashboard.json --settings settings.json --pretty
+
+# 2. Start API server (Terminal 1)
+.\run-api.ps1
+
+# 3. Start frontend dashboard (Terminal 2)
+cd frontend
+npm install
+npm run dev
+```
+
+Visit `http://localhost:3001` to see the dashboard.
+
+### Backend Only
+
+```powershell
+# 1. Generate dashboard data
 cargo run --bin cli -- --input database --output dashboard/dashboard.json --settings settings.json --pretty
 
 # 2. Start API server
@@ -14,6 +33,31 @@ cargo run --bin cli -- --input database --output dashboard/dashboard.json --sett
 # 3. Test API
 Invoke-WebRequest http://localhost:3000/health
 ```
+
+## Frontend Dashboard
+
+Modern Next.js dashboard with real-time data visualization.
+
+### Features
+
+- 📊 Interactive charts (pie, area, line)
+- 💰 Key metrics dashboard (Net Worth, Assets, Liabilities)
+- 🔄 Auto-refresh every 30 seconds
+- 📱 Responsive design
+- 🎨 Modern UI with shadcn/ui components
+
+### Tech Stack
+
+- Next.js 16 (App Router) + TypeScript
+- TanStack Query for data fetching
+- Recharts for visualizations
+- Tailwind CSS + shadcn/ui
+
+### Documentation
+
+- [Frontend README](frontend/README.md) - Complete frontend guide
+- [Fullstack Quick Start](docs/FULLSTACK_QUICKSTART.md) - Step-by-step setup
+- [Frontend Implementation](docs/FRONTEND_IMPLEMENTATION.md) - Technical details
 
 ## CLI
 
@@ -119,5 +163,9 @@ Deflator(t) = HICP(base) / HICP(t)
 
 ## Documentation
 
-- [API Quick Start](docs/API_QUICKSTART.md)
-- [Backend API Details](crates/backend_api/README.md)
+- [Fullstack Quick Start](docs/FULLSTACK_QUICKSTART.md) - Complete setup guide
+- [Frontend README](frontend/README.md) - Frontend documentation
+- [Frontend Implementation](docs/FRONTEND_IMPLEMENTATION.md) - Technical details
+- [API Quick Start](docs/API_QUICKSTART.md) - Backend API guide
+- [Backend API Details](crates/backend_api/README.md) - API implementation
+- [Auto-Refresh Guide](docs/AUTO_REFRESH_GUIDE.md) - Polling implementation
