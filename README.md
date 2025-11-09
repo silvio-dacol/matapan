@@ -158,6 +158,7 @@ Deflator(t) = HICP(base) / HICP(t)
 
 ### Data Sources
 
+- **FX Rates**: [ExchangeRate-API](https://www.x-rates.com/average/?from=USD&to=EUR&amount=1&year=2025)
 - **HICP**: [Eurostat HICP Index](https://ec.europa.eu/eurostat/databrowser/view/prc_hicp_midx__custom_18474914/default/table)
 - **ECLI**: [Numbeo Cost of Living](https://www.numbeo.com/cost-of-living/rankings.jsp)
 
