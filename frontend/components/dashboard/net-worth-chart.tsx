@@ -5,7 +5,6 @@
  * Displays a line/area chart showing net worth over time
  */
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { Snapshot } from "@/lib/types";
 import { useMemo, useState } from "react";
@@ -30,9 +29,13 @@ const timeframeMonths: Record<Exclude<Timeframe, "YTD" | "All">, number> = {
 
 interface NetWorthChartProps {
   snapshots: Snapshot[];
+  onPercentChange?: (percent: number | null) => void; // report percent change to parent for display
 }
 
-export function NetWorthChart({ snapshots }: NetWorthChartProps) {
+export function NetWorthChart({
+  snapshots,
+  onPercentChange,
+}: NetWorthChartProps) {
   const [timeframe, setTimeframe] = useState<Timeframe>("All");
 
   // Ensure snapshots are sorted ascending by month string (YYYY-MM)
@@ -114,28 +117,15 @@ export function NetWorthChart({ snapshots }: NetWorthChartProps) {
     return ((last - first) / first) * 100;
   }, [data]);
 
-  const pctLabel =
-    percentChange === null
-      ? "—"
-      : `${percentChange > 0 ? "+" : ""}${percentChange.toFixed(1)}%`;
-  const pctColor =
-    percentChange === null
-      ? ""
-      : percentChange >= 0
-      ? "text-green-600"
-      : "text-red-600";
+  // Notify parent when percent change updates
+  useMemo(() => {
+    if (onPercentChange) {
+      onPercentChange(percentChange);
+    }
+  }, [percentChange, onPercentChange]);
 
   return (
     <div className="space-y-3">
-      {/* Header with percent change */}
-      <div className="flex items-center justify-between">
-        <div className="text-sm font-medium text-muted-foreground">
-          Net Worth (relative)
-        </div>
-        <Badge variant="secondary" className={pctColor}>
-          {pctLabel}
-        </Badge>
-      </div>
       <ResponsiveContainer width="100%" height={260}>
         <AreaChart
           data={data}
@@ -185,7 +175,10 @@ export function NetWorthChart({ snapshots }: NetWorthChartProps) {
         </AreaChart>
       </ResponsiveContainer>
       {/* Timeframe controls below for clarity */}
-      <div className="flex flex-wrap gap-2" aria-label="Select timeframe">
+      <div
+        className="flex flex-wrap gap-2 justify-center"
+        aria-label="Select timeframe"
+      >
         {["3M", "YTD", "1Y", "3Y", "5Y", "All"].map((tf) => (
           <Button
             key={tf}

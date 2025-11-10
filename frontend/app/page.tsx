@@ -40,7 +40,12 @@ function formatDate(dateString: string): string {
   });
 }
 
+import { useState } from "react";
+
 export default function Home() {
+  const [netWorthPercentChange, setNetWorthPercentChange] = useState<
+    number | null
+  >(null);
   const { data: dashboard, isLoading, error, refetch } = useDashboard(30000); // Poll every 30 seconds
 
   if (error) {
@@ -189,13 +194,33 @@ export default function Home() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Net Worth Over Time</CardTitle>
+            <div className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2">
+                Net Worth Over Time
+                {netWorthPercentChange !== null && (
+                  <Badge
+                    variant="secondary"
+                    className={
+                      netWorthPercentChange >= 0
+                        ? "text-green-600 text-xs font-semibold"
+                        : "text-red-600 text-xs font-semibold"
+                    }
+                  >
+                    {netWorthPercentChange >= 0 ? "+" : ""}
+                    {netWorthPercentChange.toFixed(1)}%
+                  </Badge>
+                )}
+              </CardTitle>
+            </div>
             <CardDescription>
               Historical trend of your net worth
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <NetWorthChart snapshots={dashboard.snapshots} />
+            <NetWorthChart
+              snapshots={dashboard.snapshots}
+              onPercentChange={(pct) => setNetWorthPercentChange(pct)}
+            />
           </CardContent>
         </Card>
       </div>
