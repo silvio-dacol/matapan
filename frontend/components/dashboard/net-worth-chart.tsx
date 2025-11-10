@@ -147,14 +147,10 @@ export function NetWorthChart({ snapshots }: NetWorthChartProps) {
             tick={false}
             axisLine={false}
             tickLine={false}
+            padding={{ left: 0, right: 0 }}
           />
-          <YAxis
-            tickLine={false}
-            axisLine={false}
-            ticks={[]}
-            domain={["dataMin", "dataMax"]}
-            tickFormatter={() => ""}
-          />
+          {/* Hide Y axis completely to eliminate reserved left space so the area starts flush */}
+          <YAxis hide domain={["dataMin", "dataMax"]} />
           <Tooltip
             contentStyle={{ borderRadius: "4px" }}
             formatter={(_, __, item) => {
