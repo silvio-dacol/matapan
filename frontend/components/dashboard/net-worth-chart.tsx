@@ -144,18 +144,10 @@ export function NetWorthChart({
           <Tooltip
             contentStyle={{ borderRadius: "4px" }}
             formatter={(_, __, item) => {
-              const original = formatCurrency(item.payload.absolute);
-              const relChange = item.payload.change;
-              const relPct = item.payload.percent;
-              const sign = relChange >= 0 ? "+" : "";
-              return [
-                `${sign}${formatCurrency(
-                  Math.abs(relChange)
-                )} (${sign}${relPct.toFixed(1)}%)`,
-                original,
-              ];
+              // Only show the absolute net worth amount
+              return [formatCurrency(item.payload.absolute), "Net Worth"];
             }}
-            labelFormatter={(label) => label}
+            labelFormatter={(label) => label} // Month string (YYYY-MM)
           />
           <defs>
             <linearGradient id="nwGradient" x1="0" y1="0" x2="0" y2="1">
