@@ -12,21 +12,28 @@ import { useMemo, useState } from "react";
 import {
   Area,
   AreaChart,
-  CartesianGrid,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
 
+type Timeframe = "3M" | "YTD" | "1Y" | "3Y" | "5Y" | "All";
+
+// Mapping of timeframe to number of months (approximate for multi-year)
+const timeframeMonths: Record<Exclude<Timeframe, "YTD" | "All">, number> = {
+  "3M": 3,
+  "1Y": 12,
+  "3Y": 36,
+  "5Y": 60,
+};
+
 interface NetWorthChartProps {
   snapshots: Snapshot[];
 }
 
 export function NetWorthChart({ snapshots }: NetWorthChartProps) {
-  const [timeframe, setTimeframe] = useState<"3M" | "YTD" | "1Y" | "All">(
-    "All"
-  );
+  const [timeframe, setTimeframe] = useState<Timeframe>("All");
 
   // Ensure snapshots are sorted ascending by month string (YYYY-MM)
   const sorted = useMemo(
@@ -42,31 +49,49 @@ export function NetWorthChart({ snapshots }: NetWorthChartProps) {
     const now = new Date();
     const currentYear = now.getFullYear().toString();
 
-    switch (timeframe) {
-      case "3M": {
-        return sorted.slice(-3);
+    // Handle fixed month-based timeframes with fallback when insufficient data
+    if (timeframe !== "YTD" && timeframe !== "All") {
+      const targetMonths = timeframeMonths[timeframe];
+      // If we have fewer than requested months, just return everything available
+      if (sorted.length <= targetMonths) {
+        return sorted; // fallback to max available
       }
-      case "1Y": {
-        return sorted.slice(-12);
-      }
-      case "YTD": {
-        return sorted.filter((s) =>
-          s.reference_month.startsWith(currentYear + "-")
-        );
-      }
-      case "All":
-      default:
-        return sorted;
+      return sorted.slice(-targetMonths);
     }
+
+    if (timeframe === "YTD") {
+      const ytd = sorted.filter((s) =>
+        s.reference_month.startsWith(currentYear + "-")
+      );
+      // Fallback: if no data for current year yet, use last up to 12 months available
+      if (ytd.length === 0) {
+        const fallbackMonths = Math.min(12, sorted.length);
+        return sorted.slice(-fallbackMonths);
+      }
+      return ytd;
+    }
+
+    // "All"
+    return sorted;
   }, [sorted, timeframe]);
+
+  // Baseline (first value in filtered timeframe) for relative scaling
+  const baseline = filtered.length > 0 ? filtered[0].totals.net_worth : 0;
 
   const data = useMemo(
     () =>
-      filtered.map((snapshot) => ({
-        month: snapshot.reference_month,
-        "Net Worth": snapshot.totals.net_worth,
-      })),
-    [filtered]
+      filtered.map((snapshot) => {
+        const absolute = snapshot.totals.net_worth;
+        const change = absolute - baseline; // relative difference
+        const percent = baseline !== 0 ? (change / baseline) * 100 : 0;
+        return {
+          month: snapshot.reference_month,
+          absolute,
+          change,
+          percent,
+        };
+      }),
+    [filtered, baseline]
   );
 
   const formatCurrency = (value: number) => {
@@ -78,19 +103,15 @@ export function NetWorthChart({ snapshots }: NetWorthChartProps) {
     }).format(value);
   };
 
-  const formatMonth = (month: string) => {
-    const [year, monthNum] = month.split("-");
-    return `${monthNum}/${year.slice(2)}`;
-  };
+  // (Axis labels hidden, month formatter removed for minimal style)
 
   // Percentage change between first and last point in current timeframe
   const percentChange = useMemo(() => {
     if (data.length < 2) return null;
-    const first = data[0]["Net Worth"];
-    const last = data[data.length - 1]["Net Worth"];
-    if (first === 0) return null; // avoid divide by zero / meaningless percentage
-    const pct = ((last - first) / first) * 100;
-    return pct;
+    const first = data[0].absolute;
+    const last = data[data.length - 1].absolute;
+    if (first === 0) return null;
+    return ((last - first) / first) * 100;
   }, [data]);
 
   const pctLabel =
@@ -105,47 +126,82 @@ export function NetWorthChart({ snapshots }: NetWorthChartProps) {
       : "text-red-600";
 
   return (
-    <div className="space-y-4">
-      {/* Timeframe selector */}
-      <div className="flex flex-wrap gap-2">
-        {["3M", "YTD", "1Y", "All"].map((tf) => (
+    <div className="space-y-3">
+      {/* Header with percent change */}
+      <div className="flex items-center justify-between">
+        <div className="text-sm font-medium text-muted-foreground">
+          Net Worth (relative)
+        </div>
+        <Badge variant="secondary" className={pctColor}>
+          {pctLabel}
+        </Badge>
+      </div>
+      <ResponsiveContainer width="100%" height={260}>
+        <AreaChart
+          data={data}
+          margin={{ left: 0, right: 0, top: 10, bottom: 0 }}
+        >
+          {/* Minimal axes: hide X axis ticks & line; Y axis only min/max (optional) */}
+          <XAxis
+            dataKey="month"
+            tick={false}
+            axisLine={false}
+            tickLine={false}
+          />
+          <YAxis
+            tickLine={false}
+            axisLine={false}
+            ticks={[]}
+            domain={["dataMin", "dataMax"]}
+            tickFormatter={() => ""}
+          />
+          <Tooltip
+            contentStyle={{ borderRadius: "4px" }}
+            formatter={(_, __, item) => {
+              const original = formatCurrency(item.payload.absolute);
+              const relChange = item.payload.change;
+              const relPct = item.payload.percent;
+              const sign = relChange >= 0 ? "+" : "";
+              return [
+                `${sign}${formatCurrency(
+                  Math.abs(relChange)
+                )} (${sign}${relPct.toFixed(1)}%)`,
+                original,
+              ];
+            }}
+            labelFormatter={(label) => label}
+          />
+          <defs>
+            <linearGradient id="nwGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#6366f1" stopOpacity={0.35} />
+              <stop offset="100%" stopColor="#6366f1" stopOpacity={0.05} />
+            </linearGradient>
+          </defs>
+          <Area
+            type="monotone"
+            dataKey="change"
+            stroke="#6366f1"
+            strokeWidth={3}
+            fill="url(#nwGradient)"
+            fillOpacity={1}
+            isAnimationActive={false}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+      {/* Timeframe controls below for clarity */}
+      <div className="flex flex-wrap gap-2" aria-label="Select timeframe">
+        {["3M", "YTD", "1Y", "3Y", "5Y", "All"].map((tf) => (
           <Button
             key={tf}
             variant={timeframe === tf ? "default" : "outline"}
             size="sm"
             onClick={() => setTimeframe(tf as typeof timeframe)}
+            aria-pressed={timeframe === tf}
           >
             {tf}
           </Button>
         ))}
-        <Badge variant="secondary" className={`ml-auto ${pctColor}`}>
-          {pctLabel}
-        </Badge>
       </div>
-      <ResponsiveContainer width="100%" height={300}>
-        <AreaChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis
-            dataKey="month"
-            tickFormatter={formatMonth}
-            angle={-45}
-            textAnchor="end"
-            height={60}
-          />
-          <YAxis tickFormatter={formatCurrency} />
-          <Tooltip
-            formatter={(value: number) => formatCurrency(Number(value))}
-            labelFormatter={(label) => `Month: ${label}`}
-          />
-          <Area
-            type="monotone"
-            dataKey="Net Worth"
-            stroke="#3b82f6"
-            fill="#3b82f6"
-            fillOpacity={0.8}
-          />
-        </AreaChart>
-      </ResponsiveContainer>
     </div>
   );
 }
