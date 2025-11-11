@@ -171,7 +171,7 @@ export function NetWorthChart({
               const primary = base.primaryAbsolute;
               const comparison = base.comparisonAbsolute;
               return (
-                <div className="rounded-md border bg-background/95 backdrop-blur px-3 py-2 shadow-lg min-w-[180px] space-y-2">
+                <div className="rounded-md border bg-background/95 backdrop-blur px-3 py-2 shadow-lg min-w-[165px] space-y-2">
                   <div className="text-xs font-medium tracking-wide text-muted-foreground">
                     {label}
                   </div>
@@ -180,18 +180,18 @@ export function NetWorthChart({
                       <>
                         <div className="flex items-baseline justify-between gap-1">
                           <span className="text-[11px] uppercase text-muted-foreground">
-                            Inflation Adj.
-                          </span>
-                          <span className="font-semibold text-sm tabular-nums text-emerald-600">
-                            {formatCurrency(primary)}
-                          </span>
-                        </div>
-                        <div className="flex items-baseline justify-between gap-1">
-                          <span className="text-[11px] uppercase text-muted-foreground">
                             Nominal
                           </span>
                           <span className="font-semibold text-sm tabular-nums text-indigo-600">
                             {formatCurrency(comparison)}
+                          </span>
+                        </div>
+                        <div className="flex items-baseline justify-between gap-1">
+                          <span className="text-[11px] uppercase text-muted-foreground">
+                            Inflation Adj.
+                          </span>
+                          <span className="font-semibold text-sm tabular-nums text-emerald-600">
+                            {formatCurrency(primary)}
                           </span>
                         </div>
                       </>

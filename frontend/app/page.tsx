@@ -208,10 +208,11 @@ export default function Home() {
             <RefreshCw className="mr-2 h-4 w-4" />
             Refresh
           </Button>
-          <div className="flex flex-col items-end gap-1">
-            <Switch checked={showInflation} onChange={setShowInflation} />
-            <span className="text-xs text-muted-foreground">Inflation</span>
-          </div>
+          <Switch
+            checked={showInflation}
+            onChange={setShowInflation}
+            label="Inflation"
+          />
         </div>
       </div>
 
