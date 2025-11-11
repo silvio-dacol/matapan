@@ -7,7 +7,7 @@
 
 import { Button } from "@/components/ui/button";
 import type { Snapshot } from "@/lib/types";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -117,8 +117,8 @@ export function NetWorthChart({
     return ((last - first) / first) * 100;
   }, [data]);
 
-  // Notify parent when percent change updates
-  useMemo(() => {
+  // Notify parent when percent change updates (after render commit to avoid parent state update during child render)
+  useEffect(() => {
     if (onPercentChange) {
       onPercentChange(percentChange);
     }
