@@ -1,10 +1,5 @@
 "use client";
 
-/**
- * Net Worth Chart Component
- * Displays a line/area chart showing net worth over time
- */
-
 import { Button } from "@/components/ui/button";
 import type { Snapshot } from "@/lib/types";
 import { useEffect, useMemo, useState } from "react";
@@ -19,7 +14,6 @@ import {
 
 type Timeframe = "3M" | "YTD" | "1Y" | "3Y" | "5Y" | "All";
 
-// Mapping of timeframe to number of months (approximate for multi-year)
 const timeframeMonths: Record<Exclude<Timeframe, "YTD" | "All">, number> = {
   "3M": 3,
   "1Y": 12,
@@ -28,101 +22,129 @@ const timeframeMonths: Record<Exclude<Timeframe, "YTD" | "All">, number> = {
 };
 
 interface NetWorthChartProps {
-  snapshots: Snapshot[];
-  onPercentChange?: (percent: number | null) => void; // report percent change to parent for display
+  snapshots: Snapshot[]; // primary series (nominal if toggle off, real if toggle on)
+  comparisonSnapshots?: Snapshot[]; // optional nominal series when viewing inflation-adjusted
+  onPercentChange?: (percent: number | null) => void;
 }
 
 export function NetWorthChart({
   snapshots,
+  comparisonSnapshots,
   onPercentChange,
 }: NetWorthChartProps) {
   const [timeframe, setTimeframe] = useState<Timeframe>("All");
 
-  // Ensure snapshots are sorted ascending by month string (YYYY-MM)
-  const sorted = useMemo(
+  const sortedPrimary = useMemo(
     () =>
       [...snapshots].sort((a, b) =>
         a.reference_month.localeCompare(b.reference_month)
       ),
     [snapshots]
   );
+  const sortedComparison = useMemo(
+    () =>
+      comparisonSnapshots
+        ? [...comparisonSnapshots].sort((a, b) =>
+            a.reference_month.localeCompare(b.reference_month)
+          )
+        : undefined,
+    [comparisonSnapshots]
+  );
 
-  const filtered = useMemo(() => {
-    if (sorted.length === 0) return [];
+  const filteredPrimary = useMemo(() => {
+    if (sortedPrimary.length === 0) return [];
     const now = new Date();
     const currentYear = now.getFullYear().toString();
-
-    // Handle fixed month-based timeframes with fallback when insufficient data
     if (timeframe !== "YTD" && timeframe !== "All") {
-      const targetMonths = timeframeMonths[timeframe];
-      // If we have fewer than requested months, just return everything available
-      if (sorted.length <= targetMonths) {
-        return sorted; // fallback to max available
-      }
-      return sorted.slice(-targetMonths);
+      const targetMonths =
+        timeframeMonths[timeframe as Exclude<Timeframe, "YTD" | "All">];
+      return sortedPrimary.length <= targetMonths
+        ? sortedPrimary
+        : sortedPrimary.slice(-targetMonths);
     }
-
     if (timeframe === "YTD") {
-      const ytd = sorted.filter((s) =>
+      const ytd = sortedPrimary.filter((s) =>
         s.reference_month.startsWith(currentYear + "-")
       );
-      // Fallback: if no data for current year yet, use last up to 12 months available
       if (ytd.length === 0) {
-        const fallbackMonths = Math.min(12, sorted.length);
-        return sorted.slice(-fallbackMonths);
+        const fallbackMonths = Math.min(12, sortedPrimary.length);
+        return sortedPrimary.slice(-fallbackMonths);
       }
       return ytd;
     }
+    return sortedPrimary;
+  }, [sortedPrimary, timeframe]);
 
-    // "All"
-    return sorted;
-  }, [sorted, timeframe]);
+  const filteredComparison = useMemo(() => {
+    if (!sortedComparison) return undefined;
+    if (filteredPrimary.length === 0) return [];
+    // Keep only months that appear in filteredPrimary for alignment
+    const monthsSet = new Set(filteredPrimary.map((s) => s.reference_month));
+    return sortedComparison.filter((s) => monthsSet.has(s.reference_month));
+  }, [sortedComparison, filteredPrimary]);
 
-  // Baseline (first value in filtered timeframe) for relative scaling
-  const baseline = filtered.length > 0 ? filtered[0].totals.net_worth : 0;
+  const baselinePrimary =
+    filteredPrimary.length > 0 ? filteredPrimary[0].totals.net_worth : 0;
+  const baselineComparison =
+    filteredComparison && filteredComparison.length > 0
+      ? filteredComparison[0].totals.net_worth
+      : 0;
+
+  const comparisonMap = useMemo(() => {
+    if (!filteredComparison) return new Map<string, Snapshot>();
+    return new Map(filteredComparison.map((s) => [s.reference_month, s]));
+  }, [filteredComparison]);
 
   const data = useMemo(
     () =>
-      filtered.map((snapshot) => {
-        const absolute = snapshot.totals.net_worth;
-        const change = absolute - baseline; // relative difference
-        const percent = baseline !== 0 ? (change / baseline) * 100 : 0;
+      filteredPrimary.map((p) => {
+        const primaryAbsolute = p.totals.net_worth;
+        const primaryChange = primaryAbsolute - baselinePrimary;
+        let comparisonAbsolute: number | undefined;
+        let comparisonChange: number | undefined;
+        if (filteredComparison) {
+          const comp = comparisonMap.get(p.reference_month);
+          if (comp) {
+            comparisonAbsolute = comp.totals.net_worth;
+            comparisonChange = comparisonAbsolute - baselineComparison;
+          }
+        }
         return {
-          month: snapshot.reference_month,
-          absolute,
-          change,
-          percent,
+          month: p.reference_month,
+          primaryAbsolute,
+          primaryChange,
+          comparisonAbsolute,
+          comparisonChange,
         };
       }),
-    [filtered, baseline]
+    [
+      filteredPrimary,
+      filteredComparison,
+      baselinePrimary,
+      baselineComparison,
+      comparisonMap,
+    ]
   );
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("en-US", {
+  const percentChange = useMemo(() => {
+    if (data.length < 2) return null;
+    const first = data[0].primaryAbsolute;
+    const last = data[data.length - 1].primaryAbsolute;
+    if (first === 0) return null;
+    return ((last - first) / first) * 100;
+  }, [data]);
+
+  useEffect(() => {
+    onPercentChange?.(percentChange);
+  }, [percentChange, onPercentChange]);
+
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: "EUR",
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(value);
-  };
-
-  // (Axis labels hidden, month formatter removed for minimal style)
-
-  // Percentage change between first and last point in current timeframe
-  const percentChange = useMemo(() => {
-    if (data.length < 2) return null;
-    const first = data[0].absolute;
-    const last = data[data.length - 1].absolute;
-    if (first === 0) return null;
-    return ((last - first) / first) * 100;
-  }, [data]);
-
-  // Notify parent when percent change updates (after render commit to avoid parent state update during child render)
-  useEffect(() => {
-    if (onPercentChange) {
-      onPercentChange(percentChange);
-    }
-  }, [percentChange, onPercentChange]);
 
   return (
     <div className="space-y-3">
@@ -131,7 +153,6 @@ export function NetWorthChart({
           data={data}
           margin={{ left: 0, right: 0, top: 10, bottom: 0 }}
         >
-          {/* Minimal axes: hide X axis ticks & line; Y axis only min/max (optional) */}
           <XAxis
             dataKey="month"
             tick={false}
@@ -139,34 +160,66 @@ export function NetWorthChart({
             tickLine={false}
             padding={{ left: 0, right: 0 }}
           />
-          {/* Hide Y axis completely to eliminate reserved left space so the area starts flush */}
           <YAxis hide domain={["dataMin", "dataMax"]} />
           <Tooltip
             contentStyle={{ borderRadius: "4px" }}
             formatter={(_, __, item) => {
-              // Only show the absolute net worth amount
-              return [formatCurrency(item.payload.absolute), "Net Worth"];
+              const pAbs = item.payload.primaryAbsolute;
+              const cAbs = item.payload.comparisonAbsolute;
+              if (cAbs !== undefined) {
+                return [
+                  `${formatCurrency(
+                    pAbs
+                  )} (Inflation-adjusted)\n${formatCurrency(cAbs)} (Nominal)`,
+                  "Net Worth",
+                ];
+              }
+              return [formatCurrency(pAbs), "Net Worth"];
             }}
-            labelFormatter={(label) => label} // Month string (YYYY-MM)
+            labelFormatter={(label) => label}
           />
           <defs>
-            <linearGradient id="nwGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#6366f1" stopOpacity={0.35} />
-              <stop offset="100%" stopColor="#6366f1" stopOpacity={0.05} />
+            <linearGradient id="nwGradientNominal" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#6366f1" stopOpacity={0.18} />
+              <stop offset="100%" stopColor="#6366f1" stopOpacity={0.06} />
             </linearGradient>
           </defs>
-          <Area
-            type="monotone"
-            dataKey="change"
-            stroke="#6366f1"
-            strokeWidth={3}
-            fill="url(#nwGradient)"
-            fillOpacity={1}
-            isAnimationActive={false}
-          />
+          {filteredComparison ? (
+            <>
+              <Area
+                type="monotone"
+                dataKey="comparisonChange"
+                stroke="#6366f1"
+                strokeWidth={3}
+                fill="url(#nwGradientNominal)"
+                fillOpacity={1}
+                isAnimationActive={false}
+                name="Nominal"
+              />
+              <Area
+                type="monotone"
+                dataKey="primaryChange"
+                stroke="#10b981"
+                strokeWidth={2}
+                fill="none"
+                isAnimationActive={false}
+                name="Inflation-adjusted"
+              />
+            </>
+          ) : (
+            <Area
+              type="monotone"
+              dataKey="primaryChange"
+              stroke="#6366f1"
+              strokeWidth={3}
+              fill="url(#nwGradientNominal)"
+              fillOpacity={1}
+              isAnimationActive={false}
+              name="Net Worth"
+            />
+          )}
         </AreaChart>
       </ResponsiveContainer>
-      {/* Timeframe controls below for clarity */}
       <div
         className="flex flex-wrap gap-2 justify-center"
         aria-label="Select timeframe"
@@ -176,7 +229,7 @@ export function NetWorthChart({
             key={tf}
             variant={timeframe === tf ? "default" : "outline"}
             size="sm"
-            onClick={() => setTimeframe(tf as typeof timeframe)}
+            onClick={() => setTimeframe(tf as Timeframe)}
             aria-pressed={timeframe === tf}
           >
             {tf}
