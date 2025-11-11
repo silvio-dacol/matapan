@@ -162,21 +162,54 @@ export function NetWorthChart({
           />
           <YAxis hide domain={["dataMin", "dataMax"]} />
           <Tooltip
-            contentStyle={{ borderRadius: "4px" }}
-            formatter={(_, __, item) => {
-              const pAbs = item.payload.primaryAbsolute;
-              const cAbs = item.payload.comparisonAbsolute;
-              if (cAbs !== undefined) {
-                return [
-                  `${formatCurrency(
-                    pAbs
-                  )} (Inflation-adjusted)\n${formatCurrency(cAbs)} (Nominal)`,
-                  "Net Worth",
-                ];
-              }
-              return [formatCurrency(pAbs), "Net Worth"];
+            content={({ active, payload, label }) => {
+              if (!active || !payload || payload.length === 0) return null;
+              // Both series share the same underlying payload shape
+              const base = payload[0].payload as {
+                primaryAbsolute: number;
+                comparisonAbsolute?: number;
+              };
+              const primary = base.primaryAbsolute;
+              const comparison = base.comparisonAbsolute;
+              return (
+                <div className="rounded-md border bg-background/95 backdrop-blur px-3 py-2 shadow-lg min-w-[180px] space-y-2">
+                  <div className="text-xs font-medium tracking-wide text-muted-foreground">
+                    {label}
+                  </div>
+                  <div className="space-y-1">
+                    {comparison !== undefined ? (
+                      <>
+                        <div className="flex items-baseline justify-between gap-2">
+                          <span className="text-[11px] uppercase text-muted-foreground">
+                            Inflation Adj.
+                          </span>
+                          <span className="font-semibold text-sm tabular-nums text-emerald-600">
+                            {formatCurrency(primary)}
+                          </span>
+                        </div>
+                        <div className="flex items-baseline justify-between gap-2">
+                          <span className="text-[11px] uppercase text-muted-foreground">
+                            Nominal
+                          </span>
+                          <span className="font-semibold text-sm tabular-nums text-indigo-600">
+                            {formatCurrency(comparison)}
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="text-[11px] uppercase text-muted-foreground">
+                          Net Worth
+                        </span>
+                        <span className="font-semibold text-sm tabular-nums text-indigo-600">
+                          {formatCurrency(primary)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
             }}
-            labelFormatter={(label) => label}
           />
           <defs>
             <linearGradient id="nwGradientNominal" x1="0" y1="0" x2="0" y2="1">
