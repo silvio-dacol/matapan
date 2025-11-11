@@ -138,10 +138,9 @@ export function NetWorthChart({
     onPercentChange?.(percentChange);
   }, [percentChange, onPercentChange]);
 
+  // Display plain numbers without currency symbol (base currency shown elsewhere in UI)
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "EUR",
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(value);
@@ -179,7 +178,7 @@ export function NetWorthChart({
                   <div className="space-y-1">
                     {comparison !== undefined ? (
                       <>
-                        <div className="flex items-baseline justify-between gap-2">
+                        <div className="flex items-baseline justify-between gap-1">
                           <span className="text-[11px] uppercase text-muted-foreground">
                             Inflation Adj.
                           </span>
@@ -187,7 +186,7 @@ export function NetWorthChart({
                             {formatCurrency(primary)}
                           </span>
                         </div>
-                        <div className="flex items-baseline justify-between gap-2">
+                        <div className="flex items-baseline justify-between gap-1">
                           <span className="text-[11px] uppercase text-muted-foreground">
                             Nominal
                           </span>
@@ -197,7 +196,7 @@ export function NetWorthChart({
                         </div>
                       </>
                     ) : (
-                      <div className="flex items-baseline justify-between gap-2">
+                      <div className="flex items-baseline justify-between gap-1">
                         <span className="text-[11px] uppercase text-muted-foreground">
                           Net Worth
                         </span>

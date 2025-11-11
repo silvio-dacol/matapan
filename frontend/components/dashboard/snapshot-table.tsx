@@ -12,10 +12,9 @@ interface SnapshotTableProps {
   snapshots: Snapshot[];
 }
 
-function formatCurrency(amount: number, currency: string = "EUR"): string {
+function formatCurrency(amount: number): string {
+  // Plain numeric formatting (currency symbol removed; base currency displayed in header)
   return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency,
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(amount);

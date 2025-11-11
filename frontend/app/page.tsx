@@ -22,10 +22,9 @@ import { useDashboard } from "@/hooks/use-dashboard";
 import type { SnapshotBreakdown } from "@/lib/types";
 import { RefreshCw } from "lucide-react";
 
-function formatCurrency(amount: number, currency: string = "EUR"): string {
+function formatCurrency(amount: number): string {
+  // Plain numeric formatting (remove currency symbol; base currency displayed in header)
   return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency,
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(amount);
@@ -189,11 +188,14 @@ export default function Home() {
           <p className="text-muted-foreground">
             Last updated: {formatDate(metadata.generated_at)}
           </p>
-          <p className="text-xs text-muted-foreground mt-1">
-            View:{" "}
-            {showInflation
-              ? "Inflation-adjusted (HICP deflated)"
-              : "Nominal values"}
+          <p className="text-xs text-muted-foreground mt-1 flex flex-wrap gap-4">
+            <span>
+              View:{" "}
+              {showInflation
+                ? "Inflation-adjusted (HICP deflated)"
+                : "Nominal values"}
+            </span>
+            <span>Base Currency: {metadata.base_currency}</span>
           </p>
         </div>
         <div className="flex flex-col items-end gap-3">

@@ -47,9 +47,8 @@ export function AssetsBreakdownChart({ breakdown }: AssetsBreakdownChartProps) {
   ].filter((item) => item.value > 0);
 
   const formatCurrency = (value: number) => {
+    // Plain number formatting; currency symbol removed (shown globally elsewhere)
     return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "EUR",
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(value);
