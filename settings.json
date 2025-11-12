@@ -18,6 +18,8 @@
 
   "categories": {
     "assets": ["liquidity", "investments", "personal", "retirement"],
-    "liabilities": ["loans", "credit_card_debt"]
+    "liabilities": ["loans", "credit_card_debt"],
+    "positive_cash_flow": ["salary", "bonus", "pension"],
+    "negative_cash_flow": ["expense"]
   }
 }

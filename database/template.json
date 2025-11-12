@@ -56,5 +56,36 @@
       "balance": 304000,
       "comment": ""
     }
+  ],
+
+  "cash-flow-entries": [
+    {
+      "name": "Main Job",
+      "type": "salary",
+      "currency": "SEK",
+      "amount": 45000,
+      "comment": ""
+    },
+    {
+      "name": "ITP1 Pension",
+      "type": "pension",
+      "currency": "SEK",
+      "amount": 5000,
+      "comment": ""
+    },
+    {
+      "name": "Rent",
+      "type": "expense",
+      "currency": "SEK",
+      "amount": 12000,
+      "comment": ""
+    },
+    {
+      "name": "Groceries",
+      "type": "expense",
+      "currency": "SEK",
+      "amount": 4000,
+      "comment": ""
+    }
   ]
 }
