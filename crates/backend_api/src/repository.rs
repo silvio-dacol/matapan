@@ -106,8 +106,9 @@ impl DashboardRepository for FileDashboardRepository {
     async fn fetch_latest_snapshot(&self) -> Result<Snapshot> {
         let dashboard = self.load_dashboard().await?;
         dashboard
-            .latest
-            .or_else(|| dashboard.snapshots.last().cloned())
+            .snapshots
+            .last()
+            .cloned()
             .ok_or(ApiError::DashboardNotFound)
     }
 

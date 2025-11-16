@@ -102,13 +102,14 @@ export default function Home() {
         assets: s.totals.assets * scale,
         liabilities: s.totals.liabilities * scale,
         net_worth: s.totals.net_worth * scale,
+        net_cash_flow: s.totals.net_cash_flow * scale,
       };
       return { ...s, breakdown: scaledBreakdown, totals: scaledTotals };
     });
   }, [dashboard, showInflation]);
 
   const processedLatest = useMemo(() => {
-    const l = dashboard?.latest;
+    const l = dashboard?.snapshots?.[dashboard.snapshots.length - 1];
     if (!l) return null;
     if (!showInflation) return l;
     const scale = l.inflation_adjusted?.scale ?? 1.0;
@@ -123,6 +124,7 @@ export default function Home() {
       assets: l.totals.assets * scale,
       liabilities: l.totals.liabilities * scale,
       net_worth: l.totals.net_worth * scale,
+      net_cash_flow: l.totals.net_cash_flow * scale,
     };
     return { ...l, breakdown: scaledBreakdown, totals: scaledTotals };
   }, [dashboard, showInflation]);
@@ -175,7 +177,7 @@ export default function Home() {
   }
 
   const { metadata } = dashboard;
-  const latestOriginal = dashboard.latest; // original (unscaled) for purchasing power reference
+  const latestOriginal = dashboard.snapshots[dashboard.snapshots.length - 1]; // original (unscaled) for purchasing power reference
 
   return (
     <div className="container mx-auto p-8">
@@ -217,7 +219,7 @@ export default function Home() {
       </div>
 
       {/* Key Metrics */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5 mb-8">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -279,6 +281,20 @@ export default function Home() {
             <Badge variant="secondary" className="mt-2 text-xs">
               vs New York
             </Badge>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Net Cash Flow
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">
+              {formatCurrency(processedLatest.totals.net_cash_flow)}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">Monthly income minus expenses</p>
           </CardContent>
         </Card>
       </div>

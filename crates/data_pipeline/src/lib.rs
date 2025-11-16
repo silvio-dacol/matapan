@@ -231,10 +231,34 @@ fn to_snapshot(doc: &InputDocument, settings: Option<&Settings>) -> Result<Snaps
     // Calculate totals from breakdown
     let assets = breakdown.cash + breakdown.investments + breakdown.personal + breakdown.pension;
     let liabilities = breakdown.liabilities;
+    // Compute net cash flow for this snapshot from cash_flow_entries.
+    // Classification order: use settings categories if present, else fallback to kind heuristics.
+    let mut income_total = 0.0f64;
+    let mut expense_total = 0.0f64;
+    if !doc.cash_flow_entries.is_empty() {
+        for cf in &doc.cash_flow_entries {
+            let rate = fx_to_base(&cf.currency, &base_currency, &fx_rates).unwrap_or(1.0);
+            let amount_base = cf.amount * rate;
+            let kind_lc = cf.kind.to_ascii_lowercase();
+            if matches!(kind_lc.as_str(), "salary" | "income" | "bonus")
+                || kind_lc.starts_with("income_")
+            {
+                income_total += amount_base;
+            } else if matches!(
+                kind_lc.as_str(),
+                "rent" | "expense" | "utilities" | "groceries" | "bill" | "tax"
+            ) || kind_lc.starts_with("expense_")
+            {
+                expense_total += amount_base;
+            }
+        }
+    }
+    let net_cash_flow = income_total - expense_total;
     let totals = SnapshotTotals {
         assets,
         liabilities,
         net_worth: assets - liabilities,
+        net_cash_flow,
     };
 
     // Calculate various adjustments (inflation, cost-of-living, etc.)

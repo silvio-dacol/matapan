@@ -52,6 +52,7 @@ export interface SnapshotTotals {
   assets: number;
   liabilities: number;
   net_worth: number;
+  net_cash_flow: number;
 }
 
 export interface InflationAdjusted {
@@ -85,7 +86,6 @@ export interface Snapshot {
 export interface Dashboard {
   metadata: Metadata;
   snapshots: Snapshot[];
-  latest: Snapshot;
 }
 
 // API response types for specific endpoints
