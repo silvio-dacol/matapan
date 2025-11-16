@@ -293,7 +293,10 @@ fn fx_to_base(
 /// Save rate formula per year: total_savings / total_income, where
 /// total_savings = sum(income) - sum(expenses) across available months.
 /// Months may be fewer than 12; we use only months present.
-fn compute_yearly_save_rates(docs: &[InputDocument], settings: Option<&Settings>) -> Option<Vec<models::YearlyStats>> {
+fn compute_yearly_save_rates(
+    docs: &[InputDocument],
+    settings: Option<&Settings>,
+) -> Option<Vec<models::YearlyStats>> {
     if docs.is_empty() {
         return None;
     }
@@ -311,7 +314,13 @@ fn compute_yearly_save_rates(docs: &[InputDocument], settings: Option<&Settings>
             .reference_month
             .as_ref()
             .and_then(|m| m.split('-').next().and_then(|y| y.parse::<i32>().ok()))
-            .or_else(|| doc.metadata.date.split('-').next().and_then(|y| y.parse::<i32>().ok()));
+            .or_else(|| {
+                doc.metadata
+                    .date
+                    .split('-')
+                    .next()
+                    .and_then(|y| y.parse::<i32>().ok())
+            });
         let Some(year) = year_opt else { continue }; // skip if cannot parse
 
         let fx_rates = doc.get_fx_rates();
@@ -330,25 +339,40 @@ fn compute_yearly_save_rates(docs: &[InputDocument], settings: Option<&Settings>
                 _ => {}
             }
         }
-        if income_month == 0.0 && expenses_month == 0.0 { continue; }
-        let entry = map.entry(year).or_insert(Acc { months: 0, income: 0.0, expenses: 0.0 });
+        if income_month == 0.0 && expenses_month == 0.0 {
+            continue;
+        }
+        let entry = map.entry(year).or_insert(Acc {
+            months: 0,
+            income: 0.0,
+            expenses: 0.0,
+        });
         entry.months += 1;
         entry.income += income_month;
         entry.expenses += expenses_month;
     }
-    if map.is_empty() { return None; }
-    let mut out: Vec<models::YearlyStats> = map.into_iter().map(|(year, acc)| {
-        let savings = acc.income - acc.expenses;
-        let save_rate = if acc.income > 0.0 { savings / acc.income } else { 0.0 };
-        models::YearlyStats {
-            year,
-            months_count: acc.months,
-            total_income: acc.income,
-            total_expenses: acc.expenses,
-            total_savings: savings,
-            average_save_rate: save_rate,
-        }
-    }).collect();
+    if map.is_empty() {
+        return None;
+    }
+    let mut out: Vec<models::YearlyStats> = map
+        .into_iter()
+        .map(|(year, acc)| {
+            let savings = acc.income - acc.expenses;
+            let save_rate = if acc.income > 0.0 {
+                savings / acc.income
+            } else {
+                0.0
+            };
+            models::YearlyStats {
+                year,
+                months_count: acc.months,
+                total_income: acc.income,
+                total_expenses: acc.expenses,
+                total_savings: savings,
+                average_save_rate: save_rate,
+            }
+        })
+        .collect();
     // Sort by year ascending for consistency
     out.sort_by_key(|y| y.year);
     Some(out)

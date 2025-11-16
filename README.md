@@ -66,6 +66,7 @@ Reads monthly JSON snapshots from `database/`, aggregates them with normalizatio
 New field: `yearly_stats` provides aggregated cash-flow based savings metrics per year present in the data (partial years supported).
 
 Each item has:
+
 - `year`: Calendar year.
 - `months_count`: Number of months with cash-flow data for that year.
 - `total_income`: Sum of salary-type cash-flow entries converted to base currency.

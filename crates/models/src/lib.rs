@@ -461,7 +461,10 @@ impl Dashboard {
             metadata: self.metadata.clone(),
             snapshots: self.snapshots.iter().map(|s| s.rounded()).collect(),
             latest: self.latest.as_ref().map(|s| s.rounded()),
-            yearly_stats: self.yearly_stats.as_ref().map(|ys| ys.iter().map(|y| y.rounded()).collect()),
+            yearly_stats: self
+                .yearly_stats
+                .as_ref()
+                .map(|ys| ys.iter().map(|y| y.rounded()).collect()),
         }
     }
 }
