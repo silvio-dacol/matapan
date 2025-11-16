@@ -51,11 +51,6 @@ pub fn compute_new_york_only(
         deflator: None,
         ecli_norm: Some(ecli_norm),
         ny_advantage_pct: Some(ny_advantage_pct),
-        badge: Some(format!(
-            "Relative to New York: {:+.1}% purchasing power",
-            ny_advantage_pct
-        )),
-        normalization_applied: Some(true),
         notes: Some("Cost-of-living normalization to New York".to_string()),
     }))
 }

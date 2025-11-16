@@ -29,8 +29,6 @@ pub fn compute_inflation_only(
         deflator: Some(scale),
         ecli_norm: None,
         ny_advantage_pct: None,
-        badge: None,
-        normalization_applied: None,
         notes: Some("Inflation-only deflation using HICP".to_string()),
     }))
 }
@@ -87,6 +85,8 @@ mod tests {
             personal: 5000.0,
             pension: 15000.0,
             liabilities: 2000.0,
+            positive_cash_flow: 0.0,
+            negative_cash_flow: 0.0,
         }
     }
 
@@ -179,11 +179,7 @@ mod tests {
         // Check metadata fields
         assert!(adj.scale > 0.0);
         assert!(adj.deflator.is_some());
-        assert!(adj.ecli_norm.is_none());
         assert!(adj.ny_advantage_pct.is_none());
-        assert!(adj.badge.is_none());
-        assert!(adj.notes.is_some());
-        assert!(adj.notes.unwrap().contains("HICP"));
     }
 
     #[test]

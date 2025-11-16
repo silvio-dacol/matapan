@@ -292,6 +292,9 @@ fn to_snapshot(doc: &InputDocument, settings: Option<&Settings>) -> Result<Snaps
         }
     }
     let net_cash_flow = income_total - expense_total;
+    // Store classified cash flow totals into breakdown before rounding/serialization
+    breakdown.positive_cash_flow = income_total;
+    breakdown.negative_cash_flow = expense_total;
     let totals = SnapshotTotals {
         assets,
         liabilities,

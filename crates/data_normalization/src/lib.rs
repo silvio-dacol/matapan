@@ -66,11 +66,6 @@ fn compute_combined_adjustment(
         deflator: Some(deflator),
         ecli_norm: Some(ecli_norm),
         ny_advantage_pct: Some((1.0 / ecli_norm - 1.0) * 100.0),
-        badge: Some(format!(
-            "Relative to New York: {:+.1}% purchasing power (inflation-adjusted)",
-            (1.0 / ecli_norm - 1.0) * 100.0
-        )),
-        normalization_applied: Some(true),
         notes: Some(
             "Combined inflation deflation and New York cost-of-living normalization".to_string(),
         ),
@@ -89,6 +84,8 @@ mod tests {
             personal: 5000.0,
             pension: 15000.0,
             liabilities: 2000.0,
+            positive_cash_flow: 0.0,
+            negative_cash_flow: 0.0,
         }
     }
 
@@ -103,8 +100,6 @@ mod tests {
             deflator: Some(0.9),
             ecli_norm: None,
             ny_advantage_pct: None,
-            badge: None,
-            normalization_applied: None,
             notes: None,
         };
 
@@ -114,8 +109,6 @@ mod tests {
             deflator: None,
             ecli_norm: Some(0.3),
             ny_advantage_pct: Some(233.0),
-            badge: None,
-            normalization_applied: None,
             notes: None,
         };
 
@@ -130,6 +123,7 @@ mod tests {
         assert!((adj.scale - 3.0).abs() < 0.01);
         assert_eq!(adj.deflator, Some(0.9));
         assert_eq!(adj.ecli_norm, Some(0.3));
+        assert!(adj.notes.is_some());
         assert!(warnings.is_empty());
     }
 
@@ -144,18 +138,14 @@ mod tests {
             deflator: Some(1.0),
             ecli_norm: None,
             ny_advantage_pct: None,
-            badge: None,
-            normalization_applied: None,
             notes: None,
         };
 
         let ny_adj = SnapshotAdjustment {
             scale: 10.0,
             deflator: None,
-            ecli_norm: Some(0.1), // Very low cost of living = high scale
+            ecli_norm: Some(0.1),
             ny_advantage_pct: None,
-            badge: None,
-            normalization_applied: None,
             notes: None,
         };
 
@@ -178,18 +168,14 @@ mod tests {
             deflator: Some(1.0),
             ecli_norm: None,
             ny_advantage_pct: None,
-            badge: None,
-            normalization_applied: None,
             notes: None,
         };
 
         let ny_adj = SnapshotAdjustment {
             scale: 4.0,
             deflator: None,
-            ecli_norm: Some(0.25), // 25% of NY cost = 4x purchasing power
+            ecli_norm: Some(0.25),
             ny_advantage_pct: None,
-            badge: None,
-            normalization_applied: None,
             notes: None,
         };
 
@@ -201,8 +187,8 @@ mod tests {
 
         // NY advantage should be (1/0.25 - 1) * 100 = 300%
         assert!((adj.ny_advantage_pct.unwrap() - 300.0).abs() < 0.1);
-        assert!(adj.badge.is_some());
-        assert!(adj.badge.unwrap().contains("+300"));
+        assert_eq!(adj.ecli_norm, Some(0.25));
+        assert!(adj.notes.is_some());
     }
 
     #[test]
@@ -215,8 +201,6 @@ mod tests {
             deflator: Some(0.8),
             ecli_norm: None,
             ny_advantage_pct: None,
-            badge: None,
-            normalization_applied: None,
             notes: None,
         };
 
@@ -225,8 +209,6 @@ mod tests {
             deflator: None,
             ecli_norm: Some(0.4),
             ny_advantage_pct: None,
-            badge: None,
-            normalization_applied: None,
             notes: None,
         };
 
@@ -236,13 +218,11 @@ mod tests {
 
         let adj = result.unwrap();
 
-        // Verify metadata fields are set
+        // Verify simplified fields are set
         assert!((adj.scale - 2.0).abs() < 0.01); // 0.8 / 0.4 = 2.0
         assert_eq!(adj.deflator, Some(0.8));
         assert_eq!(adj.ecli_norm, Some(0.4));
         assert!(adj.ny_advantage_pct.is_some());
-        assert!(adj.badge.is_some());
-        assert!(adj.normalization_applied.is_some());
         assert!(adj.notes.is_some());
     }
 }

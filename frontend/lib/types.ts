@@ -46,6 +46,8 @@ export interface SnapshotBreakdown {
   personal: number;
   pension: number;
   liabilities: number;
+  positive_cash_flow: number;
+  negative_cash_flow: number;
 }
 
 export interface SnapshotTotals {
@@ -64,10 +66,8 @@ export interface InflationAdjusted {
 export interface RealPurchasingPower {
   scale: number;
   deflator: number;
-  ecli_norm: number;
   ny_advantage_pct: number;
-  badge: string;
-  normalization_applied: boolean;
+  ecli_norm: number;
   notes: string;
 }
 

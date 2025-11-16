@@ -292,6 +292,10 @@ pub struct SnapshotBreakdown {
     pub personal: f64,
     pub pension: f64,
     pub liabilities: f64,
+    /// Total classified positive cash flow (income) for the period, in base currency
+    pub positive_cash_flow: f64,
+    /// Total classified negative cash flow (expenses) for the period, in base currency
+    pub negative_cash_flow: f64,
 }
 
 impl SnapshotBreakdown {
@@ -303,6 +307,8 @@ impl SnapshotBreakdown {
             personal: round_to_2_decimals(self.personal),
             pension: round_to_2_decimals(self.pension),
             liabilities: round_to_2_decimals(self.liabilities),
+            positive_cash_flow: round_to_2_decimals(self.positive_cash_flow),
+            negative_cash_flow: round_to_2_decimals(self.negative_cash_flow),
         }
     }
 }
@@ -315,6 +321,8 @@ impl Default for SnapshotBreakdown {
             personal: 0.0,
             pension: 0.0,
             liabilities: 0.0,
+            positive_cash_flow: 0.0,
+            negative_cash_flow: 0.0,
         }
     }
 }
@@ -391,14 +399,8 @@ pub struct SnapshotAdjustment {
     pub deflator: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ecli_norm: Option<f64>,
-    /// Percentage advantage vs New York (positive means cheaper than NY). Example: +10.5 means 10.5% more purchasing power.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ny_advantage_pct: Option<f64>,
-    /// Compact human phrase / badge: "Relative to New York: +10.5% purchasing power"
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub badge: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub normalization_applied: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub notes: Option<String>,
 }
@@ -411,8 +413,6 @@ impl SnapshotAdjustment {
             deflator: self.deflator.map(round_to_4_decimals),
             ecli_norm: self.ecli_norm.map(round_to_4_decimals),
             ny_advantage_pct: self.ny_advantage_pct.map(round_to_1_decimal),
-            badge: self.badge.clone(),
-            normalization_applied: self.normalization_applied,
             notes: self.notes.clone(),
         }
     }

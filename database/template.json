@@ -17,7 +17,9 @@
       "local_purchasing_power_index": 0
     },
 
-    "hicp": 120.43
+    "hicp": 120.43,
+
+    "ny_average_monthly_net_salary": 4940
   },
 
   "net_worth_entries": [
