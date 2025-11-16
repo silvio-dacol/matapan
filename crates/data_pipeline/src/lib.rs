@@ -41,14 +41,25 @@ pub fn run(cfg: Config) -> Result<()> {
                 base_currency,
                 normalize: settings.as_ref().and_then(|s| s.normalize.clone()),
                 hicp: settings.as_ref().and_then(|s| s.hicp.clone()),
-                ecli: settings.as_ref().and_then(|s| s.ecli.clone()),
+                ecli: settings.as_ref().and_then(|s| s.ecli_weights.clone()),
                 categories: settings.as_ref().and_then(|s| s.categories.clone()),
             };
 
+            // Compute performance for single snapshot (no previous data)
+            let mut single = snap.clone();
+            single.performance = Some(models::PerformanceMetrics {
+                nominal_return: 0.0,
+                hicp_monthly: 0.0,
+                real_return: 0.0,
+                twr_cumulative: 0.0,
+                benchmark: "EU Inflation (HICP)".to_string(),
+                notes: Some("Only latest snapshot processed; returns set to 0.0".to_string()),
+            });
+
             let dashboard = Dashboard {
                 metadata,
-                snapshots: vec![snap.clone()],
-                latest: Some(snap),
+                snapshots: vec![single.clone()],
+                latest: Some(single),
             };
 
             // Round all values to 2 decimal places before writing
@@ -68,6 +79,9 @@ pub fn run(cfg: Config) -> Result<()> {
         snapshots.push(snap);
     }
 
+    // Compute performance metrics across snapshots (requires sequential access)
+    compute_performance_metrics(&mut snapshots);
+
     // Determine the base currency from settings or use EUR as default
     let base_currency = settings
         .as_ref()
@@ -80,7 +94,7 @@ pub fn run(cfg: Config) -> Result<()> {
         base_currency,
         normalize: settings.as_ref().and_then(|s| s.normalize.clone()),
         hicp: settings.as_ref().and_then(|s| s.hicp.clone()),
-        ecli: settings.as_ref().and_then(|s| s.ecli.clone()),
+        ecli: settings.as_ref().and_then(|s| s.ecli_weights.clone()),
         categories: settings.as_ref().and_then(|s| s.categories.clone()),
     };
 
@@ -246,6 +260,7 @@ fn to_snapshot(doc: &InputDocument, settings: Option<&Settings>) -> Result<Snaps
         totals,
         inflation_adjusted,
         real_purchasing_power,
+        performance: None, // filled later in batch computation
         warnings,
     })
 }
@@ -364,5 +379,55 @@ mod tests {
         assert_eq!(Category::from_str("debt"), Some(Category::Liabilities));
 
         assert_eq!(Category::from_str("unknown"), None);
+    }
+}
+
+/// Computes performance metrics (nominal, real returns and cumulative TWR) for a chronological list of snapshots.
+fn compute_performance_metrics(snapshots: &mut [Snapshot]) {
+    if snapshots.is_empty() {
+        return;
+    }
+    let mut twr: f64 = 1.0; // time-weighted cumulative factor
+    for i in 0..snapshots.len() {
+        let (nominal_return, hicp_monthly) = if i == 0 {
+            (0.0, 0.0)
+        } else {
+            let prev = &snapshots[i - 1];
+            let curr = &snapshots[i];
+            let nw_prev = prev.totals.net_worth;
+            let nw_curr = curr.totals.net_worth;
+            // External inflows currently unknown -> treat as 0.0
+            let external_inflows = 0.0;
+            let nominal = if nw_prev.abs() < f64::EPSILON {
+                0.0
+            } else {
+                (nw_curr - nw_prev - external_inflows) / nw_prev
+            };
+            let hicp_prev = prev.hicp;
+            let hicp_curr = curr.hicp;
+            let hicp_rate = match (hicp_prev, hicp_curr) {
+                (Some(p), Some(c)) if p > 0.0 => (c / p) - 1.0,
+                _ => 0.0,
+            };
+            (nominal, hicp_rate)
+        };
+        let real_return = nominal_return - hicp_monthly;
+        twr *= 1.0 + real_return;
+        let twr_cumulative = twr - 1.0;
+        let notes = if i == 0 {
+            Some("First snapshot: returns set to 0.0".to_string())
+        } else if nominal_return == 0.0 {
+            Some("Net worth unchanged or previous month zero; nominal return 0.0".to_string())
+        } else {
+            Some("External inflows currently treated as 0.0".to_string())
+        };
+        snapshots[i].performance = Some(models::PerformanceMetrics {
+            nominal_return,
+            hicp_monthly,
+            real_return,
+            twr_cumulative,
+            benchmark: "EU Inflation (HICP)".to_string(),
+            notes,
+        });
     }
 }

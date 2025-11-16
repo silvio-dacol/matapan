@@ -73,7 +73,7 @@ mod tests {
                 base_month: Some("01".to_string()),
                 base_hicp,
             }),
-            ecli: None,
+            ecli_weights: None,
             categories: None,
         }
     }
@@ -116,11 +116,10 @@ mod tests {
 
     #[test]
     fn test_inflation_adjustment_with_inflation() {
-        // Current HICP = 120, and we need base HICP from settings = 100
-        // Due to get_hicp_base checking document first, we test the actual behavior
-        // This test verifies the deflation calculation works correctly
+        // Current HICP = 120 (document), base HICP = 126.72 (settings)
+        // Expect scale = base / current = 126.72 / 120.0
         let doc = mock_document(120.0, true);
-        let settings = mock_settings(126.72); // Use base from actual settings.json
+        let settings = mock_settings(126.72);
         let breakdown = test_breakdown();
         let totals = test_totals();
         let mut warnings = Vec::new();
@@ -131,11 +130,8 @@ mod tests {
 
         assert!(result.is_some());
         let adj = result.unwrap();
-
-        // With bug: base_hicp comes from doc (120), curr_hicp is also doc (120) = scale 1.0
-        // Expected: base=126.72, curr=120 -> scale = 1.056
-        // Let's just test that we get a valid result
-        assert!(adj.scale > 0.0);
+        let expected_scale = 126.72 / 120.0;
+        assert!((adj.scale - expected_scale).abs() < 0.0001);
         assert_eq!(adj.deflator, Some(adj.scale));
     }
 

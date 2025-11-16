@@ -30,7 +30,7 @@ pub struct Settings {
     #[serde(default)]
     pub hicp: Option<HicpBase>,
     #[serde(default)]
-    pub ecli: Option<EcliWeight>,
+    pub ecli_weights: Option<EcliWeight>,
     #[serde(default)]
     pub categories: Option<CategoryConfig>,
 }
@@ -139,7 +139,7 @@ impl InputDocument {
     /// Gets ECLI weights from settings, with fallback to defaults
     pub fn get_ecli_weights(&self, settings: Option<&Settings>) -> Option<EcliWeight> {
         if let Some(s) = settings {
-            if let Some(ref ecli) = s.ecli {
+            if let Some(ref ecli) = s.ecli_weights {
                 return Some(ecli.clone());
             }
         }
@@ -334,6 +334,8 @@ pub struct Snapshot {
     pub inflation_adjusted: Option<SnapshotAdjustment>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub real_purchasing_power: Option<SnapshotAdjustment>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub performance: Option<PerformanceMetrics>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub warnings: Vec<String>,
 }
@@ -351,6 +353,7 @@ impl Snapshot {
             totals: self.totals.rounded(),
             inflation_adjusted: self.inflation_adjusted.as_ref().map(|adj| adj.rounded()),
             real_purchasing_power: self.real_purchasing_power.as_ref().map(|adj| adj.rounded()),
+            performance: self.performance.as_ref().map(|p| p.rounded()),
             warnings: self.warnings.clone(),
         }
     }
@@ -385,6 +388,30 @@ impl SnapshotAdjustment {
             ny_advantage_pct: self.ny_advantage_pct.map(round_to_1_decimal),
             badge: self.badge.clone(),
             normalization_applied: self.normalization_applied,
+            notes: self.notes.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PerformanceMetrics {
+    pub nominal_return: f64,
+    pub hicp_monthly: f64,
+    pub real_return: f64,
+    pub twr_cumulative: f64,
+    pub benchmark: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub notes: Option<String>,
+}
+
+impl PerformanceMetrics {
+    pub fn rounded(&self) -> Self {
+        Self {
+            nominal_return: round_to_4_decimals(self.nominal_return),
+            hicp_monthly: round_to_4_decimals(self.hicp_monthly),
+            real_return: round_to_4_decimals(self.real_return),
+            twr_cumulative: round_to_4_decimals(self.twr_cumulative),
+            benchmark: self.benchmark.clone(),
             notes: self.notes.clone(),
         }
     }

@@ -8,7 +8,7 @@
     "base_hicp": 126.72
   },
 
-  "ecli": {
+  "ecli_weights": {
     "cost_of_living_index_weight": 0.25,
     "rent_index_weight": 0.4,
     "groceries_index_weight": 0.35,
@@ -19,7 +19,7 @@
   "categories": {
     "assets": ["liquidity", "investments", "personal", "retirement"],
     "liabilities": ["loans", "credit_card_debt"],
-    "positive_cash_flow": ["salary", "bonus", "pension"],
-    "negative_cash_flow": ["expense"]
+    "positive_cash_flow": ["salary", "bonus", "pension", "reinbursement"],
+    "negative_cash_flow": ["expense", "rent", "transportation"]
   }
 }
