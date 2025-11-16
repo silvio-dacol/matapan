@@ -22,9 +22,9 @@
 
   "ecli_weights": {
     "cost_of_living_index_weight": 0.25,
-    "rent_index_weight": 0.4,
-    "groceries_index_weight": 0.35,
-    "restaurant_price_index_weight": 0.0,
+    "rent_index_weight": 0.35,
+    "groceries_index_weight": 0.3,
+    "restaurant_price_index_weight": 0.1,
     "local_purchasing_power_index_weight": 0.0
   },
 
@@ -33,5 +33,6 @@
     "liabilities": ["loans", "credit_card_debt"],
     "positive_cash_flow": ["salary", "bonus", "pension", "reinbursement"],
     "negative_cash_flow": ["expense", "rent", "transportation"]
-  }
+  },
+  "ny_salary_ratio": 0.65
 }

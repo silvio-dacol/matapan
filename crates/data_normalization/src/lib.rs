@@ -29,7 +29,9 @@ pub fn compute_adjustments(
         // We need to compute NY data for the combined adjustment
         let ny_temp = ecli::compute_new_york_only(doc, settings, breakdown, totals, warnings)?;
         match (&inflation_adjusted, &ny_temp) {
-            (Some(infl), Some(ny)) => compute_combined_adjustment(breakdown, infl, ny, warnings)?,
+            (Some(infl), Some(ny)) => {
+                compute_combined_adjustment(doc, breakdown, infl, ny, settings, warnings)?
+            }
             _ => None,
         }
     } else {
@@ -41,9 +43,11 @@ pub fn compute_adjustments(
 
 /// Helper function to combine inflation and NY adjustments
 fn compute_combined_adjustment(
+    doc: &InputDocument,
     _original_breakdown: &SnapshotBreakdown,
     inflation_adj: &SnapshotAdjustment,
     ny_adj: &SnapshotAdjustment,
+    _settings: Option<&Settings>,
     warnings: &mut Vec<String>,
 ) -> Result<Option<SnapshotAdjustment>> {
     // Extract deflator and ecli_norm, using scale as fallback
@@ -61,14 +65,52 @@ fn compute_combined_adjustment(
         ));
     }
 
+    // Derive local monthly salary from cash flow entries (case-insensitive kind == "salary")
+    const NYC_AVG_MONTHLY_NET_SALARY: f64 = 4940.0;
+    let fx = doc.get_fx_rates();
+    let base_currency = doc.get_base_currency(_settings);
+    let mut local_salary_sum = 0.0;
+    for cf in &doc.cash_flow_entries {
+        if cf.kind.eq_ignore_ascii_case("salary") {
+            let amount_in_base = if cf.currency == base_currency {
+                cf.amount
+            } else {
+                fx.get(&cf.currency).copied().unwrap_or(0.0) * cf.amount
+            };
+            local_salary_sum += amount_in_base;
+        }
+    }
+    let salary_ratio_opt = if local_salary_sum > 0.0 {
+        Some(local_salary_sum / NYC_AVG_MONTHLY_NET_SALARY)
+    } else {
+        None
+    };
+
+    // Advantage including salary effect if available
+    let effective_adv_scale = match salary_ratio_opt {
+        Some(r) => scale * r,
+        None => scale,
+    };
+    let ny_advantage_pct = (effective_adv_scale - 1.0) * 100.0;
+
+    let mut note = String::from(
+        "Combined inflation + New York cost-of-living normalization; advantage includes salary if present",
+    );
+    if let Some(r) = salary_ratio_opt {
+        note.push_str(&format!(
+            "; local_salary={:.2} base_currency; nyc_salary=4940.00; salary_ratio={:.4}",
+            local_salary_sum, r
+        ));
+    } else {
+        note.push_str("; no local salary entry found — using cost-of-living only");
+    }
+
     Ok(Some(SnapshotAdjustment {
-        scale,
+        scale, // retains cost-of-living & inflation combined scale (without salary)
         deflator: Some(deflator),
         ecli_norm: Some(ecli_norm),
-        ny_advantage_pct: Some((1.0 / ecli_norm - 1.0) * 100.0),
-        notes: Some(
-            "Combined inflation deflation and New York cost-of-living normalization".to_string(),
-        ),
+        ny_advantage_pct: Some(ny_advantage_pct),
+        notes: Some(note),
     }))
 }
 
@@ -112,9 +154,33 @@ mod tests {
             notes: None,
         };
 
-        let result =
-            compute_combined_adjustment(&breakdown, &inflation_adj, &ny_adj, &mut warnings)
-                .unwrap();
+        let doc = InputDocument {
+            metadata: Metadata {
+                version: Some(1),
+                reference_month: None,
+                date: "2024-01-01".to_string(),
+                base_currency: Some("EUR".to_string()),
+                normalize: Some("yes".to_string()),
+                adjust_to_inflation: None,
+                normalize_to_new_york_ecli: None,
+                normalize_to_hicp: None,
+                normalize_to_ecli: None,
+                hicp: None,
+                fx_rates: None,
+                ecli: None,
+            },
+            net_worth_entries: vec![],
+            cash_flow_entries: vec![],
+        };
+        let result = compute_combined_adjustment(
+            &doc,
+            &breakdown,
+            &inflation_adj,
+            &ny_adj,
+            None,
+            &mut warnings,
+        )
+        .unwrap();
 
         assert!(result.is_some());
         let adj = result.unwrap();
@@ -149,9 +215,33 @@ mod tests {
             notes: None,
         };
 
-        let result =
-            compute_combined_adjustment(&breakdown, &inflation_adj, &ny_adj, &mut warnings)
-                .unwrap();
+        let doc = InputDocument {
+            metadata: Metadata {
+                version: Some(1),
+                reference_month: None,
+                date: "2024-01-01".to_string(),
+                base_currency: Some("EUR".to_string()),
+                normalize: Some("yes".to_string()),
+                adjust_to_inflation: None,
+                normalize_to_new_york_ecli: None,
+                normalize_to_hicp: None,
+                normalize_to_ecli: None,
+                hicp: None,
+                fx_rates: None,
+                ecli: None,
+            },
+            net_worth_entries: vec![],
+            cash_flow_entries: vec![],
+        };
+        let result = compute_combined_adjustment(
+            &doc,
+            &breakdown,
+            &inflation_adj,
+            &ny_adj,
+            None,
+            &mut warnings,
+        )
+        .unwrap();
 
         assert!(result.is_some());
         assert_eq!(warnings.len(), 1);
@@ -179,9 +269,33 @@ mod tests {
             notes: None,
         };
 
-        let result =
-            compute_combined_adjustment(&breakdown, &inflation_adj, &ny_adj, &mut warnings)
-                .unwrap();
+        let doc = InputDocument {
+            metadata: Metadata {
+                version: Some(1),
+                reference_month: None,
+                date: "2024-01-01".to_string(),
+                base_currency: Some("EUR".to_string()),
+                normalize: Some("yes".to_string()),
+                adjust_to_inflation: None,
+                normalize_to_new_york_ecli: None,
+                normalize_to_hicp: None,
+                normalize_to_ecli: None,
+                hicp: None,
+                fx_rates: None,
+                ecli: None,
+            },
+            net_worth_entries: vec![],
+            cash_flow_entries: vec![],
+        };
+        let result = compute_combined_adjustment(
+            &doc,
+            &breakdown,
+            &inflation_adj,
+            &ny_adj,
+            None,
+            &mut warnings,
+        )
+        .unwrap();
 
         let adj = result.unwrap();
 
@@ -212,9 +326,33 @@ mod tests {
             notes: None,
         };
 
-        let result =
-            compute_combined_adjustment(&breakdown, &inflation_adj, &ny_adj, &mut warnings)
-                .unwrap();
+        let doc = InputDocument {
+            metadata: Metadata {
+                version: Some(1),
+                reference_month: None,
+                date: "2024-01-01".to_string(),
+                base_currency: Some("EUR".to_string()),
+                normalize: Some("yes".to_string()),
+                adjust_to_inflation: None,
+                normalize_to_new_york_ecli: None,
+                normalize_to_hicp: None,
+                normalize_to_ecli: None,
+                hicp: None,
+                fx_rates: None,
+                ecli: None,
+            },
+            net_worth_entries: vec![],
+            cash_flow_entries: vec![],
+        };
+        let result = compute_combined_adjustment(
+            &doc,
+            &breakdown,
+            &inflation_adj,
+            &ny_adj,
+            None,
+            &mut warnings,
+        )
+        .unwrap();
 
         let adj = result.unwrap();
 
