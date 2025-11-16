@@ -40,6 +40,8 @@ pub struct Settings {
 pub struct CategoryConfig {
     pub assets: Vec<String>,
     pub liabilities: Vec<String>,
+    pub positive_cash_flows: Vec<String>,
+    pub negative_cash_flows: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -317,6 +319,7 @@ pub struct SnapshotTotals {
     pub assets: f64,
     pub liabilities: f64,
     pub net_worth: f64,
+    pub net_cash_flow: f64,
 }
 
 impl SnapshotTotals {
@@ -326,6 +329,7 @@ impl SnapshotTotals {
             assets: round_to_2_decimals(self.assets),
             liabilities: round_to_2_decimals(self.liabilities),
             net_worth: round_to_2_decimals(self.net_worth),
+            net_cash_flow: round_to_2_decimals(self.net_cash_flow),
         }
     }
 }
@@ -439,7 +443,7 @@ pub struct DashboardMetadata {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hicp: Option<HicpBase>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub ecli: Option<EcliWeight>,
+    pub ecli_weights: Option<EcliWeight>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub categories: Option<CategoryConfig>,
 }
@@ -447,11 +451,9 @@ pub struct DashboardMetadata {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Dashboard {
     pub metadata: DashboardMetadata,
-    pub snapshots: Vec<Snapshot>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub latest: Option<Snapshot>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub yearly_stats: Option<Vec<YearlyStats>>,
+    pub snapshots: Vec<Snapshot>,
 }
 
 impl Dashboard {
@@ -460,7 +462,6 @@ impl Dashboard {
         Self {
             metadata: self.metadata.clone(),
             snapshots: self.snapshots.iter().map(|s| s.rounded()).collect(),
-            latest: self.latest.as_ref().map(|s| s.rounded()),
             yearly_stats: self
                 .yearly_stats
                 .as_ref()

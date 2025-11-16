@@ -41,7 +41,7 @@ pub fn run(cfg: Config) -> Result<()> {
                 base_currency,
                 normalize: settings.as_ref().and_then(|s| s.normalize.clone()),
                 hicp: settings.as_ref().and_then(|s| s.hicp.clone()),
-                ecli: settings.as_ref().and_then(|s| s.ecli_weights.clone()),
+                ecli_weights: settings.as_ref().and_then(|s| s.ecli_weights.clone()),
                 categories: settings.as_ref().and_then(|s| s.categories.clone()),
             };
 
@@ -59,7 +59,6 @@ pub fn run(cfg: Config) -> Result<()> {
             let dashboard = Dashboard {
                 metadata,
                 snapshots: vec![single.clone()],
-                latest: Some(single),
                 yearly_stats: None,
             };
 
@@ -95,19 +94,16 @@ pub fn run(cfg: Config) -> Result<()> {
         base_currency,
         normalize: settings.as_ref().and_then(|s| s.normalize.clone()),
         hicp: settings.as_ref().and_then(|s| s.hicp.clone()),
-        ecli: settings.as_ref().and_then(|s| s.ecli_weights.clone()),
+        ecli_weights: settings.as_ref().and_then(|s| s.ecli_weights.clone()),
         categories: settings.as_ref().and_then(|s| s.categories.clone()),
     };
 
-    // Create the final dashboard and write to output
-    let latest = snapshots.last().cloned();
     // Compute yearly cashflow-based save rates
     let yearly_stats = compute_yearly_save_rates(&docs, settings.as_ref());
 
     let dashboard = Dashboard {
         metadata,
         snapshots,
-        latest,
         yearly_stats: yearly_stats,
     };
 
@@ -253,7 +249,11 @@ fn to_snapshot(doc: &InputDocument, settings: Option<&Settings>) -> Result<Snaps
     };
     let hicp_opt = doc.metadata.hicp;
     let ecli_opt = doc.metadata.ecli.clone();
-    let reference_month = doc.metadata.reference_month.clone();
+    let reference_month = doc
+        .metadata
+        .reference_month
+        .as_ref()
+        .and_then(|rm| format_reference_month(rm));
 
     Ok(Snapshot {
         data_updated_at,
@@ -376,6 +376,35 @@ fn compute_yearly_save_rates(
     // Sort by year ascending for consistency
     out.sort_by_key(|y| y.year);
     Some(out)
+}
+
+/// Convert `YYYY-MM` to `Month YYYY` (e.g. `2024-08` -> `August 2024`). Returns None if pattern invalid.
+fn format_reference_month(s: &str) -> Option<String> {
+    if s.len() != 7 {
+        return None;
+    }
+    let parts: Vec<&str> = s.split('-').collect();
+    if parts.len() != 2 {
+        return None;
+    }
+    let year = parts[0];
+    let month_num: u32 = parts[1].parse().ok()?;
+    let name = match month_num {
+        1 => "January",
+        2 => "February",
+        3 => "March",
+        4 => "April",
+        5 => "May",
+        6 => "June",
+        7 => "July",
+        8 => "August",
+        9 => "September",
+        10 => "October",
+        11 => "November",
+        12 => "December",
+        _ => return None,
+    };
+    Some(format!("{} {}", name, year))
 }
 
 #[cfg(test)]
