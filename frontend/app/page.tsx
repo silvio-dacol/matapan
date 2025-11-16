@@ -294,7 +294,9 @@ export default function Home() {
             <div className="text-3xl font-bold">
               {formatCurrency(processedLatest.totals.net_cash_flow)}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Monthly income minus expenses</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Monthly income minus expenses
+            </p>
           </CardContent>
         </Card>
       </div>

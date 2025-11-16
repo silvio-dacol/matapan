@@ -61,6 +61,7 @@ mod tests {
                 ecli: None,
             },
             net_worth_entries: vec![],
+            cash_flow_entries: vec![],
         }
     }
 
@@ -93,6 +94,7 @@ mod tests {
             assets: 50000.0,
             liabilities: 2000.0,
             net_worth: 48000.0,
+            net_cash_flow: 0.0,
         }
     }
 

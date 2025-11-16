@@ -40,7 +40,9 @@ pub struct Settings {
 pub struct CategoryConfig {
     pub assets: Vec<String>,
     pub liabilities: Vec<String>,
+    #[serde(default, alias = "positive_cash_flow")]
     pub positive_cash_flows: Vec<String>,
+    #[serde(default, alias = "negative_cash_flow")]
     pub negative_cash_flows: Vec<String>,
 }
 

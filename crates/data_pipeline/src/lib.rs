@@ -236,19 +236,51 @@ fn to_snapshot(doc: &InputDocument, settings: Option<&Settings>) -> Result<Snaps
     let mut income_total = 0.0f64;
     let mut expense_total = 0.0f64;
     if !doc.cash_flow_entries.is_empty() {
+        // Build classification sets from settings if available
+        let (pos_set, neg_set) = settings
+            .and_then(|s| s.categories.as_ref())
+            .map(|c| {
+                let p = c
+                    .positive_cash_flows
+                    .iter()
+                    .map(|v| v.to_ascii_lowercase())
+                    .collect::<std::collections::HashSet<_>>();
+                let n = c
+                    .negative_cash_flows
+                    .iter()
+                    .map(|v| v.to_ascii_lowercase())
+                    .collect::<std::collections::HashSet<_>>();
+                (p, n)
+            })
+            .unwrap_or_default();
+
         for cf in &doc.cash_flow_entries {
             let rate = fx_to_base(&cf.currency, &base_currency, &fx_rates).unwrap_or(1.0);
             let amount_base = cf.amount * rate;
             let kind_lc = cf.kind.to_ascii_lowercase();
-            if matches!(kind_lc.as_str(), "salary" | "income" | "bonus")
-                || kind_lc.starts_with("income_")
-            {
+            let is_income = if !pos_set.is_empty() {
+                pos_set.contains(&kind_lc)
+            } else {
+                matches!(kind_lc.as_str(), "salary" | "income" | "bonus" | "pension")
+                    || kind_lc.starts_with("income_")
+            };
+            let is_expense = if !neg_set.is_empty() {
+                neg_set.contains(&kind_lc)
+            } else {
+                matches!(
+                    kind_lc.as_str(),
+                    "rent"
+                        | "expense"
+                        | "transportation"
+                        | "utilities"
+                        | "groceries"
+                        | "bill"
+                        | "tax"
+                ) || kind_lc.starts_with("expense_")
+            };
+            if is_income {
                 income_total += amount_base;
-            } else if matches!(
-                kind_lc.as_str(),
-                "rent" | "expense" | "utilities" | "groceries" | "bill" | "tax"
-            ) || kind_lc.starts_with("expense_")
-            {
+            } else if is_expense {
                 expense_total += amount_base;
             }
         }
