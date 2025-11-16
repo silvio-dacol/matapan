@@ -64,6 +64,8 @@ pub struct InputDocument {
     pub metadata: Metadata,
     #[serde(default)]
     pub net_worth_entries: Vec<InputEntry>,
+    #[serde(rename = "cash-flow-entries", default)]
+    pub cash_flow_entries: Vec<CashFlowEntry>,
 }
 
 impl InputDocument {
@@ -224,6 +226,17 @@ pub struct InputEntry {
     pub kind: String,
     pub currency: String,
     pub balance: f64,
+    #[serde(default)]
+    pub comment: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CashFlowEntry {
+    pub name: String,
+    #[serde(rename = "type")]
+    pub kind: String,
+    pub currency: String,
+    pub amount: f64,
     #[serde(default)]
     pub comment: String,
 }
@@ -437,6 +450,8 @@ pub struct Dashboard {
     pub snapshots: Vec<Snapshot>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub latest: Option<Snapshot>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub yearly_stats: Option<Vec<YearlyStats>>,
 }
 
 impl Dashboard {
@@ -446,6 +461,31 @@ impl Dashboard {
             metadata: self.metadata.clone(),
             snapshots: self.snapshots.iter().map(|s| s.rounded()).collect(),
             latest: self.latest.as_ref().map(|s| s.rounded()),
+            yearly_stats: self.yearly_stats.as_ref().map(|ys| ys.iter().map(|y| y.rounded()).collect()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct YearlyStats {
+    pub year: i32,
+    pub months_count: usize,
+    pub total_income: f64,
+    pub total_expenses: f64,
+    pub total_savings: f64,
+    /// average_save_rate expressed as a fraction (0.25 => 25%)
+    pub average_save_rate: f64,
+}
+
+impl YearlyStats {
+    pub fn rounded(&self) -> Self {
+        Self {
+            year: self.year,
+            months_count: self.months_count,
+            total_income: round_to_2_decimals(self.total_income),
+            total_expenses: round_to_2_decimals(self.total_expenses),
+            total_savings: round_to_2_decimals(self.total_savings),
+            average_save_rate: round_to_4_decimals(self.average_save_rate),
         }
     }
 }

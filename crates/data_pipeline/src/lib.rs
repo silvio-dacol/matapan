@@ -60,6 +60,7 @@ pub fn run(cfg: Config) -> Result<()> {
                 metadata,
                 snapshots: vec![single.clone()],
                 latest: Some(single),
+                yearly_stats: None,
             };
 
             // Round all values to 2 decimal places before writing
@@ -100,10 +101,14 @@ pub fn run(cfg: Config) -> Result<()> {
 
     // Create the final dashboard and write to output
     let latest = snapshots.last().cloned();
+    // Compute yearly cashflow-based save rates
+    let yearly_stats = compute_yearly_save_rates(&docs, settings.as_ref());
+
     let dashboard = Dashboard {
         metadata,
         snapshots,
         latest,
+        yearly_stats: yearly_stats,
     };
 
     // Round all values to 2 decimal places before writing
@@ -282,6 +287,71 @@ fn fx_to_base(
         .get(currency)
         .or_else(|| rates.get(&currency.to_uppercase()))
         .copied()
+}
+
+/// Computes yearly average save rates based on cash-flow entries.
+/// Save rate formula per year: total_savings / total_income, where
+/// total_savings = sum(income) - sum(expenses) across available months.
+/// Months may be fewer than 12; we use only months present.
+fn compute_yearly_save_rates(docs: &[InputDocument], settings: Option<&Settings>) -> Option<Vec<models::YearlyStats>> {
+    if docs.is_empty() {
+        return None;
+    }
+    use std::collections::HashMap;
+    struct Acc {
+        months: usize,
+        income: f64,
+        expenses: f64,
+    }
+    let mut map: HashMap<i32, Acc> = HashMap::new();
+    for doc in docs {
+        // Determine year from reference_month if available else from date
+        let year_opt = doc
+            .metadata
+            .reference_month
+            .as_ref()
+            .and_then(|m| m.split('-').next().and_then(|y| y.parse::<i32>().ok()))
+            .or_else(|| doc.metadata.date.split('-').next().and_then(|y| y.parse::<i32>().ok()));
+        let Some(year) = year_opt else { continue }; // skip if cannot parse
+
+        let fx_rates = doc.get_fx_rates();
+        let base_currency = doc.get_base_currency(settings);
+        let mut income_month = 0.0f64;
+        let mut expenses_month = 0.0f64;
+        for e in &doc.cash_flow_entries {
+            let rate = fx_to_base(&e.currency, &base_currency, &fx_rates).unwrap_or(1.0);
+            let amount_base = e.amount * rate;
+            match e.kind.to_ascii_lowercase().as_str() {
+                // Treat salary-like entries as income
+                "salary" => income_month += amount_base,
+                // Treat rent & expense as expenses/outflows
+                "rent" | "expense" => expenses_month += amount_base,
+                // Ignore other kinds for now (can extend later)
+                _ => {}
+            }
+        }
+        if income_month == 0.0 && expenses_month == 0.0 { continue; }
+        let entry = map.entry(year).or_insert(Acc { months: 0, income: 0.0, expenses: 0.0 });
+        entry.months += 1;
+        entry.income += income_month;
+        entry.expenses += expenses_month;
+    }
+    if map.is_empty() { return None; }
+    let mut out: Vec<models::YearlyStats> = map.into_iter().map(|(year, acc)| {
+        let savings = acc.income - acc.expenses;
+        let save_rate = if acc.income > 0.0 { savings / acc.income } else { 0.0 };
+        models::YearlyStats {
+            year,
+            months_count: acc.months,
+            total_income: acc.income,
+            total_expenses: acc.expenses,
+            total_savings: savings,
+            average_save_rate: save_rate,
+        }
+    }).collect();
+    // Sort by year ascending for consistency
+    out.sort_by_key(|y| y.year);
+    Some(out)
 }
 
 #[cfg(test)]

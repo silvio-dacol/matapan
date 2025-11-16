@@ -63,6 +63,18 @@ Modern Next.js dashboard with real-time data visualization.
 
 Reads monthly JSON snapshots from `database/`, aggregates them with normalization, and outputs `dashboard/dashboard.json`.
 
+New field: `yearly_stats` provides aggregated cash-flow based savings metrics per year present in the data (partial years supported).
+
+Each item has:
+- `year`: Calendar year.
+- `months_count`: Number of months with cash-flow data for that year.
+- `total_income`: Sum of salary-type cash-flow entries converted to base currency.
+- `total_expenses`: Sum of rent and expense entries converted to base currency.
+- `total_savings`: Income minus expenses.
+- `average_save_rate`: `total_savings / total_income` (fraction; 0.52 => 52%).
+
+Currently considered income kinds: `salary`. Considered expense kinds: `rent`, `expense`. Other kinds are ignored; extend as needed.
+
 ### Usage
 
 ```powershell
