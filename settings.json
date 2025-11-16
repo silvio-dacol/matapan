@@ -2,10 +2,22 @@
   "base_currency": "EUR",
   "normalize": "yes",
 
-  "hicp": {
+  "base_hicp": {
     "base_year": "2024",
     "base_month": "08",
     "base_hicp": 126.72
+  },
+
+  "base_basket_of_goods": {
+    "1kg white rice": 2.79,
+    "12 large eggs": 3.86,
+    "1kg apples": 2.73,
+    "1kg tomatoes": 3.6,
+    "1.5L bottled water": 1.47,
+    "1L milk": 1.42,
+    "1kg local cheese": 9.81,
+    "1kg chicken fillets": 10.41,
+    "1kg beef": 17.35
   },
 
   "ecli_weights": {

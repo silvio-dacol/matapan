@@ -28,11 +28,14 @@ pub struct Settings {
     #[serde(default)]
     pub normalize: Option<String>,
     #[serde(default)]
-    pub hicp: Option<HicpBase>,
+    pub base_hicp: Option<HicpBase>,
     #[serde(default)]
     pub ecli_weights: Option<EcliWeight>,
     #[serde(default)]
     pub categories: Option<CategoryConfig>,
+    /// Base basket of goods with prices at the HICP base period
+    #[serde(default)]
+    pub base_basket_of_goods: Option<HashMap<String, f64>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -138,7 +141,7 @@ impl InputDocument {
     /// Gets HICP base value from settings or metadata
     pub fn get_hicp_base(&self, settings: Option<&Settings>) -> Option<f64> {
         settings
-            .and_then(|s| s.hicp.as_ref().map(|h| h.base_hicp()))
+            .and_then(|s| s.base_hicp.as_ref().map(|h| h.base_hicp()))
             .or_else(|| self.metadata.hicp)
     }
 
@@ -347,6 +350,8 @@ pub struct Snapshot {
     pub hicp: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ecli: Option<EcliBasic>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub basket_of_goods: Option<HashMap<String, f64>>,
     pub breakdown: SnapshotBreakdown,
     pub totals: SnapshotTotals,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -368,6 +373,7 @@ impl Snapshot {
             fx_rates: self.fx_rates.clone(),
             hicp: self.hicp,
             ecli: self.ecli.clone(),
+            basket_of_goods: self.basket_of_goods.clone(),
             breakdown: self.breakdown.rounded(),
             totals: self.totals.rounded(),
             inflation_adjusted: self.inflation_adjusted.as_ref().map(|adj| adj.rounded()),
@@ -443,7 +449,9 @@ pub struct DashboardMetadata {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub normalize: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub hicp: Option<HicpBase>,
+    pub base_hicp: Option<HicpBase>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub base_basket_of_goods: Option<HashMap<String, f64>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ecli_weights: Option<EcliWeight>,
     #[serde(skip_serializing_if = "Option::is_none")]

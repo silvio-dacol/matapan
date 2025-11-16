@@ -69,11 +69,12 @@ mod tests {
         Settings {
             base_currency: "EUR".to_string(),
             normalize: Some("yes".to_string()),
-            hicp: Some(HicpBase {
+            base_hicp: Some(HicpBase {
                 base_year: Some("2015".to_string()),
                 base_month: Some("01".to_string()),
                 base_hicp,
             }),
+            base_basket_of_goods: None,
             ecli_weights: None,
             categories: None,
         }

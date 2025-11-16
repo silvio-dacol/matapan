@@ -40,7 +40,10 @@ pub fn run(cfg: Config) -> Result<()> {
                 generated_at: Utc::now().to_rfc3339(),
                 base_currency,
                 normalize: settings.as_ref().and_then(|s| s.normalize.clone()),
-                hicp: settings.as_ref().and_then(|s| s.hicp.clone()),
+                base_hicp: settings.as_ref().and_then(|s| s.base_hicp.clone()),
+                base_basket_of_goods: settings
+                    .as_ref()
+                    .and_then(|s| s.base_basket_of_goods.clone()),
                 ecli_weights: settings.as_ref().and_then(|s| s.ecli_weights.clone()),
                 categories: settings.as_ref().and_then(|s| s.categories.clone()),
             };
@@ -93,7 +96,10 @@ pub fn run(cfg: Config) -> Result<()> {
         generated_at: Utc::now().to_rfc3339(),
         base_currency,
         normalize: settings.as_ref().and_then(|s| s.normalize.clone()),
-        hicp: settings.as_ref().and_then(|s| s.hicp.clone()),
+        base_hicp: settings.as_ref().and_then(|s| s.base_hicp.clone()),
+        base_basket_of_goods: settings
+            .as_ref()
+            .and_then(|s| s.base_basket_of_goods.clone()),
         ecli_weights: settings.as_ref().and_then(|s| s.ecli_weights.clone()),
         categories: settings.as_ref().and_then(|s| s.categories.clone()),
     };
@@ -311,12 +317,34 @@ fn to_snapshot(doc: &InputDocument, settings: Option<&Settings>) -> Result<Snaps
         .as_ref()
         .and_then(|rm| format_reference_month(rm));
 
+    // Compute inflated basket of goods if settings and hicp data available
+    let basket_of_goods = settings
+        .and_then(|s| s.base_basket_of_goods.clone())
+        .and_then(|base_map| {
+            let base_hicp = doc.get_hicp_base(settings);
+            match (base_hicp, hicp_opt) {
+                (Some(bh), Some(current)) if bh > 0.0 => {
+                    let scale = current / bh;
+                    let adjusted: std::collections::HashMap<String, f64> = base_map
+                        .into_iter()
+                        .map(|(k, v)| {
+                            let rounded = (v * scale * 100.0).round() / 100.0;
+                            (k, rounded)
+                        })
+                        .collect();
+                    Some(adjusted)
+                }
+                _ => None,
+            }
+        });
+
     Ok(Snapshot {
         data_updated_at,
         reference_month,
         fx_rates: fx_rates_opt,
         hicp: hicp_opt,
         ecli: ecli_opt,
+        basket_of_goods,
         breakdown,
         totals,
         inflation_adjusted,
