@@ -9,6 +9,7 @@ members = [
     "crates/logger",
     "crates/models",
     "crates/settings_loader",
+    "crates/dashboard_engine",
 ]
 
 resolver = "3"

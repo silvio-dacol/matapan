@@ -12,13 +12,13 @@
   "net_worth_entries": [
     {
       "name": "SEB Account",
-      "type": "liquidity",
+      "type": "cash",
       "currency": "SEK",
       "balance": 24500.25
     },
     {
       "name": "Revolut",
-      "type": "liquidity",
+      "type": "cash",
       "currency": "EUR",
       "balance": 875.1
     },
