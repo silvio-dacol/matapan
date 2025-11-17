@@ -1,93 +1,65 @@
 {
-  "metadata": {
-    "version": 1,
-    "date": "1998-01-12",
+  "month": "1998-01",
 
-    "fx_rates": {
-      "EUR": 1.0,
-      "SEK": 0.090902,
-      "CNY": 0.11963
-    },
-
-    "ecli": {
-      "cost_of_living_index": 56.2,
-      "rent_index": 20.8,
-      "groceries_index": 56.1,
-      "restaurant_price_index": 0,
-      "local_purchasing_power_index": 0
-    },
-
-    "hicp": 120.43,
-
-    "ny_average_monthly_net_salary": 4940
+  "fx_rates": {
+    "EUR": 1.0,
+    "SEK": 0.090902,
+    "CNY": 0.11963
   },
+
+  "hicp": 129.43,
 
   "net_worth_entries": [
     {
       "name": "SEB Account",
       "type": "liquidity",
       "currency": "SEK",
-      "balance": 24500.25,
-      "comment": ""
+      "balance": 24500.25
+    },
+    {
+      "name": "Revolut",
+      "type": "liquidity",
+      "currency": "EUR",
+      "balance": 875.1
     },
     {
       "name": "IBKR",
       "type": "investments",
       "currency": "EUR",
-      "balance": 5345.09,
-      "comment": ""
+      "balance": 52863.39
     },
     {
-      "name": "Credit Card",
-      "type": "credit_card_debt",
-      "currency": "SEK",
-      "balance": 209.87,
-      "comment": ""
-    },
-    {
-      "name": "INPS",
-      "type": "pension",
-      "currency": "SEK",
-      "balance": 20998.8,
-      "comment": ""
-    },
-    {
-      "name": "House",
-      "type": "personal",
+      "name": "Pension Fund",
+      "type": "retirement",
       "currency": "EUR",
-      "balance": 304000,
-      "comment": ""
+      "balance": 38975.69
     }
   ],
 
-  "cash-flow-entries": [
+  "cash_flow_entries": [
     {
-      "name": "Main Job",
+      "name": "Main Job Salary",
       "type": "salary",
       "currency": "SEK",
-      "amount": 45000,
-      "comment": ""
+      "amount": 45000
     },
     {
-      "name": "ITP1 Pension",
-      "type": "pension",
-      "currency": "SEK",
-      "amount": 5000,
-      "comment": ""
+      "name": "Side Project",
+      "type": "bonus",
+      "currency": "EUR",
+      "amount": 300
     },
     {
-      "name": "Rent",
-      "type": "expense",
+      "name": "Rent Apartment",
+      "type": "rent",
       "currency": "SEK",
-      "amount": 12000,
-      "comment": ""
+      "amount": 12000
     },
     {
       "name": "Groceries",
       "type": "expense",
       "currency": "SEK",
-      "amount": 4000,
-      "comment": ""
+      "amount": 3500
     }
   ]
 }
