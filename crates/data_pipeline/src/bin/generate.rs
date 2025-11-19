@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use dashboard_engine::{generate_dashboard, write_dashboard_json};
+use data_pipeline::{generate_dashboard, write_dashboard_json};
 use std::env;
 use std::path::PathBuf;
 

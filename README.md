@@ -7,8 +7,13 @@ Track net worth over time with inflation adjustment and cost-of-living normaliza
 ### Full Stack (Frontend + Backend)
 
 ```powershell
-# 1. Generate dashboard data from monthly snapshots
-cargo run --bin cli -- --input database --output dashboard/dashboard.json --settings settings.json --pretty
+# 1. Generate dashboard data (choose ONE of the two methods below)
+
+# A) Using new data_pipeline binary (direct files → dashboard):
+cargo run -p data_pipeline --bin generate-dashboard -- --settings settings.json --database database --out dashboard/dashboard.json
+
+# B) Using the CLI aggregator (still supported):
+cargo run -p cli -- --input database --output dashboard/dashboard.json --settings settings.json --pretty
 
 # 2. Start API server (Terminal 1)
 .\run-api.ps1
@@ -24,8 +29,10 @@ Visit `http://localhost:3001` to see the dashboard.
 ### Backend Only
 
 ```powershell
-# 1. Generate dashboard data
-cargo run --bin cli -- --input database --output dashboard/dashboard.json --settings settings.json --pretty
+# 1. Generate dashboard data (pick one)
+cargo run -p data_pipeline --bin generate-dashboard -- --settings settings.json --database database --out dashboard/dashboard.json
+# OR
+cargo run -p cli -- --input database --output dashboard/dashboard.json --settings settings.json --pretty
 
 # 2. Start API server
 .\run-api.ps1
@@ -59,66 +66,94 @@ Modern Next.js dashboard with real-time data visualization.
 - [Fullstack Quick Start](docs/FULLSTACK_QUICKSTART.md) - Step-by-step setup
 - [Frontend Implementation](docs/FRONTEND_IMPLEMENTATION.md) - Technical details
 
-## CLI
+## Data Generation
 
-Reads monthly JSON snapshots from `database/`, aggregates them with normalization, and outputs `dashboard/dashboard.json`.
+Two supported flows produce `dashboard/dashboard.json`:
 
-New field: `yearly_stats` provides aggregated cash-flow based savings metrics per year present in the data (partial years supported).
+1. `data_pipeline::generate-dashboard` – Direct transformation of raw monthly files + settings.
+2. `cli` – Higher-level wrapper (still available) with some extra convenience flags.
 
-Each item has:
+Both now emit a unified structure containing:
+`metadata`, `yearly_stats[]`, and `snapshots[]` (each snapshot includes categories, cash flow, performance, and real wealth metrics already rounded).
 
-- `year`: Calendar year.
-- `months_count`: Number of months with cash-flow data for that year.
-- `total_income`: Sum of salary-type cash-flow entries converted to base currency.
-- `total_expenses`: Sum of rent and expense entries converted to base currency.
-- `total_savings`: Income minus expenses.
-- `average_save_rate`: `total_savings / total_income` (fraction; 0.52 => 52%).
+### Yearly Stats
+Per-year aggregation of cash-flow metrics:
+- `year`, `months_count`, `total_income`, `total_expenses`, `total_savings`, `average_save_rate`.
+Current classification comes from `settings.json` (`positive_cash_flows`, `negative_cash_flows`).
 
-Currently considered income kinds: `salary`. Considered expense kinds: `rent`, `expense`. Other kinds are ignored; extend as needed.
-
-### Usage
-
+### CLI Usage (unchanged)
 ```powershell
-# Process all snapshots
-cargo run --bin cli -- --input database --output dashboard/dashboard.json --settings settings.json --pretty
-
-# Process latest only
-cargo run --bin cli -- --input database --output dashboard/dashboard.json --latest-only
+cargo run -p cli -- --input database --output dashboard/dashboard.json --settings settings.json --pretty
 ```
 
-### Options
+### Direct Pipeline Usage
+```powershell
+cargo run -p data_pipeline --bin generate-dashboard -- --settings settings.json --database database --out dashboard/dashboard.json
+```
 
-- `-i, --input <PATH>` - Input folder with JSON snapshots (default: `database`)
-- `-o, --output <PATH>` - Output dashboard file (default: `dashboard/dashboard.json`)
-- `-s, --settings <PATH>` - Settings file for defaults (optional)
-- `--latest-only` - Process only the latest snapshot
-- `--pretty` - Pretty-print JSON output (default: true)
+### Monthly Input File Format (raw database/*.json)
 
-### Input Format
+Required fields:
+```jsonc
+{
+	"reference_month": "2025-10",        // or "month" (YYYY-MM)
+	"fx_rates": { "EUR": 1.0, "SEK": 0.09104 },
+	"hicp": 129.43,
+	"cash-flow-entries": [
+		{ "name": "Volvo Cars Salary", "type": "salary", "currency": "SEK", "amount": 33852 },
+		{ "name": "Apartment Rent", "type": "rent", "currency": "SEK", "amount": 8500 }
+	],
+	"net_worth_entries": [
+		{ "name": "SEB", "type": "cash", "currency": "SEK", "balance": 134468 },
+		{ "name": "Intesa Sanpaolo", "type": "investments", "currency": "EUR", "balance": 29832 }
+	]
+}
+```
+Accepted aliases:
+- `reference_month` or `month` for the period.
+- `cash-flow-entries`, `cash_flow_entries`.
 
-Each snapshot file requires:
+### Settings File (`settings.json`)
+Provides classification & base context:
+```jsonc
+{
+	"settings_version": 1,
+	"base_currency": "EUR",
+	"hicp": { "base_year": 2025, "base_month": 1, "base_value": 128.50 },
+	"categories": {
+		"assets": ["cash", "investments", "retirement", "personal"],
+		"liabilities": ["debt"],
+		"positive_cash_flows": ["salary", "pension"],
+		"negative_cash_flows": ["rent", "expense"]
+	}
+}
+```
 
-- `metadata.date` (YYYY-MM-DD)
-- `net_worth_entries[]` with `name`, `type`, `currency`, `balance`
+### Output Snapshot Structure (simplified)
+Each snapshot:
+```jsonc
+{
+	"month": "2025-10",
+	"hicp": 129.43,
+	"totals": { "assets": 123456.78, "liabilities": 2345.67, "net_worth": 121111.11 },
+	"by_category": { "assets": { "cash": 9999.99 }, "liabilities": { } },
+	"cash_flow": { "income": 4000.00, "expenses": 2500.00, "net_cash_flow": 1500.00, "save_rate": 0.3750 },
+	"performance": { "portfolio_nominal_return": 0.0123, "portfolio_real_return": 0.0100, "twr_cumulative": 1.2345 },
+	"real_wealth": { "net_worth_real": 119000.00, "change_pct_from_prev": 0.0042 }
+}
+```
+All numeric values are already rounded to appropriate precision (2 or 4 decimals).
 
-Optional (defaults from `settings.json`):
+### Choosing a Method
+Use the pipeline binary for a lean, deterministic build. Use the CLI when you want flags like `--latest-only` (future extensions) and pretty formatting by default.
 
-- `metadata.base_currency` - Base currency for conversion (default: EUR)
-- `fx_rates` - Currency exchange rates
-- `metadata.adjust_to_inflation` - Enable HICP deflation ("yes"/"no")
-- `metadata.normalize_to_new_york_ecli` - Enable cost-of-living normalization ("yes"/"no")
-- `inflation.current_hicp` - Current HICP index value
-- `inflation.ecli_basic` - City cost-of-living indices (rent, groceries, cost_of_living)
-
-See `database/template.json` for complete structure.
-
-### Output
-
-Generates snapshots with three views:
-
-1. **Nominal** - Raw values in base currency
-2. **Inflation-adjusted** - HICP-deflated values
-3. **Real purchasing power** - Combined inflation + cost-of-living normalization
+### Regeneration Cycle
+```powershell
+# Regenerate
+cargo run -p data_pipeline --bin generate-dashboard -- --settings settings.json --database database --out dashboard/dashboard.json
+# Invalidate API cache
+Invoke-WebRequest -Uri http://localhost:3000/api/cache/invalidate -Method POST
+```
 
 ## API Server
 

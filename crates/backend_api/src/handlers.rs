@@ -73,15 +73,10 @@ pub async fn get_snapshot_entries(
     let date = NaiveDate::parse_from_str(&date_str, "%Y-%m-%d")
         .map_err(|_| ApiError::InvalidDateFormat(date_str.clone()))?;
 
-    let document = repo.fetch_entries_by_date(date).await?;
-    let fx_rates = document.get_fx_rates();
-    let base_currency = document
-        .metadata
-        .base_currency
-        .clone()
-        .unwrap_or_else(|| "EUR".to_string());
-
-    let enriched_entries: Vec<EnrichedEntry> = document
+    let monthly = repo.fetch_monthly_input(date).await?;
+    let fx_rates = &monthly.fx_rates;
+    let base_currency = "EUR".to_string(); // Base currency not stored per file; default
+    let enriched_entries: Vec<EnrichedEntry> = monthly
         .net_worth_entries
         .iter()
         .map(|entry| {
@@ -90,7 +85,6 @@ pub async fn get_snapshot_entries(
             } else {
                 *fx_rates.get(&entry.currency).unwrap_or(&1.0)
             };
-
             EnrichedEntry {
                 name: entry.name.clone(),
                 kind: entry.kind.clone(),
@@ -101,15 +95,14 @@ pub async fn get_snapshot_entries(
             }
         })
         .collect();
-
     let response = EntriesResponse {
-        date: document.metadata.date.clone(),
+        date: monthly.month.clone(),
         base_currency,
         entries: enriched_entries,
         metadata: EntryMetadata {
-            reference_month: document.metadata.reference_month.clone(),
-            fx_rates: document.metadata.fx_rates.clone(),
-            hicp: document.metadata.hicp,
+            reference_month: Some(monthly.month.clone()),
+            fx_rates: Some(monthly.fx_rates.clone()),
+            hicp: Some(monthly.hicp),
         },
     };
 

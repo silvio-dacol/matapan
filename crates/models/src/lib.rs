@@ -1,505 +1,141 @@
+
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use chrono::NaiveDate;
-use serde::{Deserialize, Serialize};
-
-/// Utility function to round a float to 2 decimal places
-#[inline]
-fn round_to_2_decimals(value: f64) -> f64 {
-    (value * 100.0).round() / 100.0
+// Settings models
+#[derive(Debug, Deserialize)]
+pub struct SettingsHicp {
+	pub base_year: i32,
+	pub base_month: u32,
+	pub base_value: f64,
 }
 
-/// Utility function to round a float to 1 decimal place
-#[inline]
-fn round_to_1_decimal(value: f64) -> f64 {
-    (value * 10.0).round() / 10.0
+#[derive(Debug, Deserialize)]
+pub struct SettingsCategories {
+	pub assets: Vec<String>,
+	pub liabilities: Vec<String>,
+	pub positive_cash_flows: Vec<String>,
+	pub negative_cash_flows: Vec<String>,
 }
 
-/// Utility function to round a float to 4 decimal places
-#[inline]
-fn round_to_4_decimals(value: f64) -> f64 {
-    (value * 10000.0).round() / 10000.0
+#[derive(Debug, Deserialize)]
+pub struct SettingsFile {
+	pub settings_version: u32,
+	pub base_currency: String,
+	pub hicp: SettingsHicp,
+	pub categories: SettingsCategories,
 }
 
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub struct Settings {
-    pub base_currency: String,
-    #[serde(default)]
-    pub normalize: Option<String>,
-    #[serde(default)]
-    pub base_hicp: Option<HicpBase>,
-    #[serde(default)]
-    pub ecli_weights: Option<EcliWeight>,
-    #[serde(default)]
-    pub categories: Option<CategoryConfig>,
-    /// Base basket of goods with prices at the HICP base period
-    #[serde(default)]
-    pub base_basket_of_goods: Option<HashMap<String, f64>>,
+// Raw input entries
+#[derive(Debug, Deserialize)]
+pub struct NetWorthEntryRaw {
+	pub name: String,
+	#[serde(rename = "type")]
+	pub kind: String,
+	pub currency: String,
+	pub balance: f64,
+	#[serde(default)]
+	pub comment: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub struct CategoryConfig {
-    pub assets: Vec<String>,
-    pub liabilities: Vec<String>,
-    #[serde(default, alias = "positive_cash_flow")]
-    pub positive_cash_flows: Vec<String>,
-    #[serde(default, alias = "negative_cash_flow")]
-    pub negative_cash_flows: Vec<String>,
+#[derive(Debug, Deserialize)]
+pub struct CashFlowEntryRaw {
+	pub name: String,
+	#[serde(rename = "type")]
+	pub kind: String,
+	pub currency: String,
+	pub amount: f64,
+	#[serde(default)]
+	pub comment: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub struct HicpBase {
-    #[serde(default)]
-    pub base_year: Option<String>,
-    #[serde(default)]
-    pub base_month: Option<String>,
-    pub base_hicp: f64,
+#[derive(Debug, Deserialize)]
+pub struct MonthlyInput {
+	#[serde(alias = "month", alias = "reference_month")]
+	pub month: String,
+	pub fx_rates: HashMap<String, f64>,
+	pub hicp: f64,
+	#[serde(default, alias = "cash_flow_entries", alias = "cash-flow-entries")]
+	pub cash_flow_entries: Vec<CashFlowEntryRaw>,
+	#[serde(default)]
+	pub net_worth_entries: Vec<NetWorthEntryRaw>,
 }
 
-impl HicpBase {
-    pub fn base_hicp(&self) -> f64 {
-        self.base_hicp
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub struct InputDocument {
-    pub metadata: Metadata,
-    #[serde(default)]
-    pub net_worth_entries: Vec<InputEntry>,
-    #[serde(rename = "cash-flow-entries", default)]
-    pub cash_flow_entries: Vec<CashFlowEntry>,
-}
-
-impl InputDocument {
-    /// Gets fx_rates from metadata
-    pub fn get_fx_rates(&self) -> HashMap<String, f64> {
-        self.metadata.fx_rates.clone().unwrap_or_default()
-    }
-
-    /// Gets base currency from metadata or settings default
-    pub fn get_base_currency(&self, settings: Option<&Settings>) -> String {
-        self.metadata
-            .base_currency
-            .clone()
-            .or_else(|| settings.map(|s| s.base_currency.clone()))
-            .unwrap_or_else(|| "EUR".to_string())
-    }
-
-    /// Checks if inflation adjustment is enabled
-    pub fn is_inflation_enabled(&self, settings: Option<&Settings>) -> bool {
-        let check = |s: &String| s.eq_ignore_ascii_case("yes");
-        // Check unified 'normalize' field
-        if let Some(settings) = settings {
-            if settings.normalize.as_ref().map_or(false, check) {
-                return true;
-            }
-        }
-        if self.metadata.normalize.as_ref().map_or(false, check) {
-            return true;
-        }
-        // Fallback to legacy fields for backward compatibility
-        self.metadata
-            .adjust_to_inflation
-            .as_ref()
-            .map_or(false, check)
-            || self
-                .metadata
-                .normalize_to_hicp
-                .as_ref()
-                .map_or(false, check)
-    }
-
-    /// Checks if ECLI normalization is enabled
-    pub fn is_ecli_enabled(&self, settings: Option<&Settings>) -> bool {
-        let check = |s: &String| s.eq_ignore_ascii_case("yes");
-        // Check unified 'normalize' field
-        if let Some(settings) = settings {
-            if settings.normalize.as_ref().map_or(false, check) {
-                return true;
-            }
-        }
-        if self.metadata.normalize.as_ref().map_or(false, check) {
-            return true;
-        }
-        // Fallback to legacy fields for backward compatibility
-        self.metadata
-            .normalize_to_new_york_ecli
-            .as_ref()
-            .map_or(false, check)
-            || self
-                .metadata
-                .normalize_to_ecli
-                .as_ref()
-                .map_or(false, check)
-    }
-
-    /// Gets HICP base value from settings or metadata
-    pub fn get_hicp_base(&self, settings: Option<&Settings>) -> Option<f64> {
-        settings
-            .and_then(|s| s.base_hicp.as_ref().map(|h| h.base_hicp()))
-            .or_else(|| self.metadata.hicp)
-    }
-
-    /// Gets ECLI weights from settings, with fallback to defaults
-    pub fn get_ecli_weights(&self, settings: Option<&Settings>) -> Option<EcliWeight> {
-        if let Some(s) = settings {
-            if let Some(ref ecli) = s.ecli_weights {
-                return Some(ecli.clone());
-            }
-        }
-
-        // Provide default weights for 2024_08 format compatibility
-        self.metadata.ecli.as_ref().map(|_| EcliWeight {
-            rent_index_weight: 0.4,
-            groceries_index_weight: 0.35,
-            cost_of_living_index_weight: 0.25,
-            restaurant_price_index_weight: 0.0,
-            local_purchasing_power_index_weight: 0.0,
-        })
-    }
-
-    /// Gets current HICP from metadata
-    #[inline]
-    pub fn get_current_hicp(&self) -> Option<f64> {
-        self.metadata.hicp
-    }
-
-    /// Gets ECLI basic data from metadata
-    #[inline]
-    pub fn get_ecli_basic(&self) -> Option<&EcliBasic> {
-        self.metadata.ecli.as_ref()
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub struct Metadata {
-    #[serde(default)]
-    pub version: Option<u32>,
-    #[serde(default)]
-    pub reference_month: Option<String>,
-    pub date: String, // YYYY-MM-DD
-    #[serde(default)]
-    pub base_currency: Option<String>,
-    #[serde(default)]
-    pub normalize: Option<String>,
-    // Legacy fields kept for backward compatibility
-    #[serde(default)]
-    pub adjust_to_inflation: Option<String>,
-    #[serde(default)]
-    pub normalize_to_new_york_ecli: Option<String>,
-    #[serde(default)]
-    pub normalize_to_hicp: Option<String>,
-    #[serde(default)]
-    pub normalize_to_ecli: Option<String>,
-    #[serde(default)]
-    pub hicp: Option<f64>,
-    #[serde(default)]
-    pub fx_rates: Option<HashMap<String, f64>>,
-    #[serde(default)]
-    pub ecli: Option<EcliBasic>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub struct EcliWeight {
-    pub rent_index_weight: f64,
-    pub groceries_index_weight: f64,
-    pub cost_of_living_index_weight: f64,
-    #[serde(default)]
-    pub restaurant_price_index_weight: f64,
-    #[serde(default)]
-    pub local_purchasing_power_index_weight: f64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub struct EcliBasic {
-    pub rent_index: f64,
-    pub groceries_index: f64,
-    pub cost_of_living_index: f64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub struct InputEntry {
-    pub name: String,
-    #[serde(rename = "type")]
-    pub kind: String,
-    pub currency: String,
-    pub balance: f64,
-    #[serde(default)]
-    pub comment: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CashFlowEntry {
-    pub name: String,
-    #[serde(rename = "type")]
-    pub kind: String,
-    pub currency: String,
-    pub amount: f64,
-    #[serde(default)]
-    pub comment: String,
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
-#[serde(rename_all = "snake_case")]
-pub enum Category {
-    Cash,
-    Investments,
-    Personal,
-    Pension,
-    Liabilities,
-}
-
-// How categories are mapped from input entry types
-impl Category {
-    pub fn from_str(s: &str) -> Option<Self> {
-        let s_lower = s.trim();
-
-        // Fast path for common exact matches
-        match s_lower {
-            "cash" | "Cash" => return Some(Category::Cash),
-            "investments" | "Investments" => return Some(Category::Investments),
-            "personal" | "Personal" => return Some(Category::Personal),
-            "pension" | "Pension" => return Some(Category::Pension),
-            "liabilities" | "Liabilities" => return Some(Category::Liabilities),
-            _ => {}
-        }
-
-        // Fallback to case-insensitive matching
-        match s_lower.to_ascii_lowercase().as_str() {
-            "liquidity" | "cash" => Some(Category::Cash),
-            "investments" => Some(Category::Investments),
-            "personal" => Some(Category::Personal),
-            "pension" | "retirement" => Some(Category::Pension),
-            "liabilities" | "debt" | "credit_card_debt" => Some(Category::Liabilities),
-            _ => None,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SnapshotBreakdown {
-    pub cash: f64,
-    pub investments: f64,
-    pub personal: f64,
-    pub pension: f64,
-    pub liabilities: f64,
-    /// Total classified positive cash flow (income) for the period, in base currency
-    pub positive_cash_flow: f64,
-    /// Total classified negative cash flow (expenses) for the period, in base currency
-    pub negative_cash_flow: f64,
-}
-
-impl SnapshotBreakdown {
-    /// Round all financial values to 2 decimal places
-    pub fn rounded(&self) -> Self {
-        Self {
-            cash: round_to_2_decimals(self.cash),
-            investments: round_to_2_decimals(self.investments),
-            personal: round_to_2_decimals(self.personal),
-            pension: round_to_2_decimals(self.pension),
-            liabilities: round_to_2_decimals(self.liabilities),
-            positive_cash_flow: round_to_2_decimals(self.positive_cash_flow),
-            negative_cash_flow: round_to_2_decimals(self.negative_cash_flow),
-        }
-    }
-}
-
-impl Default for SnapshotBreakdown {
-    fn default() -> Self {
-        Self {
-            cash: 0.0,
-            investments: 0.0,
-            personal: 0.0,
-            pension: 0.0,
-            liabilities: 0.0,
-            positive_cash_flow: 0.0,
-            negative_cash_flow: 0.0,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SnapshotTotals {
-    pub assets: f64,
-    pub liabilities: f64,
-    pub net_worth: f64,
-    pub net_cash_flow: f64,
-}
-
-impl SnapshotTotals {
-    /// Round all financial values to 2 decimal places
-    pub fn rounded(&self) -> Self {
-        Self {
-            assets: round_to_2_decimals(self.assets),
-            liabilities: round_to_2_decimals(self.liabilities),
-            net_worth: round_to_2_decimals(self.net_worth),
-            net_cash_flow: round_to_2_decimals(self.net_cash_flow),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Snapshot {
-    pub data_updated_at: NaiveDate,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub reference_month: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub fx_rates: Option<HashMap<String, f64>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub hicp: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub ecli: Option<EcliBasic>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub basket_of_goods: Option<HashMap<String, f64>>,
-    pub breakdown: SnapshotBreakdown,
-    pub totals: SnapshotTotals,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub inflation_adjusted: Option<SnapshotAdjustment>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub real_purchasing_power: Option<SnapshotAdjustment>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub performance: Option<PerformanceMetrics>,
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub warnings: Vec<String>,
-}
-
-impl Snapshot {
-    /// Round all financial values to 2 decimal places
-    pub fn rounded(&self) -> Self {
-        Self {
-            data_updated_at: self.data_updated_at,
-            reference_month: self.reference_month.clone(),
-            fx_rates: self.fx_rates.clone(),
-            hicp: self.hicp,
-            ecli: self.ecli.clone(),
-            basket_of_goods: self.basket_of_goods.clone(),
-            breakdown: self.breakdown.rounded(),
-            totals: self.totals.rounded(),
-            inflation_adjusted: self.inflation_adjusted.as_ref().map(|adj| adj.rounded()),
-            real_purchasing_power: self.real_purchasing_power.as_ref().map(|adj| adj.rounded()),
-            performance: self.performance.as_ref().map(|p| p.rounded()),
-            warnings: self.warnings.clone(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SnapshotAdjustment {
-    pub scale: f64,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub deflator: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub ecli_norm: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub ny_advantage_pct: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub notes: Option<String>,
-}
-
-impl SnapshotAdjustment {
-    /// Round all scale factors to 4 decimals
-    pub fn rounded(&self) -> Self {
-        Self {
-            scale: round_to_4_decimals(self.scale),
-            deflator: self.deflator.map(round_to_4_decimals),
-            ecli_norm: self.ecli_norm.map(round_to_4_decimals),
-            ny_advantage_pct: self.ny_advantage_pct.map(round_to_1_decimal),
-            notes: self.notes.clone(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PerformanceMetrics {
-    pub nominal_return: f64,
-    pub hicp_monthly: f64,
-    pub real_return: f64,
-    pub twr_cumulative: f64,
-    pub benchmark: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub notes: Option<String>,
-}
-
-impl PerformanceMetrics {
-    pub fn rounded(&self) -> Self {
-        Self {
-            nominal_return: round_to_4_decimals(self.nominal_return),
-            hicp_monthly: round_to_4_decimals(self.hicp_monthly),
-            real_return: round_to_4_decimals(self.real_return),
-            twr_cumulative: round_to_4_decimals(self.twr_cumulative),
-            benchmark: self.benchmark.clone(),
-            notes: self.notes.clone(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
+// Output models
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DashboardMetadata {
-    pub generated_at: String,
-    pub base_currency: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub normalize: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub base_hicp: Option<HicpBase>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub base_basket_of_goods: Option<HashMap<String, f64>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub ecli_weights: Option<EcliWeight>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub categories: Option<CategoryConfig>,
+	pub generated_at: String,
+	pub settings_version: u32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Dashboard {
-    pub metadata: DashboardMetadata,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub yearly_stats: Option<Vec<YearlyStats>>,
-    pub snapshots: Vec<Snapshot>,
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SnapshotTotals {
+	pub assets: f64,
+	pub liabilities: f64,
+	pub net_worth: f64,
 }
 
-impl Dashboard {
-    /// Round all financial values to 2 decimal places
-    pub fn rounded(&self) -> Self {
-        Self {
-            metadata: self.metadata.clone(),
-            snapshots: self.snapshots.iter().map(|s| s.rounded()).collect(),
-            yearly_stats: self
-                .yearly_stats
-                .as_ref()
-                .map(|ys| ys.iter().map(|y| y.rounded()).collect()),
-        }
-    }
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SnapshotCashFlow {
+	pub income: f64,
+	pub expenses: f64,
+	pub net_cash_flow: f64,
+	pub save_rate: f64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SnapshotPerformance {
+	pub portfolio_nominal_return: f64,
+	pub portfolio_real_return: f64,
+	pub twr_cumulative: f64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SnapshotRealWealth {
+	pub net_worth_real: f64,
+	pub change_pct_from_prev: f64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ByCategory {
+	pub assets: HashMap<String, f64>,
+	pub liabilities: HashMap<String, f64>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SnapshotOutput {
+	pub month: String,
+	pub fx_rates: HashMap<String, f64>,
+	pub hicp: f64,
+	pub totals: SnapshotTotals,
+	pub by_category: ByCategory,
+	pub cash_flow: SnapshotCashFlow,
+	pub performance: SnapshotPerformance,
+	pub real_wealth: SnapshotRealWealth,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct YearlyStats {
-    pub year: i32,
-    pub months_count: usize,
-    pub total_income: f64,
-    pub total_expenses: f64,
-    pub total_savings: f64,
-    /// average_save_rate expressed as a fraction (0.25 => 25%)
-    pub average_save_rate: f64,
+	pub year: i32,
+	pub months_count: usize,
+	pub total_income: f64,
+	pub total_expenses: f64,
+	pub total_savings: f64,
+	pub average_save_rate: f64,
 }
 
-impl YearlyStats {
-    pub fn rounded(&self) -> Self {
-        Self {
-            year: self.year,
-            months_count: self.months_count,
-            total_income: round_to_2_decimals(self.total_income),
-            total_expenses: round_to_2_decimals(self.total_expenses),
-            total_savings: round_to_2_decimals(self.total_savings),
-            average_save_rate: round_to_4_decimals(self.average_save_rate),
-        }
-    }
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DashboardOutput {
+	pub metadata: DashboardMetadata,
+	pub yearly_stats: Vec<YearlyStats>,
+	pub snapshots: Vec<SnapshotOutput>,
 }
+
+// Rounding compatibility methods (already finalized in pipeline generation, so identity)
+impl SnapshotOutput {
+	pub fn rounded(self) -> Self { self }
+}
+impl DashboardOutput {
+	pub fn rounded(self) -> Self { self }
+}
+
