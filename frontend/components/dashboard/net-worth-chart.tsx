@@ -81,45 +81,11 @@ export function NetWorthChart({
       filteredPrimary.map((p, index) => {
         const primaryAbsolute = p.totals.net_worth;
         const primaryChange = primaryAbsolute - baselinePrimary;
-        const cashChange =
-          p.breakdown.cash - (filteredPrimary[0]?.breakdown.cash || 0);
-        const investmentsChange =
-          p.breakdown.investments -
-          (filteredPrimary[0]?.breakdown.investments || 0);
-        const pensionChange =
-          p.breakdown.pension - (filteredPrimary[0]?.breakdown.pension || 0);
-        const personalChange =
-          p.breakdown.personal - (filteredPrimary[0]?.breakdown.personal || 0);
 
-        // Calculate percentage changes from baseline
-        const baselineCash = filteredPrimary[0]?.breakdown.cash || 0;
-        const baselineInvestments =
-          filteredPrimary[0]?.breakdown.investments || 0;
-        const baselinePension = filteredPrimary[0]?.breakdown.pension || 0;
-        const baselinePersonal = filteredPrimary[0]?.breakdown.personal || 0;
-
+        // Calculate percentage changes from baseline (only for net worth in performance mode)
         const primaryPerf =
           baselinePrimary !== 0
             ? ((primaryAbsolute - baselinePrimary) / baselinePrimary) * 100
-            : 0;
-        const cashPerf =
-          baselineCash !== 0
-            ? ((p.breakdown.cash - baselineCash) / baselineCash) * 100
-            : 0;
-        const investmentsPerf =
-          baselineInvestments !== 0
-            ? ((p.breakdown.investments - baselineInvestments) /
-                baselineInvestments) *
-              100
-            : 0;
-        const pensionPerf =
-          baselinePension !== 0
-            ? ((p.breakdown.pension - baselinePension) / baselinePension) * 100
-            : 0;
-        const personalPerf =
-          baselinePersonal !== 0
-            ? ((p.breakdown.personal - baselinePersonal) / baselinePersonal) *
-              100
             : 0;
 
         return {
@@ -127,18 +93,11 @@ export function NetWorthChart({
           primaryAbsolute,
           primaryChange,
           primaryPerf,
-          cashAbsolute: p.breakdown.cash,
-          cashChange,
-          cashPerf,
-          investmentsAbsolute: p.breakdown.investments,
-          investmentsChange,
-          investmentsPerf,
-          pensionAbsolute: p.breakdown.pension,
-          pensionChange,
-          pensionPerf,
-          personalAbsolute: p.breakdown.personal,
-          personalChange,
-          personalPerf,
+          // Absolute values for stacked area chart
+          cash: p.breakdown.cash,
+          investments: p.breakdown.investments,
+          pension: p.breakdown.pension,
+          personal: p.breakdown.personal,
         };
       }),
     [filteredPrimary, baselinePrimary]
@@ -201,77 +160,98 @@ export function NetWorthChart({
           <Tooltip
             content={({ active, payload, label }) => {
               if (!active || !payload || payload.length === 0) return null;
-              const data = payload[0].payload as {
-                primaryAbsolute: number;
-                primaryPerf: number;
-                cashAbsolute: number;
-                cashPerf: number;
-                investmentsAbsolute: number;
-                investmentsPerf: number;
-                pensionAbsolute: number;
-                pensionPerf: number;
-                personalAbsolute: number;
-                personalPerf: number;
-              };
-              return (
-                <div className="rounded-md border bg-background/95 backdrop-blur px-3 py-2 shadow-lg min-w-[200px] space-y-2">
-                  <div className="text-xs font-medium tracking-wide text-muted-foreground">
-                    {label}
-                  </div>
-                  <div className="space-y-1">
-                    <div className="flex items-baseline justify-between gap-3">
-                      <span className="text-[11px] uppercase text-muted-foreground">
-                        Net Worth
-                      </span>
-                      <span className="font-semibold text-sm tabular-nums text-indigo-600">
-                        {viewMode === "absolute"
-                          ? formatCurrency(data.primaryAbsolute)
-                          : formatPercent(data.primaryPerf)}
-                      </span>
+              
+              if (viewMode === "performance") {
+                const data = payload[0].payload as {
+                  primaryAbsolute: number;
+                  primaryPerf: number;
+                };
+                return (
+                  <div className="rounded-md border bg-background/95 backdrop-blur px-3 py-2 shadow-lg min-w-[200px] space-y-2">
+                    <div className="text-xs font-medium tracking-wide text-muted-foreground">
+                      {label}
                     </div>
-                    <div className="flex items-baseline justify-between gap-3">
-                      <span className="text-[11px] uppercase text-muted-foreground">
-                        Cash
-                      </span>
-                      <span className="font-semibold text-sm tabular-nums text-emerald-600">
-                        {viewMode === "absolute"
-                          ? formatCurrency(data.cashAbsolute)
-                          : formatPercent(data.cashPerf)}
-                      </span>
-                    </div>
-                    <div className="flex items-baseline justify-between gap-3">
-                      <span className="text-[11px] uppercase text-muted-foreground">
-                        Investments
-                      </span>
-                      <span className="font-semibold text-sm tabular-nums text-blue-600">
-                        {viewMode === "absolute"
-                          ? formatCurrency(data.investmentsAbsolute)
-                          : formatPercent(data.investmentsPerf)}
-                      </span>
-                    </div>
-                    <div className="flex items-baseline justify-between gap-3">
-                      <span className="text-[11px] uppercase text-muted-foreground">
-                        Pension
-                      </span>
-                      <span className="font-semibold text-sm tabular-nums text-purple-600">
-                        {viewMode === "absolute"
-                          ? formatCurrency(data.pensionAbsolute)
-                          : formatPercent(data.pensionPerf)}
-                      </span>
-                    </div>
-                    <div className="flex items-baseline justify-between gap-3">
-                      <span className="text-[11px] uppercase text-muted-foreground">
-                        Personal
-                      </span>
-                      <span className="font-semibold text-sm tabular-nums text-amber-600">
-                        {viewMode === "absolute"
-                          ? formatCurrency(data.personalAbsolute)
-                          : formatPercent(data.personalPerf)}
-                      </span>
+                    <div className="space-y-1">
+                      <div className="flex items-baseline justify-between gap-3">
+                        <span className="text-[11px] uppercase text-muted-foreground">
+                          Net Worth
+                        </span>
+                        <span className="font-semibold text-sm tabular-nums text-indigo-600">
+                          {formatPercent(data.primaryPerf)}
+                        </span>
+                      </div>
+                      <div className="flex items-baseline justify-between gap-3 pt-1 border-t">
+                        <span className="text-[11px] uppercase text-muted-foreground">
+                          Absolute
+                        </span>
+                        <span className="font-medium text-xs tabular-nums text-muted-foreground">
+                          {formatCurrency(data.primaryAbsolute)}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
+                );
+              } else {
+                // Absolute mode - show stacked values
+                const data = payload[0].payload as {
+                  primaryAbsolute: number;
+                  cash: number;
+                  investments: number;
+                  pension: number;
+                  personal: number;
+                };
+                return (
+                  <div className="rounded-md border bg-background/95 backdrop-blur px-3 py-2 shadow-lg min-w-[200px] space-y-2">
+                    <div className="text-xs font-medium tracking-wide text-muted-foreground">
+                      {label}
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex items-baseline justify-between gap-3">
+                        <span className="text-[11px] uppercase text-muted-foreground">
+                          Net Worth
+                        </span>
+                        <span className="font-semibold text-sm tabular-nums text-indigo-600">
+                          {formatCurrency(data.primaryAbsolute)}
+                        </span>
+                      </div>
+                      <div className="border-t pt-1 mt-1 space-y-1">
+                        <div className="flex items-baseline justify-between gap-3">
+                          <span className="text-[11px] uppercase text-muted-foreground">
+                            Cash
+                          </span>
+                          <span className="font-semibold text-xs tabular-nums text-emerald-600">
+                            {formatCurrency(data.cash)}
+                          </span>
+                        </div>
+                        <div className="flex items-baseline justify-between gap-3">
+                          <span className="text-[11px] uppercase text-muted-foreground">
+                            Investments
+                          </span>
+                          <span className="font-semibold text-xs tabular-nums text-blue-600">
+                            {formatCurrency(data.investments)}
+                          </span>
+                        </div>
+                        <div className="flex items-baseline justify-between gap-3">
+                          <span className="text-[11px] uppercase text-muted-foreground">
+                            Pension
+                          </span>
+                          <span className="font-semibold text-xs tabular-nums text-purple-600">
+                            {formatCurrency(data.pension)}
+                          </span>
+                        </div>
+                        <div className="flex items-baseline justify-between gap-3">
+                          <span className="text-[11px] uppercase text-muted-foreground">
+                            Personal
+                          </span>
+                          <span className="font-semibold text-xs tabular-nums text-amber-600">
+                            {formatCurrency(data.personal)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
             }}
           />
           <defs>
@@ -302,60 +282,67 @@ export function NetWorthChart({
               <stop offset="100%" stopColor="#f59e0b" stopOpacity={0.05} />
             </linearGradient>
           </defs>
-          <Area
-            type="monotone"
-            dataKey={viewMode === "absolute" ? "cashChange" : "cashPerf"}
-            stroke="#10b981"
-            strokeWidth={2}
-            fill="url(#cashGradient)"
-            fillOpacity={1}
-            isAnimationActive={false}
-            name="Cash"
-          />
-          <Area
-            type="monotone"
-            dataKey={
-              viewMode === "absolute" ? "investmentsChange" : "investmentsPerf"
-            }
-            stroke="#3b82f6"
-            strokeWidth={2}
-            fill="url(#investmentsGradient)"
-            fillOpacity={1}
-            isAnimationActive={false}
-            name="Investments"
-          />
-          <Area
-            type="monotone"
-            dataKey={viewMode === "absolute" ? "pensionChange" : "pensionPerf"}
-            stroke="#a855f7"
-            strokeWidth={2}
-            fill="url(#pensionGradient)"
-            fillOpacity={1}
-            isAnimationActive={false}
-            name="Pension"
-          />
-          <Area
-            type="monotone"
-            dataKey={
-              viewMode === "absolute" ? "personalChange" : "personalPerf"
-            }
-            stroke="#f59e0b"
-            strokeWidth={2}
-            fill="url(#personalGradient)"
-            fillOpacity={1}
-            isAnimationActive={false}
-            name="Personal"
-          />
-          <Area
-            type="monotone"
-            dataKey={viewMode === "absolute" ? "primaryChange" : "primaryPerf"}
-            stroke="#6366f1"
-            strokeWidth={3}
-            fill="url(#nwGradientNominal)"
-            fillOpacity={1}
-            isAnimationActive={false}
-            name="Net Worth"
-          />
+          {viewMode === "performance" ? (
+            // Performance mode: only show Net Worth percentage change
+            <Area
+              type="monotone"
+              dataKey="primaryPerf"
+              stroke="#6366f1"
+              strokeWidth={3}
+              fill="url(#nwGradientNominal)"
+              fillOpacity={1}
+              isAnimationActive={false}
+              name="Net Worth"
+            />
+          ) : (
+            // Absolute mode: stacked area chart showing asset composition
+            <>
+              <Area
+                type="monotone"
+                dataKey="cash"
+                stackId="1"
+                stroke="#10b981"
+                strokeWidth={1.5}
+                fill="url(#cashGradient)"
+                fillOpacity={1}
+                isAnimationActive={false}
+                name="Cash"
+              />
+              <Area
+                type="monotone"
+                dataKey="investments"
+                stackId="1"
+                stroke="#3b82f6"
+                strokeWidth={1.5}
+                fill="url(#investmentsGradient)"
+                fillOpacity={1}
+                isAnimationActive={false}
+                name="Investments"
+              />
+              <Area
+                type="monotone"
+                dataKey="pension"
+                stackId="1"
+                stroke="#a855f7"
+                strokeWidth={1.5}
+                fill="url(#pensionGradient)"
+                fillOpacity={1}
+                isAnimationActive={false}
+                name="Pension"
+              />
+              <Area
+                type="monotone"
+                dataKey="personal"
+                stackId="1"
+                stroke="#f59e0b"
+                strokeWidth={1.5}
+                fill="url(#personalGradient)"
+                fillOpacity={1}
+                isAnimationActive={false}
+                name="Personal"
+              />
+            </>
+          )}
           <Legend
             verticalAlign="top"
             height={36}
