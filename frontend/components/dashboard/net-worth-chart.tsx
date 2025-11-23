@@ -160,7 +160,7 @@ export function NetWorthChart({
           <Tooltip
             content={({ active, payload, label }) => {
               if (!active || !payload || payload.length === 0) return null;
-              
+
               if (viewMode === "performance") {
                 const data = payload[0].payload as {
                   primaryAbsolute: number;
