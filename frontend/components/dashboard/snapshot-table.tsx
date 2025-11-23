@@ -36,7 +36,7 @@ export function SnapshotTable({ snapshots }: SnapshotTableProps) {
             <th className="text-right py-3 px-4 font-medium">Investments</th>
             <th className="text-right py-3 px-4 font-medium">Pension</th>
             <th className="text-right py-3 px-4 font-medium">Liabilities</th>
-            <th className="text-right py-3 px-4 font-medium">PP vs NY</th>
+            <th className="text-right py-3 px-4 font-medium">Δ %</th>
           </tr>
         </thead>
         <tbody>
@@ -75,7 +75,8 @@ export function SnapshotTable({ snapshots }: SnapshotTableProps) {
               </td>
               <td className="text-right py-3 px-4">
                 <span className="text-sm text-muted-foreground">
-                  +{snapshot.real_purchasing_power.ny_advantage_pct.toFixed(1)}%
+                  {snapshot.real_wealth.change_pct_from_prev >= 0 ? "+" : ""}
+                  {snapshot.real_wealth.change_pct_from_prev.toFixed(1)}%
                 </span>
               </td>
             </tr>

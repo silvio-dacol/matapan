@@ -1,53 +1,22 @@
-/**
- * TypeScript types mirroring the Rust backend API structures
- */
-
+// Simplified types aligned with new backend dashboard schema
 export interface FxRates {
   [currency: string]: number;
 }
 
-export interface HICP {
-  base_year: string;
-  base_month: string;
-  base_hicp: number;
-}
-
-export interface ECLI {
-  rent_index_weight: number;
-  groceries_index_weight: number;
-  cost_of_living_index_weight: number;
-  restaurant_price_index_weight: number;
-  local_purchasing_power_index_weight: number;
-}
-
-export interface ECLIData {
-  rent_index: number;
-  groceries_index: number;
-  cost_of_living_index: number;
-}
-
-export interface Categories {
-  assets: string[];
-  liabilities: string[];
-}
-
-export interface Metadata {
+export interface DashboardMetadata {
   generated_at: string;
-  base_currency: string;
-  normalize: string;
-  hicp: HICP;
-  ecli: ECLI;
-  categories: Categories;
+  settings_version: number;
+  base_currency: string; // Constant (EUR) for now
 }
 
 export interface SnapshotBreakdown {
   cash: number;
   investments: number;
+  pension: number; // mapped from backend "retirement"
   personal: number;
-  pension: number;
   liabilities: number;
-  positive_cash_flow: number;
-  negative_cash_flow: number;
+  income: number; // monthly income (from cash_flow)
+  expenses: number; // monthly expenses (from cash_flow)
 }
 
 export interface SnapshotTotals {
@@ -57,49 +26,46 @@ export interface SnapshotTotals {
   net_cash_flow: number;
 }
 
-export interface InflationAdjusted {
-  scale: number;
-  deflator: number;
-  notes: string;
+export interface SnapshotRealWealth {
+  net_worth_real: number;
+  change_pct_from_prev: number;
 }
 
-export interface RealPurchasingPower {
-  scale: number;
-  deflator: number;
-  ny_advantage_pct: number;
-  ecli_norm: number;
-  notes: string;
+export interface SnapshotPerformance {
+  portfolio_nominal_return: number;
+  portfolio_real_return: number;
+  twr_cumulative: number;
 }
 
 export interface Snapshot {
-  data_updated_at: string;
-  reference_month: string;
+  data_updated_at: string; // metadata.generated_at
+  reference_month: string; // month
   fx_rates: FxRates;
   hicp: number;
-  ecli: ECLIData;
   breakdown: SnapshotBreakdown;
   totals: SnapshotTotals;
-  inflation_adjusted: InflationAdjusted;
-  real_purchasing_power: RealPurchasingPower;
+  real_wealth: SnapshotRealWealth;
+  performance: SnapshotPerformance;
 }
 
 export interface Dashboard {
-  metadata: Metadata;
+  metadata: DashboardMetadata;
   snapshots: Snapshot[];
 }
 
 // API response types for specific endpoints
+// Entries endpoint types (kept minimal; adjust if endpoint changes)
 export interface SnapshotEntry {
-  category: string;
-  sub_category: string;
-  description: string;
-  original_amount: number;
-  original_currency: string;
-  converted_amount_eur: number;
-  notes?: string;
+  name: string;
+  type: string;
+  currency: string;
+  balance: number;
+  balance_in_base: number;
+  comment: string;
 }
-
 export interface SnapshotEntriesResponse {
-  reference_month: string;
+  date: string;
+  base_currency: string;
   entries: SnapshotEntry[];
+  metadata: { reference_month?: string; fx_rates?: FxRates; hicp?: number };
 }

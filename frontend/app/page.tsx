@@ -8,7 +8,6 @@
 import { AssetsBreakdownChart } from "@/components/dashboard/assets-breakdown-chart";
 import { NetWorthChart } from "@/components/dashboard/net-worth-chart";
 import { SnapshotTable } from "@/components/dashboard/snapshot-table";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -42,92 +41,25 @@ function formatDate(dateString: string): string {
 
 import { useMemo, useState } from "react";
 
-// Simple iPhone-style toggle switch (local, minimal styling)
-interface SwitchProps {
-  checked: boolean;
-  onChange: (checked: boolean) => void;
-  label?: string;
-}
-
-function Switch({ checked, onChange, label }: SwitchProps) {
-  return (
-    <div className="flex items-center gap-2 select-none">
-      {label && (
-        <span className="text-xs font-medium text-muted-foreground">
-          {label}
-        </span>
-      )}
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        onClick={() => onChange(!checked)}
-        className={
-          "relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 " +
-          (checked ? "bg-indigo-600" : "bg-gray-300")
-        }
-      >
-        <span
-          className={
-            "inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform " +
-            (checked ? "translate-x-5" : "translate-x-1")
-          }
-        />
-      </button>
-    </div>
-  );
-}
+// Removed inflation toggle; backend provides only nominal + real wealth metrics
 
 export default function Home() {
   const [netWorthPercentChange, setNetWorthPercentChange] = useState<
     number | null
   >(null);
   const { data: dashboard, isLoading, error, refetch } = useDashboard(30000); // Poll every 30 seconds
-  const [showInflation, setShowInflation] = useState(false);
+  // Percent change computed directly; no inflation-adjusted toggle
 
   // Hooks must run regardless of loading state; handle undefined within memo.
-  const processedSnapshots = useMemo(() => {
-    if (!dashboard?.snapshots) return [];
-    if (!showInflation) return dashboard.snapshots;
-    return dashboard.snapshots.map((s) => {
-      const scale = s.inflation_adjusted?.scale ?? 1.0;
-      const scaledBreakdown: SnapshotBreakdown = {
-        cash: s.breakdown.cash * scale,
-        investments: s.breakdown.investments * scale,
-        personal: s.breakdown.personal * scale,
-        pension: s.breakdown.pension * scale,
-        liabilities: s.breakdown.liabilities * scale,
-      };
-      const scaledTotals = {
-        assets: s.totals.assets * scale,
-        liabilities: s.totals.liabilities * scale,
-        net_worth: s.totals.net_worth * scale,
-        net_cash_flow: s.totals.net_cash_flow * scale,
-      };
-      return { ...s, breakdown: scaledBreakdown, totals: scaledTotals };
-    });
-  }, [dashboard, showInflation]);
+  const processedSnapshots = useMemo(
+    () => dashboard?.snapshots || [],
+    [dashboard]
+  );
 
-  const processedLatest = useMemo(() => {
-    const l = dashboard?.snapshots?.[dashboard.snapshots.length - 1];
-    if (!l) return null;
-    if (!showInflation) return l;
-    const scale = l.inflation_adjusted?.scale ?? 1.0;
-    const scaledBreakdown: SnapshotBreakdown = {
-      cash: l.breakdown.cash * scale,
-      investments: l.breakdown.investments * scale,
-      personal: l.breakdown.personal * scale,
-      pension: l.breakdown.pension * scale,
-      liabilities: l.breakdown.liabilities * scale,
-    };
-    const scaledTotals = {
-      assets: l.totals.assets * scale,
-      liabilities: l.totals.liabilities * scale,
-      net_worth: l.totals.net_worth * scale,
-      net_cash_flow: l.totals.net_cash_flow * scale,
-    };
-    return { ...l, breakdown: scaledBreakdown, totals: scaledTotals };
-  }, [dashboard, showInflation]);
+  const processedLatest = useMemo(
+    () => dashboard?.snapshots?.[dashboard.snapshots.length - 1] || null,
+    [dashboard]
+  );
 
   if (error) {
     return (
@@ -177,7 +109,7 @@ export default function Home() {
   }
 
   const { metadata } = dashboard;
-  const latestOriginal = dashboard.snapshots[dashboard.snapshots.length - 1]; // original (unscaled) for purchasing power reference
+  const latestOriginal = processedLatest; // reference to latest snapshot
 
   return (
     <div className="container mx-auto p-8">
@@ -191,12 +123,6 @@ export default function Home() {
             Last updated: {formatDate(metadata.generated_at)}
           </p>
           <p className="text-xs text-muted-foreground mt-1 flex flex-wrap gap-4">
-            <span>
-              View:{" "}
-              {showInflation
-                ? "Inflation-adjusted (HICP deflated)"
-                : "Nominal values"}
-            </span>
             <span>Base Currency: {metadata.base_currency}</span>
           </p>
         </div>
@@ -210,11 +136,6 @@ export default function Home() {
             <RefreshCw className="mr-2 h-4 w-4" />
             Refresh
           </Button>
-          <Switch
-            checked={showInflation}
-            onChange={setShowInflation}
-            label="Inflation"
-          />
         </div>
       </div>
 
@@ -266,23 +187,7 @@ export default function Home() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Purchasing Power
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              +
-              {latestOriginal.real_purchasing_power.ny_advantage_pct.toFixed(1)}
-              %
-            </div>
-            <Badge variant="secondary" className="mt-2 text-xs">
-              vs New York
-            </Badge>
-          </CardContent>
-        </Card>
+        {/* Removed Purchasing Power card (not provided by backend) */}
 
         <Card>
           <CardHeader className="pb-2">
@@ -319,17 +224,16 @@ export default function Home() {
               <CardTitle className="flex items-center gap-2">
                 Net Worth Over Time
                 {netWorthPercentChange !== null && (
-                  <Badge
-                    variant="secondary"
+                  <span
                     className={
-                      netWorthPercentChange >= 0
-                        ? "text-green-600 text-xs font-semibold"
-                        : "text-red-600 text-xs font-semibold"
+                      (netWorthPercentChange >= 0
+                        ? "text-green-600"
+                        : "text-red-600") + " text-xs font-semibold ml-2"
                     }
                   >
                     {netWorthPercentChange >= 0 ? "+" : ""}
                     {netWorthPercentChange.toFixed(1)}%
-                  </Badge>
+                  </span>
                 )}
               </CardTitle>
             </div>
@@ -339,12 +243,7 @@ export default function Home() {
           </CardHeader>
           <CardContent>
             <NetWorthChart
-              snapshots={
-                showInflation ? processedSnapshots : processedSnapshots
-              }
-              comparisonSnapshots={
-                showInflation ? dashboard.snapshots : undefined
-              }
+              snapshots={processedSnapshots}
               onPercentChange={(pct) => setNetWorthPercentChange(pct)}
             />
           </CardContent>
@@ -355,10 +254,7 @@ export default function Home() {
       <Card>
         <CardHeader>
           <CardTitle>Snapshot History</CardTitle>
-          <CardDescription>
-            Monthly snapshots showing{" "}
-            {showInflation ? "inflation-adjusted" : "nominal"} values
-          </CardDescription>
+          <CardDescription>Monthly snapshots (nominal values)</CardDescription>
         </CardHeader>
         <CardContent>
           <SnapshotTable snapshots={processedSnapshots} />

@@ -22,14 +22,12 @@ const timeframeMonths: Record<Exclude<Timeframe, "YTD" | "All">, number> = {
 };
 
 interface NetWorthChartProps {
-  snapshots: Snapshot[]; // primary series (nominal if toggle off, real if toggle on)
-  comparisonSnapshots?: Snapshot[]; // optional nominal series when viewing inflation-adjusted
+  snapshots: Snapshot[];
   onPercentChange?: (percent: number | null) => void;
 }
 
 export function NetWorthChart({
   snapshots,
-  comparisonSnapshots,
   onPercentChange,
 }: NetWorthChartProps) {
   const [timeframe, setTimeframe] = useState<Timeframe>("All");
@@ -41,15 +39,7 @@ export function NetWorthChart({
       ),
     [snapshots]
   );
-  const sortedComparison = useMemo(
-    () =>
-      comparisonSnapshots
-        ? [...comparisonSnapshots].sort((a, b) =>
-            a.reference_month.localeCompare(b.reference_month)
-          )
-        : undefined,
-    [comparisonSnapshots]
-  );
+  // Single series only (inflation-adjusted comparison removed)
 
   const filteredPrimary = useMemo(() => {
     if (sortedPrimary.length === 0) return [];
@@ -75,55 +65,26 @@ export function NetWorthChart({
     return sortedPrimary;
   }, [sortedPrimary, timeframe]);
 
-  const filteredComparison = useMemo(() => {
-    if (!sortedComparison) return undefined;
-    if (filteredPrimary.length === 0) return [];
-    // Keep only months that appear in filteredPrimary for alignment
-    const monthsSet = new Set(filteredPrimary.map((s) => s.reference_month));
-    return sortedComparison.filter((s) => monthsSet.has(s.reference_month));
-  }, [sortedComparison, filteredPrimary]);
+  const filteredComparison = undefined;
 
   const baselinePrimary =
     filteredPrimary.length > 0 ? filteredPrimary[0].totals.net_worth : 0;
-  const baselineComparison =
-    filteredComparison && filteredComparison.length > 0
-      ? filteredComparison[0].totals.net_worth
-      : 0;
+  const baselineComparison = 0;
 
-  const comparisonMap = useMemo(() => {
-    if (!filteredComparison) return new Map<string, Snapshot>();
-    return new Map(filteredComparison.map((s) => [s.reference_month, s]));
-  }, [filteredComparison]);
+  const comparisonMap = new Map<string, Snapshot>();
 
   const data = useMemo(
     () =>
       filteredPrimary.map((p) => {
         const primaryAbsolute = p.totals.net_worth;
         const primaryChange = primaryAbsolute - baselinePrimary;
-        let comparisonAbsolute: number | undefined;
-        let comparisonChange: number | undefined;
-        if (filteredComparison) {
-          const comp = comparisonMap.get(p.reference_month);
-          if (comp) {
-            comparisonAbsolute = comp.totals.net_worth;
-            comparisonChange = comparisonAbsolute - baselineComparison;
-          }
-        }
         return {
           month: p.reference_month,
           primaryAbsolute,
           primaryChange,
-          comparisonAbsolute,
-          comparisonChange,
         };
       }),
-    [
-      filteredPrimary,
-      filteredComparison,
-      baselinePrimary,
-      baselineComparison,
-      comparisonMap,
-    ]
+    [filteredPrimary, baselinePrimary]
   );
 
   const percentChange = useMemo(() => {
@@ -163,48 +124,22 @@ export function NetWorthChart({
           <Tooltip
             content={({ active, payload, label }) => {
               if (!active || !payload || payload.length === 0) return null;
-              // Both series share the same underlying payload shape
-              const base = payload[0].payload as {
-                primaryAbsolute: number;
-                comparisonAbsolute?: number;
-              };
+              const base = payload[0].payload as { primaryAbsolute: number };
               const primary = base.primaryAbsolute;
-              const comparison = base.comparisonAbsolute;
               return (
                 <div className="rounded-md border bg-background/95 backdrop-blur px-3 py-2 shadow-lg min-w-[165px] space-y-2">
                   <div className="text-xs font-medium tracking-wide text-muted-foreground">
                     {label}
                   </div>
                   <div className="space-y-1">
-                    {comparison !== undefined ? (
-                      <>
-                        <div className="flex items-baseline justify-between gap-1">
-                          <span className="text-[11px] uppercase text-muted-foreground">
-                            Nominal
-                          </span>
-                          <span className="font-semibold text-sm tabular-nums text-indigo-600">
-                            {formatCurrency(comparison)}
-                          </span>
-                        </div>
-                        <div className="flex items-baseline justify-between gap-1">
-                          <span className="text-[11px] uppercase text-muted-foreground">
-                            Inflation Adj.
-                          </span>
-                          <span className="font-semibold text-sm tabular-nums text-emerald-600">
-                            {formatCurrency(primary)}
-                          </span>
-                        </div>
-                      </>
-                    ) : (
-                      <div className="flex items-baseline justify-between gap-1">
-                        <span className="text-[11px] uppercase text-muted-foreground">
-                          Net Worth
-                        </span>
-                        <span className="font-semibold text-sm tabular-nums text-indigo-600">
-                          {formatCurrency(primary)}
-                        </span>
-                      </div>
-                    )}
+                    <div className="flex items-baseline justify-between gap-1">
+                      <span className="text-[11px] uppercase text-muted-foreground">
+                        Net Worth
+                      </span>
+                      <span className="font-semibold text-sm tabular-nums text-indigo-600">
+                        {formatCurrency(primary)}
+                      </span>
+                    </div>
                   </div>
                 </div>
               );
@@ -216,40 +151,16 @@ export function NetWorthChart({
               <stop offset="100%" stopColor="#6366f1" stopOpacity={0.06} />
             </linearGradient>
           </defs>
-          {filteredComparison ? (
-            <>
-              <Area
-                type="monotone"
-                dataKey="comparisonChange"
-                stroke="#6366f1"
-                strokeWidth={3}
-                fill="url(#nwGradientNominal)"
-                fillOpacity={1}
-                isAnimationActive={false}
-                name="Nominal"
-              />
-              <Area
-                type="monotone"
-                dataKey="primaryChange"
-                stroke="#10b981"
-                strokeWidth={2}
-                fill="none"
-                isAnimationActive={false}
-                name="Inflation-adjusted"
-              />
-            </>
-          ) : (
-            <Area
-              type="monotone"
-              dataKey="primaryChange"
-              stroke="#6366f1"
-              strokeWidth={3}
-              fill="url(#nwGradientNominal)"
-              fillOpacity={1}
-              isAnimationActive={false}
-              name="Net Worth"
-            />
-          )}
+          <Area
+            type="monotone"
+            dataKey="primaryChange"
+            stroke="#6366f1"
+            strokeWidth={3}
+            fill="url(#nwGradientNominal)"
+            fillOpacity={1}
+            isAnimationActive={false}
+            name="Net Worth"
+          />
         </AreaChart>
       </ResponsiveContainer>
       <div
