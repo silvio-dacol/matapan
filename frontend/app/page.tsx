@@ -5,7 +5,6 @@
  * Displays net worth overview with KPIs, charts, and snapshot history
  */
 
-import { AssetsBreakdownChart } from "@/components/dashboard/assets-breakdown-chart";
 import { NetWorthChart } from "@/components/dashboard/net-worth-chart";
 import { SnapshotTable } from "@/components/dashboard/snapshot-table";
 import { Button } from "@/components/ui/button";
@@ -18,7 +17,6 @@ import {
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDashboard } from "@/hooks/use-dashboard";
-import type { SnapshotBreakdown } from "@/lib/types";
 import { RefreshCw } from "lucide-react";
 
 function formatCurrency(amount: number): string {
@@ -109,7 +107,6 @@ export default function Home() {
   }
 
   const { metadata } = dashboard;
-  const latestOriginal = processedLatest; // reference to latest snapshot
 
   return (
     <div className="container mx-auto p-8">
@@ -140,7 +137,7 @@ export default function Home() {
       </div>
 
       {/* Key Metrics */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5 mb-8">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -207,48 +204,36 @@ export default function Home() {
       </div>
 
       {/* Charts */}
-      <div className="grid gap-6 md:grid-cols-2 mb-8">
-        <Card>
-          <CardHeader>
-            <CardTitle>Assets Breakdown</CardTitle>
-            <CardDescription>Current distribution of assets</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <AssetsBreakdownChart breakdown={processedLatest.breakdown} />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <CardTitle className="flex items-center gap-2">
-                Net Worth Over Time
-                {netWorthPercentChange !== null && (
-                  <span
-                    className={
-                      (netWorthPercentChange >= 0
-                        ? "text-green-600"
-                        : "text-red-600") + " text-xs font-semibold ml-2"
-                    }
-                  >
-                    {netWorthPercentChange >= 0 ? "+" : ""}
-                    {netWorthPercentChange.toFixed(1)}%
-                  </span>
-                )}
-              </CardTitle>
-            </div>
-            <CardDescription>
-              Historical trend of your net worth
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <NetWorthChart
-              snapshots={processedSnapshots}
-              onPercentChange={(pct) => setNetWorthPercentChange(pct)}
-            />
-          </CardContent>
-        </Card>
-      </div>
+      <Card className="mb-8">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2">
+              Net Worth Over Time
+              {netWorthPercentChange !== null && (
+                <span
+                  className={
+                    (netWorthPercentChange >= 0
+                      ? "text-green-600"
+                      : "text-red-600") + " text-xs font-semibold ml-2"
+                  }
+                >
+                  {netWorthPercentChange >= 0 ? "+" : ""}
+                  {netWorthPercentChange.toFixed(1)}%
+                </span>
+              )}
+            </CardTitle>
+          </div>
+          <CardDescription>
+            Historical trend of your net worth and asset breakdown
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <NetWorthChart
+            snapshots={processedSnapshots}
+            onPercentChange={(pct) => setNetWorthPercentChange(pct)}
+          />
+        </CardContent>
+      </Card>
 
       {/* Snapshot Table */}
       <Card>
