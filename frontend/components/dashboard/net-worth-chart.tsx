@@ -1,376 +1,256 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Snapshot } from "@/lib/types";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
-  Area,
-  AreaChart,
+  CartesianGrid,
+  Line,
+  LineChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
 
-type Timeframe = "3M" | "YTD" | "1Y" | "3Y" | "5Y" | "All";
-type ViewMode = "value" | "performance";
-
-const timeframeMonths: Record<Exclude<Timeframe, "YTD" | "All">, number> = {
-  "3M": 3,
-  "1Y": 12,
-  "3Y": 36,
-  "5Y": 60,
-};
-
 interface NetWorthChartProps {
   snapshots: Snapshot[];
-  onPercentChange?: (percent: number | null) => void;
 }
 
-export function NetWorthChart({
-  snapshots,
-  onPercentChange,
-}: NetWorthChartProps) {
-  const [timeframe, setTimeframe] = useState<Timeframe>("YTD");
-  const [viewMode, setViewMode] = useState<ViewMode>("value");
+type ViewMode = "value" | "performance";
+type RangeKey = "3M" | "YTD" | "1Y" | "3Y" | "5Y" | "ALL";
 
-  const getMonthKey = (s: Snapshot) => s.reference_month;
+const RANGES: RangeKey[] = ["3M", "YTD", "1Y", "3Y", "5Y", "ALL"];
 
-  const sortedPrimary = useMemo(
-    () =>
-      [...snapshots].sort((a, b) =>
-        getMonthKey(a).localeCompare(getMonthKey(b))
-      ),
-    [snapshots]
+type Point = {
+  index: number;
+  label: string;
+  cumulativeRealPerfPct: number;
+  monthlyRealPerfPct: number;
+  twrFactor: number;
+  netWorth: number;
+};
+
+function buildPerformanceSeries(sortedSnapshots: Snapshot[]): Point[] {
+  const ordered = [...sortedSnapshots].sort((a, b) =>
+    a.reference_month.localeCompare(b.reference_month)
   );
 
-  const filteredPrimary = useMemo(() => {
-    if (sortedPrimary.length === 0) return [];
+  const points: Point[] = [];
+  let cumulativeRealFactor = 1;
 
-    const now = new Date();
-    const currentYear = now.getFullYear().toString();
+  ordered.forEach((snap, idx) => {
+    const monthlyReal = snap.performance?.portfolio_real_return ?? 0;
 
-    if (timeframe !== "YTD" && timeframe !== "All") {
-      const targetMonths =
-        timeframeMonths[timeframe as Exclude<Timeframe, "YTD" | "All">];
-      return sortedPrimary.length <= targetMonths
-        ? sortedPrimary
-        : sortedPrimary.slice(-targetMonths);
+    if (idx === 0) {
+      cumulativeRealFactor = 1;
+    } else {
+      cumulativeRealFactor *= 1 + monthlyReal;
     }
 
-    if (timeframe === "YTD") {
-      const ytd = sortedPrimary.filter((s) =>
-        getMonthKey(s).startsWith(currentYear + "-")
-      );
-      if (ytd.length === 0) {
-        const fallbackMonths = Math.min(12, sortedPrimary.length);
-        return sortedPrimary.slice(-fallbackMonths);
-      }
-      return ytd;
-    }
-
-    return sortedPrimary;
-  }, [sortedPrimary, timeframe]);
-
-  const baselinePrimary =
-    filteredPrimary.length > 0 ? filteredPrimary[0].totals.net_worth : 0;
-
-  const data = useMemo(() => {
-    const twrBaseline =
-      filteredPrimary.length > 0
-        ? filteredPrimary[0].performance.twr_cumulative
-        : 1;
-
-    return filteredPrimary.map((p) => {
-      const month = getMonthKey(p);
-      const totals = p.totals;
-      const performance = p.performance;
-      const breakdown = p.breakdown;
-
-      const primaryAbsolute = totals.net_worth;
-
-      const primaryPercentChange =
-        baselinePrimary !== 0
-          ? ((primaryAbsolute - baselinePrimary) / baselinePrimary) * 100
-          : 0;
-
-      const twr = performance.twr_cumulative;
-      const perfPct = (twr / twrBaseline - 1) * 100;
-
-      const twrCumulative = performance.twr_cumulative;
-
-      return {
-        month,
-        primaryAbsolute,
-        primaryPercentChange,
-        performance: perfPct,
-        twrCumulative,
-        cash: breakdown.cash,
-        investments: breakdown.investments,
-        pension: breakdown.pension,
-        personal: breakdown.personal,
-      };
+    points.push({
+      index: idx,
+      label: snap.reference_month, // "YYYY-MM"
+      cumulativeRealPerfPct: (cumulativeRealFactor - 1) * 100,
+      monthlyRealPerfPct: monthlyReal * 100,
+      twrFactor: snap.performance?.twr_cumulative ?? cumulativeRealFactor,
+      netWorth: snap.totals.net_worth,
     });
-  }, [filteredPrimary, baselinePrimary]);
+  });
 
-  const percentChange = useMemo(() => {
-    if (data.length < 2) return null;
-    const first = data[0].primaryAbsolute;
-    const last = data[data.length - 1].primaryAbsolute;
-    if (!first) return null;
-    return ((last - first) / first) * 100;
-  }, [data]);
+  return points;
+}
 
-  useEffect(() => {
-    onPercentChange?.(percentChange);
-  }, [percentChange, onPercentChange]);
+function filterByRange(points: Point[], range: RangeKey): Point[] {
+  if (points.length === 0) return points;
+  const n = points.length;
 
-  const formatCurrency = (value: number) =>
-    new Intl.NumberFormat("en-US", {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
+  if (range === "ALL") return points;
 
-  const formatPercent = (value: number) =>
-    `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
+  if (range === "YTD") {
+    const latestYear = points[n - 1].label.slice(0, 4);
+    const firstIdx = points.findIndex((p) => p.label.startsWith(latestYear));
+    return points.slice(firstIdx >= 0 ? firstIdx : 0);
+  }
 
-  const categories = useMemo(() => {
-    // Use the known breakdown categories from SnapshotBreakdown
-    return ["cash", "investments", "pension", "personal"];
-  }, []);
-
-  const categoryColors: Record<string, string> = {
-    cash: "#10b981",
-    investments: "#3b82f6",
-    pension: "#a855f7",
-    personal: "#f59e0b",
+  const monthsBackMap: Record<Exclude<RangeKey, "YTD" | "ALL">, number> = {
+    "3M": 3,
+    "1Y": 12,
+    "3Y": 36,
+    "5Y": 60,
   };
 
-  const categoryFills: Record<string, string> = {
-    cash: "url(#cashGradient)",
-    investments: "url(#investmentsGradient)",
-    pension: "url(#pensionGradient)",
-    personal: "url(#personalGradient)",
-  };
+  const monthsBack = monthsBackMap[range as Exclude<RangeKey, "YTD" | "ALL">];
+  const start = Math.max(n - monthsBack, 0);
+  return points.slice(start);
+}
+
+function formatPct(value: number) {
+  return `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
+}
+
+function formatNumber(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+interface CustomTooltipProps {
+  mode: ViewMode;
+  active?: boolean;
+  payload?: any[];
+  label?: string;
+}
+
+const CustomTooltip = ({
+  mode,
+  active,
+  payload,
+  label,
+}: CustomTooltipProps) => {
+  if (!active || !payload || payload.length === 0) return null;
+  const data = payload[0].payload as Point;
 
   return (
-    <div className="space-y-3">
-      <div className="relative">
-        {/* top right toggle */}
-        <div className="absolute right-3 top-3 z-10 flex gap-2">
-          <Button
-            variant={viewMode === "value" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setViewMode("value")}
-          >
-            Value
-          </Button>
-          <Button
-            variant={viewMode === "performance" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setViewMode("performance")}
-          >
-            Performance
-          </Button>
+    <div className="rounded-xl border bg-background/95 p-3 shadow-md">
+      <div className="mb-1 text-xs text-muted-foreground">{label}</div>
+
+      {mode === "value" ? (
+        <>
+          <div className="text-sm font-semibold">
+            Net worth: {formatNumber(data.netWorth)}
+          </div>
+          <div className="text-xs text-muted-foreground">
+            Real performance (cumulative):{" "}
+            {formatPct(data.cumulativeRealPerfPct)}
+          </div>
+          <div className="text-xs text-muted-foreground">
+            Monthly real performance: {formatPct(data.monthlyRealPerfPct)}
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="text-sm font-semibold">
+            Real performance (cumulative):{" "}
+            {formatPct(data.cumulativeRealPerfPct)}
+          </div>
+          <div className="text-xs text-muted-foreground">
+            Monthly real performance: {formatPct(data.monthlyRealPerfPct)}
+          </div>
+          <div className="text-xs text-muted-foreground">
+            TWR factor: {data.twrFactor.toFixed(4)}
+          </div>
+          <div className="mt-1 text-xs text-muted-foreground">
+            Net worth: {formatNumber(data.netWorth)}
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+export function NetWorthChart({ snapshots }: NetWorthChartProps) {
+  const [mode, setMode] = useState<ViewMode>("value");
+  const [range, setRange] = useState<RangeKey>("YTD");
+
+  if (!snapshots || snapshots.length === 0) {
+    return <div className="text-sm text-muted-foreground">No data yet</div>;
+  }
+
+  const fullSeries = useMemo(
+    () => buildPerformanceSeries(snapshots),
+    [snapshots]
+  );
+  const series = useMemo(
+    () => filterByRange(fullSeries, range),
+    [fullSeries, range]
+  );
+
+  // Y axis domain based on current mode
+  let domain: [number, number];
+  let tickFormatter: (value: number) => string;
+
+  if (mode === "performance") {
+    const values = series.map((p) => p.cumulativeRealPerfPct);
+    const minVal = Math.min(...values, 0);
+    const maxVal = Math.max(...values, 0);
+    const padding = Math.max((maxVal - minVal) * 0.1, 5);
+    domain = [minVal - padding, maxVal + padding];
+    tickFormatter = (v) => `${v.toFixed(0)}%`;
+  } else {
+    const values = series.map((p) => p.netWorth);
+    const minVal = Math.min(...values);
+    const maxVal = Math.max(...values);
+    const padding = Math.max((maxVal - minVal) * 0.05, maxVal * 0.01, 500);
+    domain = [minVal - padding, maxVal + padding];
+    tickFormatter = (v) => formatNumber(v);
+  }
+
+  return (
+    <div className="w-full space-y-4">
+      <div className="flex items-center justify-between">
+        <Tabs value={mode} onValueChange={(v) => setMode(v as ViewMode)}>
+          <TabsList className="grid grid-cols-2">
+            <TabsTrigger value="value">Value</TabsTrigger>
+            <TabsTrigger value="performance">Performance</TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        <div className="inline-flex items-center rounded-full border bg-background p-1 text-xs">
+          {RANGES.map((r) => (
+            <button
+              key={r}
+              type="button"
+              onClick={() => setRange(r)}
+              className={[
+                "rounded-full px-2 py-1",
+                range === r
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-muted",
+              ].join(" ")}
+            >
+              {r}
+            </button>
+          ))}
         </div>
-
-        <ResponsiveContainer width="100%" height={380}>
-          <AreaChart
-            data={data}
-            margin={{ left: 0, right: 0, top: 10, bottom: 0 }}
-          >
-            {/* hide x axis visuals but keep data for tooltip */}
-            <XAxis dataKey="month" hide padding={{ left: 0, right: 0 }} />
-            <YAxis
-              hide
-              domain={[
-                (dataMin: number) => Math.min(dataMin - 1, -5),
-                (dataMax: number) => Math.max(dataMax + 1, 5),
-              ]}
-            />
-
-            <Tooltip
-              content={({ active, payload, label }) => {
-                if (!active || !payload || payload.length === 0) return null;
-                const row = payload[0].payload as {
-                  month: string;
-                  primaryAbsolute: number;
-                  primaryPercentChange: number;
-                  performance: number;
-                  twrCumulative: number;
-                  cash: number;
-                  investments: number;
-                  pension: number;
-                  personal: number;
-                };
-
-                if (viewMode === "performance") {
-                  return (
-                    <div className="rounded-md border bg-background/95 backdrop-blur px-3 py-2 shadow-lg min-w-[200px] space-y-2">
-                      <div className="text-xs font-medium tracking-wide text-muted-foreground">
-                        {label}
-                      </div>
-                      <div className="space-y-1">
-                        <div className="flex items-baseline justify-between gap-3">
-                          <span className="text-[11px] uppercase text-muted-foreground">
-                            Real performance
-                          </span>
-                          <span className="font-semibold text-sm tabular-nums text-emerald-600">
-                            {formatPercent(row.performance)}
-                          </span>
-                        </div>
-                        <div className="flex items-baseline justify-between gap-3 pt-1 border-t">
-                          <span className="text-[11px] uppercase text-muted-foreground">
-                            TWR factor
-                          </span>
-                          <span className="font-medium text-xs tabular-nums text-muted-foreground">
-                            {row.twrCumulative?.toFixed(4)}
-                          </span>
-                        </div>
-                        <div className="text-[10px] text-muted-foreground pt-1">
-                          Time weighted return ignoring deposits and withdrawals
-                        </div>
-                      </div>
-                    </div>
-                  );
-                }
-
-                return (
-                  <div className="rounded-md border bg-background/95 backdrop-blur px-3 py-2 shadow-lg min-w-[220px] space-y-2">
-                    <div className="text-xs font-medium tracking-wide text-muted-foreground">
-                      {label}
-                    </div>
-                    <div className="space-y-1">
-                      <div className="flex items-baseline justify-between gap-3">
-                        <span className="text-[11px] uppercase text-muted-foreground">
-                          Net worth
-                        </span>
-                        <span className="font-semibold text-sm tabular-nums text-indigo-600">
-                          {formatCurrency(row.primaryAbsolute)}
-                        </span>
-                      </div>
-                      <div className="flex items-baseline justify-between gap-3">
-                        <span className="text-[11px] uppercase text-muted-foreground">
-                          Change
-                        </span>
-                        <span className="font-semibold text-xs tabular-nums text-indigo-600">
-                          {formatPercent(row.primaryPercentChange)}
-                        </span>
-                      </div>
-                      <div className="border-t pt-1 mt-1 space-y-1">
-                        <div className="flex items-baseline justify-between gap-3">
-                          <span className="text-[11px] uppercase text-muted-foreground">
-                            Cash
-                          </span>
-                          <span className="font-semibold text-xs tabular-nums text-emerald-600">
-                            {formatCurrency(row.cash)}
-                          </span>
-                        </div>
-                        <div className="flex items-baseline justify-between gap-3">
-                          <span className="text-[11px] uppercase text-muted-foreground">
-                            Investments
-                          </span>
-                          <span className="font-semibold text-xs tabular-nums text-blue-600">
-                            {formatCurrency(row.investments)}
-                          </span>
-                        </div>
-                        <div className="flex items-baseline justify-between gap-3">
-                          <span className="text-[11px] uppercase text-muted-foreground">
-                            Pension
-                          </span>
-                          <span className="font-semibold text-xs tabular-nums text-purple-600">
-                            {formatCurrency(row.pension)}
-                          </span>
-                        </div>
-                        <div className="flex items-baseline justify-between gap-3">
-                          <span className="text-[11px] uppercase text-muted-foreground">
-                            Personal
-                          </span>
-                          <span className="font-semibold text-xs tabular-nums text-amber-600">
-                            {formatCurrency(row.personal)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              }}
-            />
-
-            <defs>
-              <linearGradient id="nwGradientTotal" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#6366f1" stopOpacity={0.2} />
-                <stop offset="100%" stopColor="#6366f1" stopOpacity={0.05} />
-              </linearGradient>
-              <linearGradient id="cashGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#10b981" stopOpacity={0.15} />
-                <stop offset="100%" stopColor="#10b981" stopOpacity={0.05} />
-              </linearGradient>
-              <linearGradient
-                id="investmentsGradient"
-                x1="0"
-                y1="0"
-                x2="0"
-                y2="1"
-              >
-                <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.15} />
-                <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.05} />
-              </linearGradient>
-              <linearGradient id="pensionGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#a855f7" stopOpacity={0.15} />
-                <stop offset="100%" stopColor="#a855f7" stopOpacity={0.05} />
-              </linearGradient>
-              <linearGradient id="personalGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#f59e0b" stopOpacity={0.15} />
-                <stop offset="100%" stopColor="#f59e0b" stopOpacity={0.05} />
-              </linearGradient>
-            </defs>
-
-            {viewMode === "performance" ? (
-              <Area
-                type="monotone"
-                dataKey="performance"
-                stroke="#22c55e"
-                strokeWidth={3}
-                fill="none"
-                isAnimationActive={false}
-                name="Real performance %"
-              />
-            ) : (
-              <>
-                {categories.map((cat) => (
-                  <Area
-                    key={cat}
-                    type="monotone"
-                    dataKey={cat}
-                    stackId="1"
-                    stroke={categoryColors[cat] ?? "#888"}
-                    fill={categoryFills[cat] ?? "rgba(0,0,0,0.1)"}
-                    strokeWidth={1.5}
-                    isAnimationActive={false}
-                  />
-                ))}
-              </>
-            )}
-          </AreaChart>
-        </ResponsiveContainer>
       </div>
 
-      <div
-        className="flex flex-wrap gap-2 justify-center"
-        aria-label="Select timeframe"
-      >
-        {["3M", "YTD", "1Y", "3Y", "5Y", "All"].map((tf) => (
-          <Button
-            key={tf}
-            variant={timeframe === tf ? "default" : "outline"}
-            size="sm"
-            onClick={() => setTimeframe(tf as Timeframe)}
-            aria-pressed={timeframe === tf}
+      <div className="h-80 w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart
+            data={series}
+            margin={{ top: 20, right: 30, bottom: 20, left: 0 }}
           >
-            {tf}
-          </Button>
-        ))}
+            <CartesianGrid vertical={false} strokeOpacity={0.25} />
+            <XAxis
+              dataKey="label"
+              tick={{ fontSize: 10 }}
+              tickMargin={8}
+              minTickGap={16}
+            />
+            <YAxis
+              tickFormatter={tickFormatter}
+              domain={domain}
+              tick={{ fontSize: 12 }}
+              width={70}
+            />
+            {mode === "performance" && (
+              <ReferenceLine y={0} strokeOpacity={0.6} />
+            )}
+            <Tooltip content={<CustomTooltip mode={mode} />} />
+            <Line
+              type="monotone"
+              dataKey={
+                mode === "performance" ? "cumulativeRealPerfPct" : "netWorth"
+              }
+              strokeWidth={2}
+              dot={false}
+              activeDot={{ r: 4 }}
+              name={mode === "performance" ? "Real performance" : "Net worth"}
+            />
+          </LineChart>
+        </ResponsiveContainer>
       </div>
     </div>
   );
