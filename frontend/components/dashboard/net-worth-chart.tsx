@@ -34,8 +34,7 @@ export function NetWorthChart({
   const [timeframe, setTimeframe] = useState<Timeframe>("YTD");
   const [viewMode, setViewMode] = useState<ViewMode>("value");
 
-  const getMonthKey = (s: Snapshot) =>
-    ((s as any).reference_month ?? (s as any).month) as string;
+  const getMonthKey = (s: Snapshot) => s.reference_month;
 
   const sortedPrimary = useMemo(
     () =>
@@ -74,55 +73,42 @@ export function NetWorthChart({
   }, [sortedPrimary, timeframe]);
 
   const baselinePrimary =
-    filteredPrimary.length > 0
-      ? (filteredPrimary[0] as any).totals?.net_worth ?? 0
-      : 0;
+    filteredPrimary.length > 0 ? filteredPrimary[0].totals.net_worth : 0;
 
   const data = useMemo(() => {
-    let runningRealFactor = 1;
-    let baselineRealFactor: number | null = null;
+    const twrBaseline =
+      filteredPrimary.length > 0
+        ? filteredPrimary[0].performance.twr_cumulative
+        : 1;
 
     return filteredPrimary.map((p) => {
       const month = getMonthKey(p);
-      const totals = (p as any).totals ?? {};
-      const performance = (p as any).performance ?? {};
-      const byCategory = (p as any).by_category ?? {};
-      const assets = byCategory.assets ?? {};
+      const totals = p.totals;
+      const performance = p.performance;
+      const breakdown = p.breakdown;
 
-      const primaryAbsolute = totals.net_worth ?? 0;
+      const primaryAbsolute = totals.net_worth;
 
       const primaryPercentChange =
         baselinePrimary !== 0
           ? ((primaryAbsolute - baselinePrimary) / baselinePrimary) * 100
           : 0;
 
-      const twrCumulative =
-        typeof performance.twr_cumulative === "number"
-          ? performance.twr_cumulative
-          : 1.0;
+      const twr = performance.twr_cumulative;
+      const perfPct = (twr / twrBaseline - 1) * 100;
 
-      const realReturn = performance.portfolio_real_return ?? 0;
-
-      runningRealFactor *= 1 + realReturn;
-      if (baselineRealFactor === null) {
-        baselineRealFactor = runningRealFactor;
-      }
-
-      const realPerfFromStart =
-        baselineRealFactor !== 0
-          ? (runningRealFactor / baselineRealFactor - 1) * 100
-          : 0;
+      const twrCumulative = performance.twr_cumulative;
 
       return {
         month,
         primaryAbsolute,
         primaryPercentChange,
-        realPerfFromStart,
+        performance: perfPct,
         twrCumulative,
-        cash: assets.cash ?? 0,
-        investments: assets.investments ?? 0,
-        pension: assets.retirement ?? 0,
-        personal: assets.personal ?? 0,
+        cash: breakdown.cash,
+        investments: breakdown.investments,
+        pension: breakdown.pension,
+        personal: breakdown.personal,
       };
     });
   }, [filteredPrimary, baselinePrimary]);
@@ -147,6 +133,25 @@ export function NetWorthChart({
 
   const formatPercent = (value: number) =>
     `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
+
+  const categories = useMemo(() => {
+    // Use the known breakdown categories from SnapshotBreakdown
+    return ["cash", "investments", "pension", "personal"];
+  }, []);
+
+  const categoryColors: Record<string, string> = {
+    cash: "#10b981",
+    investments: "#3b82f6",
+    pension: "#a855f7",
+    personal: "#f59e0b",
+  };
+
+  const categoryFills: Record<string, string> = {
+    cash: "url(#cashGradient)",
+    investments: "url(#investmentsGradient)",
+    pension: "url(#pensionGradient)",
+    personal: "url(#personalGradient)",
+  };
 
   return (
     <div className="space-y-3">
@@ -176,12 +181,28 @@ export function NetWorthChart({
           >
             {/* hide x axis visuals but keep data for tooltip */}
             <XAxis dataKey="month" hide padding={{ left: 0, right: 0 }} />
-            <YAxis hide domain={["dataMin", "dataMax"]} />
+            <YAxis
+              hide
+              domain={[
+                (dataMin: number) => Math.min(dataMin - 1, -5),
+                (dataMax: number) => Math.max(dataMax + 1, 5),
+              ]}
+            />
 
             <Tooltip
               content={({ active, payload, label }) => {
                 if (!active || !payload || payload.length === 0) return null;
-                const row = payload[0].payload as any;
+                const row = payload[0].payload as {
+                  month: string;
+                  primaryAbsolute: number;
+                  primaryPercentChange: number;
+                  performance: number;
+                  twrCumulative: number;
+                  cash: number;
+                  investments: number;
+                  pension: number;
+                  personal: number;
+                };
 
                 if (viewMode === "performance") {
                   return (
@@ -195,7 +216,7 @@ export function NetWorthChart({
                             Real performance
                           </span>
                           <span className="font-semibold text-sm tabular-nums text-emerald-600">
-                            {formatPercent(row.realPerfFromStart)}
+                            {formatPercent(row.performance)}
                           </span>
                         </div>
                         <div className="flex items-baseline justify-between gap-3 pt-1 border-t">
@@ -308,7 +329,7 @@ export function NetWorthChart({
             {viewMode === "performance" ? (
               <Area
                 type="monotone"
-                dataKey="realPerfFromStart"
+                dataKey="performance"
                 stroke="#22c55e"
                 strokeWidth={3}
                 fill="none"
@@ -317,60 +338,18 @@ export function NetWorthChart({
               />
             ) : (
               <>
-                <Area
-                  type="monotone"
-                  dataKey="cash"
-                  stackId="1"
-                  stroke="#10b981"
-                  strokeWidth={1.5}
-                  fill="url(#cashGradient)"
-                  fillOpacity={1}
-                  isAnimationActive={false}
-                  name="Cash"
-                />
-                <Area
-                  type="monotone"
-                  dataKey="investments"
-                  stackId="1"
-                  stroke="#3b82f6"
-                  strokeWidth={1.5}
-                  fill="url(#investmentsGradient)"
-                  fillOpacity={1}
-                  isAnimationActive={false}
-                  name="Investments"
-                />
-                <Area
-                  type="monotone"
-                  dataKey="pension"
-                  stackId="1"
-                  stroke="#a855f7"
-                  strokeWidth={1.5}
-                  fill="url(#pensionGradient)"
-                  fillOpacity={1}
-                  isAnimationActive={false}
-                  name="Pension"
-                />
-                <Area
-                  type="monotone"
-                  dataKey="personal"
-                  stackId="1"
-                  stroke="#f59e0b"
-                  strokeWidth={1.5}
-                  fill="url(#personalGradient)"
-                  fillOpacity={1}
-                  isAnimationActive={false}
-                  name="Personal"
-                />
-                <Area
-                  type="monotone"
-                  dataKey="primaryAbsolute"
-                  stroke="#6366f1"
-                  strokeWidth={2}
-                  fill="url(#nwGradientTotal)"
-                  fillOpacity={0.25}
-                  isAnimationActive={false}
-                  name="Total value"
-                />
+                {categories.map((cat) => (
+                  <Area
+                    key={cat}
+                    type="monotone"
+                    dataKey={cat}
+                    stackId="1"
+                    stroke={categoryColors[cat] ?? "#888"}
+                    fill={categoryFills[cat] ?? "rgba(0,0,0,0.1)"}
+                    strokeWidth={1.5}
+                    isAnimationActive={false}
+                  />
+                ))}
               </>
             )}
           </AreaChart>
