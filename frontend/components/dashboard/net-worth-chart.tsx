@@ -26,8 +26,11 @@ const RANGES: RangeKey[] = ["3M", "YTD", "1Y", "3Y", "5Y", "ALL"];
 type Point = {
   index: number;
   label: string;
+  // this will be overwritten after range filter
   cumulativeRealPerfPct: number;
   monthlyRealPerfPct: number;
+  // raw decimal monthly return, e.g. 0.3711
+  monthlyReal: number;
   twrFactor: number;
   netWorth: number;
 };
@@ -38,23 +41,18 @@ function buildPerformanceSeries(sortedSnapshots: Snapshot[]): Point[] {
   );
 
   const points: Point[] = [];
-  let cumulativeRealFactor = 1;
 
   ordered.forEach((snap, idx) => {
     const monthlyReal = snap.performance?.portfolio_real_return ?? 0;
 
-    if (idx === 0) {
-      cumulativeRealFactor = 1;
-    } else {
-      cumulativeRealFactor *= 1 + monthlyReal;
-    }
-
     points.push({
       index: idx,
       label: snap.reference_month, // "YYYY-MM"
-      cumulativeRealPerfPct: (cumulativeRealFactor - 1) * 100,
+      // placeholder, will be recomputed after range filter
+      cumulativeRealPerfPct: 0,
+      monthlyReal,
       monthlyRealPerfPct: monthlyReal * 100,
-      twrFactor: snap.performance?.twr_cumulative ?? cumulativeRealFactor,
+      twrFactor: snap.performance?.twr_cumulative ?? 1,
       netWorth: snap.totals.net_worth,
     });
   });
@@ -162,10 +160,26 @@ export function NetWorthChart({ snapshots }: NetWorthChartProps) {
     () => buildPerformanceSeries(snapshots),
     [snapshots]
   );
-  const series = useMemo(
-    () => filterByRange(fullSeries, range),
-    [fullSeries, range]
-  );
+  const series = useMemo(() => {
+    const ranged = filterByRange(fullSeries, range);
+    if (ranged.length === 0) return ranged;
+
+    let cumulativeRealFactor = 1;
+
+    return ranged.map((p, idx) => {
+      if (idx === 0) {
+        // include the first month in the cumulative
+        cumulativeRealFactor = 1 + p.monthlyReal;
+      } else {
+        cumulativeRealFactor *= 1 + p.monthlyReal;
+      }
+
+      return {
+        ...p,
+        cumulativeRealPerfPct: (cumulativeRealFactor - 1) * 100,
+      };
+    });
+  }, [fullSeries, range]);
 
   // Y axis domain based on current mode
   let domain: [number, number];

@@ -49,6 +49,16 @@ pub struct CashFlowEntryRaw {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct InvestmentContribution {
+    #[serde(default, alias = "account")]
+    pub name: String,
+    #[serde(rename = "type")]
+    pub kind: String,
+    pub currency: String,
+    pub amount: f64,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct MonthlyInput {
     #[serde(alias = "month", alias = "reference_month")]
     pub month: String,
@@ -58,6 +68,8 @@ pub struct MonthlyInput {
     pub cash_flow_entries: Vec<CashFlowEntryRaw>,
     #[serde(default)]
     pub net_worth_entries: Vec<NetWorthEntryRaw>,
+    #[serde(default)]
+    pub investment_contributions: Vec<InvestmentContribution>,
 }
 
 // Output models

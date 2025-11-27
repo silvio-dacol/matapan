@@ -61,5 +61,20 @@
       "currency": "SEK",
       "amount": 3500
     }
+  ],
+
+  "investment_contributions": [
+    {
+      "account": "IBKR",
+      "type": "investment",
+      "currency": "EUR",
+      "amount": 5000
+    },
+    {
+      "account": "Swedish Pension",
+      "type": "retirement",
+      "currency": "SEK",
+      "amount": 4000
+    }
   ]
 }
