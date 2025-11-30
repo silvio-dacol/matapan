@@ -10,8 +10,6 @@
 
   "categories": {
     "assets": ["cash", "investments", "personal", "retirement"],
-    "liabilities": ["loans", "credit_card_debt"],
-    "positive_cash_flows": ["salary", "bonus", "pension", "reimbursement"],
-    "negative_cash_flows": ["expense", "rent", "transportation"]
+    "liabilities": ["loans", "credit_card_debt"]
   }
 }

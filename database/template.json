@@ -1,80 +1,151 @@
 {
-  "month": "1998-01",
+  "month": "2000-01",
 
   "fx_rates": {
     "EUR": 1.0,
-    "SEK": 0.090902,
-    "CNY": 0.11963
+    "SEK": 0.09,
+    "CNY": 0.12
   },
 
-  "hicp": 129.43,
+  "hicp": 100.0,
 
   "net_worth_entries": [
     {
-      "name": "SEB Account",
+      "name": "SEB",
       "type": "cash",
       "currency": "SEK",
-      "balance": 24500.25
+      "balance": 25000
     },
     {
       "name": "Revolut",
       "type": "cash",
       "currency": "EUR",
-      "balance": 875.1
+      "balance": 1000
     },
     {
       "name": "IBKR",
       "type": "investments",
       "currency": "EUR",
-      "balance": 52863.39
+      "balance": 20000
+    },
+    {
+      "name": "Intesa Sanpaolo",
+      "type": "investments",
+      "currency": "EUR",
+      "balance": 5000
     },
     {
       "name": "Pension Fund",
       "type": "retirement",
-      "currency": "EUR",
-      "balance": 38975.69
+      "currency": "SEK",
+      "balance": 40000
+    },
+    {
+      "name": "Apartment Deposit",
+      "type": "personal",
+      "currency": "SEK",
+      "balance": 8000
+    },
+    {
+      "name": "Credit Card",
+      "type": "credit_card_debt",
+      "currency": "SEK",
+      "balance": 1500
     }
   ],
 
-  "cash_flow_entries": [
+  "movements": [
     {
+      "type": "transfer",
+      "from_account_type": "external_income",
+      "to_account_type": "cash",
       "name": "Main Job Salary",
-      "type": "salary",
+      "to_account_name": "SEB",
       "currency": "SEK",
-      "amount": 45000
+      "amount": 45000,
+      "tax": 0
     },
     {
-      "name": "Side Project",
-      "type": "bonus",
+      "type": "transfer",
+      "from_account_type": "external_income",
+      "to_account_type": "cash",
+      "name": "Side Project Bonus",
+      "to_account_name": "Revolut",
       "currency": "EUR",
-      "amount": 300
+      "amount": 300,
+      "tax": 0
     },
     {
-      "name": "Rent Apartment",
-      "type": "rent",
+      "type": "transfer",
+      "from_account_type": "cash",
+      "name": "Apartment Rent",
+      "from_account_name": "SEB",
+      "to_account_type": "external_expense",
       "currency": "SEK",
-      "amount": 12000
+      "amount": 12000,
+      "tax": 0
     },
     {
+      "type": "transfer",
+      "from_account_type": "cash",
       "name": "Groceries",
-      "type": "expense",
+      "from_account_name": "SEB",
+      "to_account_type": "external_expense",
       "currency": "SEK",
-      "amount": 3500
-    }
-  ],
-
-  "investment_contributions": [
-    {
-      "account": "IBKR",
-      "type": "investment",
-      "currency": "EUR",
-      "amount": 5000
+      "amount": 3500,
+      "tax": 0
     },
     {
-      "account": "Swedish Pension",
-      "type": "retirement",
+      "type": "transfer",
+      "from_account_type": "cash",
+      "name": "Transportation",
+      "from_account_name": "SEB",
+      "to_account_type": "external_expense",
       "currency": "SEK",
-      "amount": 4000
+      "amount": 800,
+      "tax": 0
+    },
+    {
+      "type": "transfer",
+      "from_account_type": "cash",
+      "name": "IBKR Investment Purchase",
+      "from_account_name": "Revolut",
+      "to_account_type": "investments",
+      "to_account_name": "IBKR",
+      "currency": "EUR",
+      "amount": 2000,
+      "tax": 0
+    },
+    {
+      "type": "transfer",
+      "from_account_type": "external_income",
+      "to_account_type": "investments",
+      "name": "Intesa Investment Contribution",
+      "to_account_name": "Intesa Sanpaolo",
+      "currency": "EUR",
+      "amount": 500,
+      "tax": 0
+    },
+    {
+      "type": "transfer",
+      "from_account_type": "external_income",
+      "to_account_type": "retirement",
+      "name": "Pension Contribution",
+      "to_account_name": "Pension Fund",
+      "currency": "SEK",
+      "amount": 4000,
+      "tax": 0
+    },
+    {
+      "type": "transfer",
+      "from_account_type": "investments",
+      "name": "Sell Stocks to Cash",
+      "from_account_name": "IBKR",
+      "to_account_type": "cash",
+      "to_account_name": "SEB",
+      "currency": "EUR",
+      "amount": 1500,
+      "tax": 150
     }
   ]
 }

@@ -110,9 +110,6 @@ Required fields:
       "type": "salary",
       "currency": "SEK",
       "amount": 33852
-    },
-    {
-      "name": "Apartment Rent",
       "type": "rent",
       "currency": "SEK",
       "amount": 8500
@@ -180,19 +177,8 @@ Each snapshot:
   },
   "real_wealth": { "net_worth_real": 119000.0, "change_pct_from_prev": 0.0042 }
 }
-```
-
-All numeric values are already rounded to appropriate precision (2 or 4 decimals).
-
-### Choosing a Method
-
-Use the pipeline binary for a lean, deterministic build. Use the CLI when you want flags like `--latest-only` (future extensions) and pretty formatting by default.
 
 ### Regeneration Cycle
-
-```powershell
-# Regenerate
-cargo run -p data_pipeline --bin generate-dashboard -- --settings settings.json --database database --out dashboard/dashboard.json
 # Invalidate API cache
 Invoke-WebRequest -Uri http://localhost:3000/api/cache/invalidate -Method POST
 ```
@@ -254,9 +240,5 @@ Deflator(t) = HICP(base) / HICP(t)
 
 ## Documentation
 
-- [Fullstack Quick Start](docs/FULLSTACK_QUICKSTART.md) - Complete setup guide
-- [Frontend README](frontend/README.md) - Frontend documentation
-- [Frontend Implementation](docs/FRONTEND_IMPLEMENTATION.md) - Technical details
 - [API Quick Start](docs/API_QUICKSTART.md) - Backend API guide
-- [Backend API Details](crates/backend_api/README.md) - API implementation
 - [Auto-Refresh Guide](docs/AUTO_REFRESH_GUIDE.md) - Polling implementation
