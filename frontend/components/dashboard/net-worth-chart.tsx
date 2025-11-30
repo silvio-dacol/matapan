@@ -136,9 +136,6 @@ const CustomTooltip = ({
           <div className="text-xs text-muted-foreground">
             Monthly real performance: {formatPct(data.monthlyRealPerfPct)}
           </div>
-          <div className="text-xs text-muted-foreground">
-            TWR factor: {data.twrFactor.toFixed(4)}
-          </div>
           <div className="mt-1 text-xs text-muted-foreground">
             Net worth: {formatNumber(data.netWorth)}
           </div>
@@ -164,14 +161,20 @@ export function NetWorthChart({ snapshots }: NetWorthChartProps) {
     const ranged = filterByRange(fullSeries, range);
     if (ranged.length === 0) return ranged;
 
-    let cumulativeRealFactor = 1;
-
+    // Start cumulative performance at 0 for the first point in the range
     return ranged.map((p, idx) => {
       if (idx === 0) {
-        // include the first month in the cumulative
-        cumulativeRealFactor = 1 + p.monthlyReal;
-      } else {
-        cumulativeRealFactor *= 1 + p.monthlyReal;
+        // First point in the selected range starts at 0%
+        return {
+          ...p,
+          cumulativeRealPerfPct: 0,
+        };
+      }
+
+      // Calculate cumulative performance from the first point in range
+      let cumulativeRealFactor = 1;
+      for (let i = 1; i <= idx; i++) {
+        cumulativeRealFactor *= 1 + ranged[i].monthlyReal;
       }
 
       return {
