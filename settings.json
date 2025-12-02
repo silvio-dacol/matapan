@@ -1,15 +1,31 @@
 {
   "settings_version": 1,
+
   "base_currency": "EUR",
 
   "hicp": {
-    "base_year": 2024,
-    "base_month": 8,
+    "base_year": 2025,
+    "base_month": 1,
     "base_value": 126.72
   },
 
-  "categories": {
-    "assets": ["cash", "investments", "personal", "retirement"],
-    "liabilities": ["loans", "credit_card_debt"]
+  "account_categories": {
+    "assets": ["cash", "investments", "retirement", "personal_assets"],
+    "liabilities": ["credit_card", "loan"]
+  },
+
+  "transaction_user_categories": [
+    "income",
+    "essential_spending",
+    "lifestyle_spending",
+    "investment",
+    "debt_repayment",
+    "tax",
+    "fee",
+    "transfer"
+  ],
+
+  "special_accounts": {
+    "external": "External"
   }
 }

@@ -9,143 +9,217 @@
 
   "hicp": 100.0,
 
-  "net_worth_entries": [
+  "accounts": [
     {
+      "id": "seb_main",
       "name": "SEB",
-      "type": "cash",
+      "category": "cash",
       "currency": "SEK",
-      "balance": 25000
+      "opening_balance": 25000,
+      "closing_balance": 27000
     },
     {
+      "id": "revolut_eur",
       "name": "Revolut",
-      "type": "cash",
+      "category": "cash",
       "currency": "EUR",
-      "balance": 1000
+      "opening_balance": 1000,
+      "closing_balance": 300
     },
     {
+      "id": "ibkr",
       "name": "IBKR",
-      "type": "investments",
+      "category": "investments",
       "currency": "EUR",
-      "balance": 20000
+      "opening_balance": 20000,
+      "closing_balance": 21500
     },
     {
+      "id": "intesa",
       "name": "Intesa Sanpaolo",
-      "type": "investments",
+      "category": "investments",
       "currency": "EUR",
-      "balance": 5000
+      "opening_balance": 5000,
+      "closing_balance": 5500
     },
     {
+      "id": "pension",
       "name": "Pension Fund",
-      "type": "retirement",
+      "category": "retirement",
       "currency": "SEK",
-      "balance": 40000
+      "opening_balance": 40000,
+      "closing_balance": 44000
     },
     {
+      "id": "apartment_deposit",
       "name": "Apartment Deposit",
-      "type": "personal",
+      "category": "personal_assets",
       "currency": "SEK",
-      "balance": 8000
+      "opening_balance": 8000,
+      "closing_balance": 8000
     },
     {
+      "id": "credit_card",
       "name": "Credit Card",
-      "type": "credit_card_debt",
+      "category": "credit_card",
       "currency": "SEK",
-      "balance": 1500
+      "opening_balance": 1500,
+      "closing_balance": 0
     }
   ],
 
-  "movements": [
+  "transactions": [
     {
-      "type": "transfer",
-      "from_account_type": "external_income",
-      "to_account_type": "cash",
-      "name": "Main Job Salary",
-      "to_account_name": "SEB",
-      "currency": "SEK",
+      "date": "2000-01-05",
+      "from_account": "External",
+      "to_account": "seb_main",
       "amount": 45000,
-      "tax": 0
+      "currency": "SEK",
+      "user_category": "income",
+      "notes": "Main job salary",
+
+      "metadata": {
+        "is_internal": false,
+        "pnl_impact": true,
+        "cf_class": "cfo"
+      }
     },
     {
-      "type": "transfer",
-      "from_account_type": "external_income",
-      "to_account_type": "cash",
-      "name": "Side Project Bonus",
-      "to_account_name": "Revolut",
-      "currency": "EUR",
+      "date": "2000-01-08",
+      "from_account": "External",
+      "to_account": "revolut_eur",
       "amount": 300,
-      "tax": 0
+      "currency": "EUR",
+      "user_category": "income",
+      "notes": "Side project bonus",
+
+      "metadata": {
+        "is_internal": false,
+        "pnl_impact": true,
+        "cf_class": "cfo"
+      }
     },
     {
-      "type": "transfer",
-      "from_account_type": "cash",
-      "name": "Apartment Rent",
-      "from_account_name": "SEB",
-      "to_account_type": "external_expense",
-      "currency": "SEK",
+      "date": "2000-01-10",
+      "from_account": "seb_main",
+      "to_account": "External",
       "amount": 12000,
-      "tax": 0
+      "currency": "SEK",
+      "user_category": "essential_spending",
+      "notes": "Apartment rent",
+
+      "metadata": {
+        "is_internal": false,
+        "pnl_impact": true,
+        "cf_class": "cfo"
+      }
     },
     {
-      "type": "transfer",
-      "from_account_type": "cash",
-      "name": "Groceries",
-      "from_account_name": "SEB",
-      "to_account_type": "external_expense",
-      "currency": "SEK",
+      "date": "2000-01-12",
+      "from_account": "seb_main",
+      "to_account": "External",
       "amount": 3500,
-      "tax": 0
+      "currency": "SEK",
+      "user_category": "essential_spending",
+      "notes": "Groceries",
+
+      "metadata": {
+        "is_internal": false,
+        "pnl_impact": true,
+        "cf_class": "cfo"
+      }
     },
     {
-      "type": "transfer",
-      "from_account_type": "cash",
-      "name": "Transportation",
-      "from_account_name": "SEB",
-      "to_account_type": "external_expense",
-      "currency": "SEK",
+      "date": "2000-01-15",
+      "from_account": "seb_main",
+      "to_account": "External",
       "amount": 800,
-      "tax": 0
-    },
-    {
-      "type": "transfer",
-      "from_account_type": "cash",
-      "name": "IBKR Investment Purchase",
-      "from_account_name": "Revolut",
-      "to_account_type": "investments",
-      "to_account_name": "IBKR",
-      "currency": "EUR",
-      "amount": 2000,
-      "tax": 0
-    },
-    {
-      "type": "transfer",
-      "from_account_type": "external_income",
-      "to_account_type": "investments",
-      "name": "Intesa Investment Contribution",
-      "to_account_name": "Intesa Sanpaolo",
-      "currency": "EUR",
-      "amount": 500,
-      "tax": 0
-    },
-    {
-      "type": "transfer",
-      "from_account_type": "external_income",
-      "to_account_type": "retirement",
-      "name": "Pension Contribution",
-      "to_account_name": "Pension Fund",
       "currency": "SEK",
-      "amount": 4000,
-      "tax": 0
+      "user_category": "essential_spending",
+      "notes": "Transportation",
+
+      "metadata": {
+        "is_internal": false,
+        "pnl_impact": true,
+        "cf_class": "cfo"
+      }
     },
     {
-      "type": "transfer",
-      "from_account_type": "investments",
-      "name": "Sell Stocks to Cash",
-      "from_account_name": "IBKR",
-      "to_account_type": "cash",
-      "to_account_name": "SEB",
+      "date": "2000-01-18",
+      "from_account": "revolut_eur",
+      "to_account": "ibkr",
+      "amount": 2000,
       "currency": "EUR",
+      "user_category": "investment",
+      "notes": "IBKR investment purchase",
+
+      "metadata": {
+        "is_internal": true,
+        "pnl_impact": false,
+        "cf_class": "cfi"
+      }
+    },
+    {
+      "date": "2000-01-20",
+      "from_account": "External",
+      "to_account": "intesa",
+      "amount": 500,
+      "currency": "EUR",
+      "user_category": "investment",
+      "notes": "Intesa investment contribution",
+
+      "metadata": {
+        "is_internal": false,
+        "pnl_impact": false,
+        "cf_class": "cfi"
+      }
+    },
+    {
+      "date": "2000-01-22",
+      "from_account": "External",
+      "to_account": "pension",
+      "amount": 4000,
+      "currency": "SEK",
+      "user_category": "investment",
+      "notes": "Pension contribution",
+
+      "metadata": {
+        "is_internal": false,
+        "pnl_impact": false,
+        "cf_class": "cfi"
+      }
+    },
+    {
+      "date": "2000-01-25",
+      "from_account": "ibkr",
+      "to_account": "seb_main",
       "amount": 1500,
-      "tax": 150
+      "currency": "EUR",
+      "user_category": "investment",
+      "notes": "Sell stocks and move to cash",
+
+      "metadata": {
+        "is_internal": true,
+        "pnl_impact": true,
+        "cf_class": "cfi",
+        "realized_gain": 312.5,
+        "tax": 150
+      }
+    },
+    {
+      "date": "2000-01-27",
+      "from_account": "seb_main",
+      "to_account": "credit_card",
+      "amount": 1500,
+      "currency": "SEK",
+      "user_category": "debt_repayment",
+      "notes": "Credit card payment",
+
+      "metadata": {
+        "is_internal": true,
+        "pnl_impact": false,
+        "cf_class": "cfo"
+      }
     }
   ]
 }

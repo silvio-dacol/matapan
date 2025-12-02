@@ -1,6 +1,45 @@
-# Net-Worth Tracker
+# Net Worth Engine Data Guide
 
-Track net worth over time with inflation adjustment and cost-of-living normalization across multiple currencies and locations.
+This document explains how to fill the JSON files that power the net worth and financial analyst engine.
+
+The goal is simple.
+
+- What do I own
+- How much do I earn or spend
+- Where does my money actually move
+
+These map to the three classic statements.
+
+- Balance Sheet
+- Income Statement
+- Cash Flow Statement
+
+## Files overview
+
+There are two types of files.
+
+1. `settings.json`  
+   Global configuration filled once and rarely changed.
+
+2. Monthly files  
+   One file per month, named for example `2025-01.json`, `2025-02.json` and so on.
+
+## 1. `settings.json`
+
+This file defines the global rules of the system.
+
+### Base currency
+
+`base_currency`
+
+This is the currency in which all summaries, net worth and charts are shown.  
+Example
+
+```json
+"base_currency": "EUR"
+```
+
+# Old Part to be Changed
 
 ## Quick Start
 
