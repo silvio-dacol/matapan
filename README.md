@@ -39,6 +39,24 @@ Example
 "base_currency": "EUR"
 ```
 
+## How to use the supporting scripts:
+
+With this command:
+
+```powershell
+cargo run -p cli --bin validate_db
+```
+
+You can validate your database files to ensure they conform to the expected structure and contain all necessary fields.
+
+With this command:
+
+```powershell
+cargo run -p cli --bin rollover_month -- --input database/2025_01.json
+```
+
+You can create a new monthly file by rolling over the previous month's data. This will copy over recurring entries and prepare a new file for the next month.
+
 # Old Part to be Changed
 
 ## Quick Start
