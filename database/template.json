@@ -1,225 +1,489 @@
 {
-  "month": "2000-01",
-
-  "fx_rates": {
-    "EUR": 1.0,
-    "SEK": 0.09,
-    "CNY": 0.12
+  "engine_version": "0.1",
+  "user_profile": {
+    "user_id": "silvio",
+    "home_country": "IT",
+    "residence_country": "SE",
+    "tax_residency": "SE",
+    "reporting_currency": "SEK"
   },
 
-  "hicp": 100.0,
+  "hicp_series": [
+    {
+      "area": "Eurozone",
+      "index_name": "HICP",
+      "base_year": 2020,
+      "month": "2025-01",
+      "value": 112.4
+    },
+    {
+      "area": "Sweden",
+      "index_name": "HICP",
+      "base_year": 2020,
+      "month": "2025-01",
+      "value": 110.1
+    }
+  ],
+
+  "fx_rates": [
+    {
+      "date": "2025-03-31",
+      "base_ccy": "SEK",
+      "quote_ccy": "EUR",
+      "rate": 0.088
+    },
+    {
+      "date": "2025-03-31",
+      "base_ccy": "SEK",
+      "quote_ccy": "USD",
+      "rate": 0.095
+    }
+  ],
+
+  "instruments": [
+    {
+      "instrument_id": "CASH_SEK",
+      "type": "cash",
+      "name": "Cash in SEK",
+      "currency": "SEK",
+      "asset_class": "cash"
+    },
+    {
+      "instrument_id": "CASH_EUR",
+      "type": "cash",
+      "name": "Cash in EUR",
+      "currency": "EUR",
+      "asset_class": "cash"
+    },
+    {
+      "instrument_id": "VWCE",
+      "type": "etf",
+      "name": "Vanguard FTSE All-World UCITS ETF",
+      "currency": "EUR",
+      "asset_class": "equity",
+      "isin": "IE00BK5BQT80"
+    },
+    {
+      "instrument_id": "TSLA",
+      "type": "stock",
+      "name": "Tesla Inc",
+      "currency": "USD",
+      "asset_class": "equity",
+      "ticker": "TSLA"
+    },
+    {
+      "instrument_id": "SE_PENSION_FUND",
+      "type": "fund",
+      "name": "AP7 Såfa",
+      "currency": "SEK",
+      "asset_class": "pension"
+    },
+    {
+      "instrument_id": "MORTGAGE_SEK",
+      "type": "loan",
+      "name": "Mortgage on apartment in Gothenburg",
+      "currency": "SEK",
+      "asset_class": "liability"
+    },
+    {
+      "instrument_id": "CC_SEK",
+      "type": "credit_card",
+      "name": "Swedish credit card",
+      "currency": "SEK",
+      "asset_class": "liability"
+    }
+  ],
 
   "accounts": [
     {
-      "id": "seb_main",
-      "name": "SEB",
-      "category": "cash",
+      "account_id": "SE_CHECKING",
+      "type": "bank_current",
+      "institution": "SEB",
+      "country": "SE",
       "currency": "SEK",
-      "opening_balance": 25000,
-      "closing_balance": 27000
+      "is_liability": false
     },
     {
-      "id": "revolut_eur",
-      "name": "Revolut",
-      "category": "cash",
+      "account_id": "SE_SAVINGS",
+      "type": "bank_savings",
+      "institution": "SEB",
+      "country": "SE",
+      "currency": "SEK",
+      "is_liability": false
+    },
+    {
+      "account_id": "IBKR_MARGIN",
+      "type": "brokerage_margin",
+      "institution": "IBKR",
+      "country": "US",
       "currency": "EUR",
-      "opening_balance": 1000,
-      "closing_balance": 300
+      "is_liability": false
     },
     {
-      "id": "ibkr",
-      "name": "IBKR",
-      "category": "investments",
-      "currency": "EUR",
-      "opening_balance": 20000,
-      "closing_balance": 21500
-    },
-    {
-      "id": "intesa",
-      "name": "Intesa Sanpaolo",
-      "category": "investments",
-      "currency": "EUR",
-      "opening_balance": 5000,
-      "closing_balance": 5500
-    },
-    {
-      "id": "pension",
-      "name": "Pension Fund",
-      "category": "retirement",
+      "account_id": "PENSION_SE",
+      "type": "pension",
+      "institution": "Pensionsmyndigheten",
+      "country": "SE",
       "currency": "SEK",
-      "opening_balance": 40000,
-      "closing_balance": 44000
+      "is_liability": false
     },
     {
-      "id": "apartment_deposit",
-      "name": "Apartment Deposit",
-      "category": "personal_assets",
+      "account_id": "MORTGAGE_APT",
+      "type": "mortgage",
+      "institution": "Handelsbanken",
+      "country": "SE",
       "currency": "SEK",
-      "opening_balance": 8000,
-      "closing_balance": 8000
+      "is_liability": true
     },
     {
-      "id": "credit_card",
-      "name": "Credit Card",
-      "category": "credit_card",
+      "account_id": "CREDIT_CARD_SE",
+      "type": "credit_card",
+      "institution": "SEB",
+      "country": "SE",
       "currency": "SEK",
-      "opening_balance": 1500,
-      "closing_balance": 0
+      "is_liability": true
+    }
+  ],
+
+  "positions": [
+    {
+      "position_id": "POS_CASH_SE_CHECKING",
+      "account_id": "SE_CHECKING",
+      "instrument_id": "CASH_SEK",
+      "quantity": 15000.0,
+      "valuation_ccy": "SEK",
+      "valuation_amount": 15000.0,
+      "as_of": "2025-03-31"
+    },
+    {
+      "position_id": "POS_CASH_SE_SAVINGS",
+      "account_id": "SE_SAVINGS",
+      "instrument_id": "CASH_SEK",
+      "quantity": 80000.0,
+      "valuation_ccy": "SEK",
+      "valuation_amount": 80000.0,
+      "as_of": "2025-03-31"
+    },
+    {
+      "position_id": "POS_VWCE",
+      "account_id": "IBKR_MARGIN",
+      "instrument_id": "VWCE",
+      "quantity": 50.0,
+      "cost_basis_ccy": "EUR",
+      "cost_basis_total": 5000.0,
+      "valuation_ccy": "EUR",
+      "valuation_amount": 5200.0,
+      "as_of": "2025-03-31"
+    },
+    {
+      "position_id": "POS_TSLA",
+      "account_id": "IBKR_MARGIN",
+      "instrument_id": "TSLA",
+      "quantity": 10.0,
+      "cost_basis_ccy": "USD",
+      "cost_basis_total": 1800.0,
+      "valuation_ccy": "USD",
+      "valuation_amount": 2000.0,
+      "as_of": "2025-03-31"
+    },
+    {
+      "position_id": "POS_CASH_EUR_IBKR",
+      "account_id": "IBKR_MARGIN",
+      "instrument_id": "CASH_EUR",
+      "quantity": 3000.0,
+      "valuation_ccy": "EUR",
+      "valuation_amount": 3000.0,
+      "as_of": "2025-03-31"
+    },
+    {
+      "position_id": "POS_PENSION_SE",
+      "account_id": "PENSION_SE",
+      "instrument_id": "SE_PENSION_FUND",
+      "quantity": 100.0,
+      "cost_basis_ccy": "SEK",
+      "cost_basis_total": 95000.0,
+      "valuation_ccy": "SEK",
+      "valuation_amount": 105000.0,
+      "as_of": "2025-03-31"
+    },
+    {
+      "position_id": "POS_MORTGAGE",
+      "account_id": "MORTGAGE_APT",
+      "instrument_id": "MORTGAGE_SEK",
+      "quantity": -1450000.0,
+      "valuation_ccy": "SEK",
+      "valuation_amount": -1450000.0,
+      "as_of": "2025-03-31"
+    },
+    {
+      "position_id": "POS_CREDIT_CARD",
+      "account_id": "CREDIT_CARD_SE",
+      "instrument_id": "CC_SEK",
+      "quantity": -5000.0,
+      "valuation_ccy": "SEK",
+      "valuation_amount": -5000.0,
+      "as_of": "2025-03-31"
     }
   ],
 
   "transactions": [
     {
-      "date": "2000-01-05",
-      "from_account": "External",
-      "to_account": "seb_main",
-      "amount": 45000,
+      "txn_id": "2025-03-01-SALARY",
+      "date": "2025-03-01",
+      "account_id": "SE_CHECKING",
+      "type": "income",
+      "category": "salary_main_job",
+      "amount": 42000.0,
       "currency": "SEK",
-      "user_category": "income",
-      "notes": "Main job salary",
-
-      "metadata": {
-        "is_internal": false,
-        "pnl_impact": true,
-        "cf_class": "cfo"
-      }
+      "description": "Net salary Volvo Cars",
+      "tags": ["recurring", "employment"]
     },
     {
-      "date": "2000-01-08",
-      "from_account": "External",
-      "to_account": "revolut_eur",
-      "amount": 300,
+      "txn_id": "2025-03-03-RENT",
+      "date": "2025-03-03",
+      "account_id": "SE_CHECKING",
+      "type": "expense",
+      "category": "housing_rent",
+      "amount": -9000.0,
+      "currency": "SEK",
+      "description": "Apartment rent",
+      "tags": ["recurring", "fixed_cost"]
+    },
+    {
+      "txn_id": "2025-03-04-UTIL_ELEC",
+      "date": "2025-03-04",
+      "account_id": "SE_CHECKING",
+      "type": "expense",
+      "category": "utilities_electricity",
+      "amount": -600.0,
+      "currency": "SEK",
+      "description": "Electricity bill",
+      "tags": ["utilities"]
+    },
+    {
+      "txn_id": "2025-03-05-UTIL_INTERNET",
+      "date": "2025-03-05",
+      "account_id": "SE_CHECKING",
+      "type": "expense",
+      "category": "utilities_internet",
+      "amount": -400.0,
+      "currency": "SEK",
+      "description": "Fiber internet",
+      "tags": ["utilities"]
+    },
+    {
+      "txn_id": "2025-03-06-GROCERIES",
+      "date": "2025-03-06",
+      "account_id": "CREDIT_CARD_SE",
+      "type": "expense",
+      "category": "food_groceries",
+      "amount": -1200.0,
+      "currency": "SEK",
+      "description": "ICA groceries",
+      "tags": ["daily_expense"]
+    },
+    {
+      "txn_id": "2025-03-07-CAFE",
+      "date": "2025-03-07",
+      "account_id": "CREDIT_CARD_SE",
+      "type": "expense",
+      "category": "food_coffee",
+      "amount": -90.0,
+      "currency": "SEK",
+      "description": "Fika with friend",
+      "tags": ["daily_expense", "discretionary"]
+    },
+    {
+      "txn_id": "2025-03-10-TRAM",
+      "date": "2025-03-10",
+      "account_id": "CREDIT_CARD_SE",
+      "type": "expense",
+      "category": "transport_public",
+      "amount": -350.0,
+      "currency": "SEK",
+      "description": "Västtrafik monthly card",
+      "tags": ["transport"]
+    },
+    {
+      "txn_id": "2025-03-12-SUB_NETFLIX",
+      "date": "2025-03-12",
+      "account_id": "SE_CHECKING",
+      "type": "expense",
+      "category": "entertainment_streaming",
+      "amount": -149.0,
+      "currency": "SEK",
+      "description": "Netflix subscription",
+      "tags": ["subscription"]
+    },
+    {
+      "txn_id": "2025-03-15-EXTRA_INCOME_FREELANCE",
+      "date": "2025-03-15",
+      "account_id": "SE_CHECKING",
+      "type": "income",
+      "category": "freelance",
+      "amount": 3000.0,
+      "currency": "SEK",
+      "description": "Consulting on diagnostics project",
+      "tags": ["side_income"]
+    },
+    {
+      "txn_id": "2025-03-18-TRANSFER_SAVINGS",
+      "date": "2025-03-18",
+      "account_id": "SE_CHECKING",
+      "contra_account_id": "SE_SAVINGS",
+      "type": "internal_transfer",
+      "category": "saving",
+      "amount": -5000.0,
+      "currency": "SEK",
+      "description": "Monthly savings transfer"
+    },
+    {
+      "txn_id": "2025-03-18-TRANSFER_SAVINGS_IN",
+      "date": "2025-03-18",
+      "account_id": "SE_SAVINGS",
+      "contra_account_id": "SE_CHECKING",
+      "type": "internal_transfer",
+      "category": "saving",
+      "amount": 5000.0,
+      "currency": "SEK",
+      "description": "Monthly savings transfer"
+    },
+    {
+      "txn_id": "2025-03-20-BROKER_DEPOSIT",
+      "date": "2025-03-20",
+      "account_id": "SE_SAVINGS",
+      "contra_account_id": "IBKR_MARGIN",
+      "type": "internal_transfer",
+      "category": "investment_deposit",
+      "amount": -10000.0,
+      "currency": "SEK",
+      "description": "Deposit to IBKR"
+    },
+    {
+      "txn_id": "2025-03-21-BROKER_DEPOSIT_IN",
+      "date": "2025-03-21",
+      "account_id": "IBKR_MARGIN",
+      "contra_account_id": "SE_SAVINGS",
+      "type": "internal_transfer",
+      "category": "investment_deposit",
+      "amount": 880.0,
       "currency": "EUR",
-      "user_category": "income",
-      "notes": "Side project bonus",
-
-      "metadata": {
-        "is_internal": false,
-        "pnl_impact": true,
-        "cf_class": "cfo"
-      }
+      "fx_rate_to_reporting": 11.36,
+      "description": "Deposit from SE savings (SEK converted to EUR)"
     },
     {
-      "date": "2000-01-10",
-      "from_account": "seb_main",
-      "to_account": "External",
-      "amount": 12000,
-      "currency": "SEK",
-      "user_category": "essential_spending",
-      "notes": "Apartment rent",
-
-      "metadata": {
-        "is_internal": false,
-        "pnl_impact": true,
-        "cf_class": "cfo"
-      }
-    },
-    {
-      "date": "2000-01-12",
-      "from_account": "seb_main",
-      "to_account": "External",
-      "amount": 3500,
-      "currency": "SEK",
-      "user_category": "essential_spending",
-      "notes": "Groceries",
-
-      "metadata": {
-        "is_internal": false,
-        "pnl_impact": true,
-        "cf_class": "cfo"
-      }
-    },
-    {
-      "date": "2000-01-15",
-      "from_account": "seb_main",
-      "to_account": "External",
-      "amount": 800,
-      "currency": "SEK",
-      "user_category": "essential_spending",
-      "notes": "Transportation",
-
-      "metadata": {
-        "is_internal": false,
-        "pnl_impact": true,
-        "cf_class": "cfo"
-      }
-    },
-    {
-      "date": "2000-01-18",
-      "from_account": "revolut_eur",
-      "to_account": "ibkr",
-      "amount": 2000,
+      "txn_id": "2025-03-22-BUY_VWCE",
+      "date": "2025-03-22",
+      "account_id": "IBKR_MARGIN",
+      "type": "trade",
+      "category": "investment_buy",
+      "instrument_id": "VWCE",
+      "quantity": 10.0,
+      "price_per_unit": 105.0,
+      "gross_amount": -1050.0,
       "currency": "EUR",
-      "user_category": "investment",
-      "notes": "IBKR investment purchase",
-
-      "metadata": {
-        "is_internal": true,
-        "pnl_impact": false,
-        "cf_class": "cfi"
-      }
+      "fees": -2.0,
+      "description": "Buy 10 VWCE",
+      "tags": ["investment"]
     },
     {
-      "date": "2000-01-20",
-      "from_account": "External",
-      "to_account": "intesa",
-      "amount": 500,
-      "currency": "EUR",
-      "user_category": "investment",
-      "notes": "Intesa investment contribution",
-
-      "metadata": {
-        "is_internal": false,
-        "pnl_impact": false,
-        "cf_class": "cfi"
-      }
+      "txn_id": "2025-03-23-BUY_TSLA",
+      "date": "2025-03-23",
+      "account_id": "IBKR_MARGIN",
+      "type": "trade",
+      "category": "investment_buy",
+      "instrument_id": "TSLA",
+      "quantity": 2.0,
+      "price_per_unit": 190.0,
+      "gross_amount": -380.0,
+      "currency": "USD",
+      "fees": -1.0,
+      "description": "Buy 2 TSLA",
+      "tags": ["investment"]
     },
     {
-      "date": "2000-01-22",
-      "from_account": "External",
-      "to_account": "pension",
-      "amount": 4000,
+      "txn_id": "2025-03-25-CREDIT_CARD_PAYMENT",
+      "date": "2025-03-25",
+      "account_id": "SE_CHECKING",
+      "contra_account_id": "CREDIT_CARD_SE",
+      "type": "internal_transfer",
+      "category": "credit_card_payment",
+      "amount": -2500.0,
       "currency": "SEK",
-      "user_category": "investment",
-      "notes": "Pension contribution",
-
-      "metadata": {
-        "is_internal": false,
-        "pnl_impact": false,
-        "cf_class": "cfi"
-      }
+      "description": "Pay credit card bill"
     },
     {
-      "date": "2000-01-25",
-      "from_account": "ibkr",
-      "to_account": "seb_main",
-      "amount": 1500,
-      "currency": "EUR",
-      "user_category": "investment",
-      "notes": "Sell stocks and move to cash",
-
-      "metadata": {
-        "is_internal": true,
-        "pnl_impact": true,
-        "cf_class": "cfi",
-        "realized_gain": 312.5,
-        "tax": 150
-      }
-    },
-    {
-      "date": "2000-01-27",
-      "from_account": "seb_main",
-      "to_account": "credit_card",
-      "amount": 1500,
+      "txn_id": "2025-03-25-CREDIT_CARD_PAYMENT_IN",
+      "date": "2025-03-25",
+      "account_id": "CREDIT_CARD_SE",
+      "contra_account_id": "SE_CHECKING",
+      "type": "internal_transfer",
+      "category": "credit_card_payment",
+      "amount": 2500.0,
       "currency": "SEK",
-      "user_category": "debt_repayment",
-      "notes": "Credit card payment",
+      "description": "Credit card bill paid"
+    },
+    {
+      "txn_id": "2025-03-27-MORTGAGE_PAYMENT",
+      "date": "2025-03-27",
+      "account_id": "SE_CHECKING",
+      "contra_account_id": "MORTGAGE_APT",
+      "type": "loan_payment",
+      "category": "mortgage_principal_interest_split",
+      "amount": -8500.0,
+      "currency": "SEK",
+      "principal_component": -5500.0,
+      "interest_component": -3000.0,
+      "description": "Monthly mortgage payment"
+    }
+  ],
 
-      "metadata": {
-        "is_internal": true,
-        "pnl_impact": false,
-        "cf_class": "cfo"
-      }
+  "recurring_templates": [
+    {
+      "template_id": "RENT",
+      "category": "housing_rent",
+      "default_amount": -9000.0,
+      "currency": "SEK",
+      "frequency": "monthly",
+      "day_of_month": 3,
+      "description": "Apartment rent"
+    },
+    {
+      "template_id": "SALARY_MAIN",
+      "category": "salary_main_job",
+      "default_amount": 42000.0,
+      "currency": "SEK",
+      "frequency": "monthly",
+      "day_of_month": 1,
+      "description": "Net salary Volvo Cars"
+    }
+  ],
+
+  "month_end_snapshots": [
+    {
+      "date": "2025-03-31",
+      "account_balances": [
+        {
+          "account_id": "SE_CHECKING",
+          "closing_balance": 15000.0,
+          "currency": "SEK"
+        },
+        {
+          "account_id": "SE_SAVINGS",
+          "closing_balance": 75000.0,
+          "currency": "SEK"
+        },
+        {
+          "account_id": "CREDIT_CARD_SE",
+          "closing_balance": -5000.0,
+          "currency": "SEK"
+        },
+        {
+          "account_id": "MORTGAGE_APT",
+          "closing_balance": -1450000.0,
+          "currency": "SEK"
+        }
+      ]
     }
   ]
 }

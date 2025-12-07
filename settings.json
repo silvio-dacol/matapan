@@ -10,7 +10,13 @@
   },
 
   "account_categories": {
-    "assets": ["cash", "investments", "retirement", "personal_assets"],
+    "assets": [
+      "cash",
+      "investments",
+      "retirement",
+      "personal_assets",
+      "receivables"
+    ],
     "liabilities": ["credit_card", "loan"]
   },
 
