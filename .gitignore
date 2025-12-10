@@ -3,3 +3,5 @@
 *.xlsx
 !template.json
 !settings.json
+/examples
+minpension.png
