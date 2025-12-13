@@ -2,11 +2,7 @@
 
 [workspace]
 members = [
-    "crates/cli",
-    "crates/data_pipeline",
-    "crates/models",
-    "crates/settings_loader",
-    "crates/data/revolut", "crates/data/intesa_sanpaolo", "crates/data/interactive_brokers", "crates/data/china_construction_bank", "crates/data/avanza", "crates/data/alipay", "crates/data/skandinaviska_enskilda_banken", "crates/data/wechat", "crates/data/nordnet",
+    "crates/data/bank_statements_parsers/revolut", "crates/data/bank_statements_parsers/intesa_sanpaolo", "crates/data/bank_statements_parsers/interactive_brokers", "crates/data/bank_statements_parsers/china_construction_bank", "crates/data/bank_statements_parsers/avanza", "crates/data/bank_statements_parsers/alipay", "crates/data/bank_statements_parsers/skandinaviska_enskilda_banken", "crates/data/bank_statements_parsers/wechat", "crates/data/bank_statements_parsers/nordnet",
 ]
 
 resolver = "3"

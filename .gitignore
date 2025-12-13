@@ -3,5 +3,6 @@
 *.xlsx
 !template.json
 !settings.json
-/bank_extracts_examples
+*.csv
+*txt
 minpension.png

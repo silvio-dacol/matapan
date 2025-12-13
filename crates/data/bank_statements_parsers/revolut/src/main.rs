@@ -147,10 +147,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let input_path = if args.len() > 1 {
         &args[1]
     } else {
-        "../../../bank_extracts_examples/Revolut.csv"
+        "revolut.csv"
     };
 
-    let default_output = "../../../dashboard/dashboard.json";
+    let default_output = "../../../../database/dashboard.json";
     let output_path = if args.len() > 2 {
         &args[2]
     } else {
