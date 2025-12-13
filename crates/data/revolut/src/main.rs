@@ -1,6 +1,7 @@
 use chrono::{NaiveDate, NaiveDateTime};
 use csv::ReaderBuilder;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::error::Error;
 use std::fs::File;
 use std::path::Path;
@@ -13,7 +14,7 @@ struct RevolutRow {
     #[serde(rename = "Product")]
     product: String,
     #[serde(rename = "Started Date")]
-    started_date: String,
+    _started_date: String,
     #[serde(rename = "Completed Date")]
     completed_date: String,
     #[serde(rename = "Description")]
@@ -21,18 +22,18 @@ struct RevolutRow {
     #[serde(rename = "Amount")]
     amount: f64,
     #[serde(rename = "Fee")]
-    fee: f64,
+    _fee: f64,
     #[serde(rename = "Currency")]
     currency: String,
     #[serde(rename = "State")]
     state: String,
     #[serde(rename = "Balance")]
-    balance: f64,
+    _balance: f64,
 }
 
 /// Your engine transaction as in template.json
 #[derive(Debug, Serialize)]
-struct EngineTransaction {
+pub struct EngineTransaction {
     txn_id: String,
     date: String,       // "YYYY-MM-DD"
     account_id: String, // e.g. "REVOLUT_CURRENT"
@@ -134,17 +135,111 @@ fn map_type_and_category(revolut_type: &str) -> (String, String) {
     }
 }
 
-// Example: read CSV and print JSON to stdout
+// Example: read CSV and write JSON to a file or stdout
 fn main() -> Result<(), Box<dyn Error>> {
-    // Accept CSV path as first argument; default to `src/Revolut.csv`.
+    // Usage:
+    //   revolut <input_csv> [output_json]
+    // If output_json is omitted, defaults to writing to `dashboard/dashboard.json`.
+    // If output_json is set to "-", prints to stdout.
+
     let args: Vec<String> = std::env::args().collect();
-    let path = if args.len() > 1 {
+
+    let input_path = if args.len() > 1 {
         &args[1]
     } else {
-        "../../../examples/Revolut.csv"
+        "../../../bank_extracts_examples/Revolut.csv"
     };
-    let txs = parse_revolut_csv(path)?;
-    let json = serde_json::to_string_pretty(&txs)?;
-    println!("{}", json);
+
+    let default_output = "../../../dashboard/dashboard.json";
+    let output_path = if args.len() > 2 {
+        &args[2]
+    } else {
+        default_output
+    };
+
+    let txs = parse_revolut_csv(input_path)?;
+    if output_path == "-" {
+        let json = serde_json::to_string_pretty(&txs)?;
+        println!("{}", json);
+    } else {
+        let out_path = std::path::Path::new(output_path);
+        if let Some(parent) = out_path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+
+        // If output is dashboard/dashboard.json, merge into template-style document
+        let merged = if out_path
+            .file_name()
+            .and_then(|s| s.to_str())
+            .map(|n| n.eq_ignore_ascii_case("dashboard.json"))
+            .unwrap_or(false)
+        {
+            merge_into_dashboard(out_path, &txs)?
+        } else {
+            serde_json::to_string_pretty(&txs)?
+        };
+
+        std::fs::write(out_path, merged)?;
+        eprintln!("Wrote Revolut transactions to {}", out_path.display());
+    }
+
     Ok(())
+}
+
+// Merge new transactions into an existing dashboard JSON, preserving layout,
+// deduplicating by txn_id, and sorting chronologically by date.
+fn merge_into_dashboard(
+    out_path: &std::path::Path,
+    new_txs: &[EngineTransaction],
+) -> Result<String, Box<dyn Error>> {
+    let existing: Option<Value> = if out_path.exists() {
+        let content = std::fs::read_to_string(out_path)?;
+        match serde_json::from_str::<Value>(&content) {
+            Ok(v) => Some(v),
+            Err(_) => None,
+        }
+    } else {
+        None
+    };
+
+    // Ensure we have an object root
+    let mut root = existing.unwrap_or_else(|| Value::Object(serde_json::Map::new()));
+
+    // Ensure "transactions" is an owned Vec<Value> we can modify safely
+    let mut txs_array: Vec<Value> = match root.get("transactions") {
+        Some(v) => v.as_array().cloned().unwrap_or_else(|| Vec::new()),
+        None => Vec::new(),
+    };
+
+    // Build a set of existing txn_ids to dedupe
+    use std::collections::HashSet;
+    let mut existing_ids: HashSet<String> = HashSet::new();
+    for v in txs_array.iter() {
+        if let Some(id) = v.get("txn_id").and_then(|x| x.as_str()) {
+            existing_ids.insert(id.to_string());
+        }
+    }
+
+    // Append new transactions that are not already present
+    for tx in new_txs {
+        if existing_ids.contains(&tx.txn_id) {
+            continue;
+        }
+        let v = serde_json::to_value(tx)?;
+        txs_array.push(v);
+    }
+
+    // Sort transactions chronologically by `date` (YYYY-MM-DD)
+    txs_array.sort_by(|a, b| {
+        let ad = a.get("date").and_then(|x| x.as_str()).unwrap_or("");
+        let bd = b.get("date").and_then(|x| x.as_str()).unwrap_or("");
+        ad.cmp(bd)
+    });
+
+    // Write back the updated transactions array into the root
+    root.as_object_mut()
+        .unwrap()
+        .insert("transactions".to_string(), Value::Array(txs_array));
+
+    Ok(serde_json::to_string_pretty(&root)?)
 }

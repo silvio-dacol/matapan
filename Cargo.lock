@@ -12,6 +12,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "alipay"
+version = "0.1.0"
+
+[[package]]
 name = "android_system_properties"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -83,6 +87,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 
 [[package]]
+name = "avanza"
+version = "0.1.0"
+
+[[package]]
 name = "bumpalo"
 version = "3.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -103,6 +111,10 @@ name = "cfg-if"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801"
+
+[[package]]
+name = "china_construction_bank"
+version = "0.1.0"
 
 [[package]]
 name = "chrono"
@@ -252,6 +264,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "interactive_brokers"
+version = "0.1.0"
+
+[[package]]
+name = "intesa_sanpaolo"
+version = "0.1.0"
+
+[[package]]
 name = "is_terminal_polyfill"
 version = "1.70.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -297,6 +317,10 @@ version = "0.1.0"
 dependencies = [
  "serde",
 ]
+
+[[package]]
+name = "nordnet"
+version = "0.1.0"
 
 [[package]]
 name = "num-traits"
@@ -448,6 +472,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
 
 [[package]]
+name = "skandinaviska_enskilda_banken"
+version = "0.1.0"
+
+[[package]]
 name = "strsim"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -534,6 +562,10 @@ checksum = "bad67dc8b2a1a6e5448428adec4c3e84c43e561d8c9ee8a9e5aabeb193ec41d1"
 dependencies = [
  "unicode-ident",
 ]
+
+[[package]]
+name = "wechat"
+version = "0.1.0"
 
 [[package]]
 name = "windows-core"
