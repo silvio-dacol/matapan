@@ -1,61 +1,121 @@
-use revolut::*;
-use std::error::Error;
+use anyhow::{Context, Result};
+use std::{
+    env,
+    fs::File,
+    io::{Read, Write},
+};
 
-fn main() -> Result<(), Box<dyn Error>> {
+use revolut::{merge_transactions_into_template, RevolutCsvParser};
+
+fn main() -> Result<()> {
     // Usage:
-    //   revolut <input_csv> [output_json] [settings_json]
-    // If output_json is omitted, defaults to writing to `dashboard/database.json`.
-    // If output_json is set to "-", prints to stdout.
+    //   revolut_parser <revolut.csv> <database.json> [output.json] [account_id]
+    //
+    // Defaults:
+    //   revolut.csv
+    //   database.json
+    //   output.json = database.json (in place)
+    //   account_id = REVOLUT_CURRENT
 
-    let args: Vec<String> = std::env::args().collect();
+    let args: Vec<String> = env::args().collect();
 
-    let input_path = if args.len() > 1 {
-        &args[1]
-    } else {
-        "revolut.csv"
-    };
+    let input_csv = args.get(1).map(|s| s.as_str()).unwrap_or("../revolut.csv");
 
-    let default_output = "../../../../database/database.json";
-    let output_path = if args.len() > 2 {
-        &args[2]
-    } else {
-        default_output
-    };
-
-    // Load settings: third arg or default to `settings.json` next to the binary
-    let settings_path = if args.len() > 3 {
-        &args[3]
-    } else {
-        "settings.json"
-    };
-    let settings = load_settings(settings_path);
-    let txs = parse_revolut_csv(input_path, &settings)?;
-    if output_path == "-" {
-        let json = serde_json::to_string_pretty(&txs)?;
-        println!("{}", json);
-    } else {
-        let out_path = std::path::Path::new(output_path);
-        if let Some(parent) = out_path.parent() {
-            std::fs::create_dir_all(parent)?;
+    // Arg2 can be either a JSON file path or a folder path.
+    // If it's a folder, resolve to folder/database.json.
+    let arg2 = args.get(2).map(|s| s.as_str());
+    let template_path_buf = match arg2 {
+        Some(p) => {
+            if p.ends_with(".json") {
+                std::path::PathBuf::from(p)
+            } else {
+                let mut pb = std::path::PathBuf::from(p);
+                pb.push("database.json");
+                pb
+            }
         }
+        None => std::path::PathBuf::from("../../../../database/database.json"),
+    };
+    let template_path = template_path_buf.to_string_lossy().to_string();
 
-        // If output is a dashboard-style file, merge into template-style document
-        let merged = if out_path
-            .file_name()
-            .and_then(|s| s.to_str())
-            .map(|n| {
-                n.eq_ignore_ascii_case("dashboard.json") || n.eq_ignore_ascii_case("database.json")
-            })
-            .unwrap_or(false)
-        {
-            merge_into_dashboard(out_path, &txs)?
-        } else {
-            serde_json::to_string_pretty(&txs)?
-        };
+    let output_path = args.get(3).map(|s| s.as_str()).unwrap_or(&template_path);
+    let account_id = args
+        .get(4)
+        .cloned()
+        .unwrap_or_else(|| "REVOLUT_CURRENT".to_string());
 
-        std::fs::write(out_path, merged)?;
-        eprintln!("Wrote Revolut transactions to {}", out_path.display());
-    }
+    // Read CSV
+    let mut csv_file =
+        File::open(input_csv).with_context(|| format!("Cannot open {}", input_csv))?;
+    let mut csv_buf = Vec::new();
+    csv_file.read_to_end(&mut csv_buf)?;
 
+    // Parse
+    let parser = RevolutCsvParser::new(account_id);
+    let txns = parser.parse_reader(csv_buf.as_slice())?;
+
+    // Read or initialize database.json
+    let template: serde_json::Value = {
+        // Try reading existing database.json
+        match File::open(template_path) {
+            Ok(mut tpl_file) => {
+                let mut tpl_str = String::new();
+                tpl_file.read_to_string(&mut tpl_str)?;
+                match serde_json::from_str(&tpl_str) {
+                    Ok(v) => v,
+                    Err(_) => {
+                        // Fallback: initialize from template.json
+                        // Prefer template.json alongside the resolved database.json
+                        let default_tpl_path = std::path::Path::new(&template_path)
+                            .parent()
+                            .map(|p| p.join("template.json"))
+                            .unwrap_or_else(|| {
+                                std::path::PathBuf::from("../../../../database/template.json")
+                            });
+                        let mut default_file =
+                            File::open(&default_tpl_path).with_context(|| {
+                                format!(
+                                    "database.json is not valid JSON and cannot open {:?}",
+                                    default_tpl_path
+                                )
+                            })?;
+                        let mut default_str = String::new();
+                        default_file.read_to_string(&mut default_str)?;
+                        serde_json::from_str(&default_str).with_context(|| {
+                            format!("template.json at {:?} is not valid JSON", default_tpl_path)
+                        })?
+                    }
+                }
+            }
+            Err(_) => {
+                // Missing database.json: initialize from template.json
+                let default_tpl_path = std::path::Path::new(&template_path)
+                    .parent()
+                    .map(|p| p.join("template.json"))
+                    .unwrap_or_else(|| {
+                        std::path::PathBuf::from("../../../../database/template.json")
+                    });
+                let mut default_file = File::open(&default_tpl_path).with_context(|| {
+                    format!("Cannot open default template at {:?}", default_tpl_path)
+                })?;
+                let mut default_str = String::new();
+                default_file.read_to_string(&mut default_str)?;
+                serde_json::from_str(&default_str).with_context(|| {
+                    format!("template.json at {:?} is not valid JSON", default_tpl_path)
+                })?
+            }
+        }
+    };
+
+    // Merge
+    let merged = merge_transactions_into_template(template, txns)?;
+    let out_str = serde_json::to_string_pretty(&merged)?;
+
+    // Write
+    let mut out_file =
+        File::create(output_path).with_context(|| format!("Cannot write {}", output_path))?;
+    out_file.write_all(out_str.as_bytes())?;
+
+    println!("OK: wrote {}", output_path);
     Ok(())
 }

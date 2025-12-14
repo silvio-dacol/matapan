@@ -78,21 +78,6 @@ Trades update:
 
 ## What is Manual now but will become Automatic with APIs (Medium Frequency)
 
-### 1. Month-End Snapshots
-
-Used for:
-
-- Reconciliation
-- Validation
-- Detecting missing transactions
-
-Why manual:
-
-- They are used for validation so it is critical they are correct
-- Once the API is in place, these can be fetched automatically
-
-## What Should Be Defined Manually (Low Frequency)
-
 ### 1. Instruments
 
 Examples:
@@ -109,7 +94,44 @@ Why manual:
 - Banks name the same thing differently
 - AI can help suggest, but humans decide
 
-### 2. Accounts
+### 2. Month-End Snapshots
+
+Used for:
+
+- Reconciliation
+- Validation
+- Detecting missing transactions
+
+Why manual:
+
+- They are used for validation so it is critical they are correct
+- Once the API is in place, these can be fetched automatically
+
+### 3. FX Rates
+
+Used for:
+
+- Converting foreign currency transactions
+- Valuing foreign currency positions
+
+Why manual:
+
+- No way to get them through APIs yet
+
+### 4. HICP Data
+
+Used for:
+
+- Inflation adjustment of cash flows
+- Understanding real returns on investments
+
+Why manual:
+
+- No way to get them through APIs yet
+
+## What Should Be Defined Manually (Low Frequency)
+
+### 1. Accounts
 
 Examples:
 

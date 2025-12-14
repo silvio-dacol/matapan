@@ -5,7 +5,7 @@
     "home_country": "IT",
     "residence_country": "SE",
     "tax_residency": "SE",
-    "reporting_currency": "SEK"
+    "base_currency": "EUR"
   },
 
   "hicp_series": [
@@ -22,21 +22,6 @@
       "base_year": 2020,
       "month": "2025-01",
       "value": 110.1
-    }
-  ],
-
-  "fx_rates": [
-    {
-      "date": "2025-03-31",
-      "base_ccy": "SEK",
-      "quote_ccy": "EUR",
-      "rate": 0.088
-    },
-    {
-      "date": "2025-03-31",
-      "base_ccy": "SEK",
-      "quote_ccy": "USD",
-      "rate": 0.095
     }
   ],
 
@@ -462,6 +447,15 @@
   "month_end_snapshots": [
     {
       "date": "2025-03-31",
+
+      "hicp": 113.0,
+
+      "fx_rates": {
+        "EUR": 1.0,
+        "SEK": 0.088743,
+        "CNY": 0.132128
+      },
+
       "account_balances": [
         {
           "account_id": "SE_CHECKING",
