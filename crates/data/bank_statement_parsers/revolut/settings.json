@@ -1,0 +1,163 @@
+{
+  "account_map": {
+    "Current": "REVOLUT_CHECKING",
+    "Savings": "REVOLUT_SAVINGS"
+  },
+  "category_rules": [
+    {
+      "pattern": "ICA",
+      "is_regex": false,
+      "category": "food_groceries",
+      "tags": ["daily_expense"]
+    },
+    {
+      "pattern": "Hemköp",
+      "is_regex": false,
+      "category": "food_groceries",
+      "tags": ["daily_expense"]
+    },
+    {
+      "pattern": "Willys",
+      "is_regex": false,
+      "category": "food_groceries",
+      "tags": ["daily_expense"]
+    },
+    {
+      "pattern": "Coop",
+      "is_regex": false,
+      "category": "food_groceries",
+      "tags": ["daily_expense"]
+    },
+
+    {
+      "pattern": "Västtrafik",
+      "is_regex": false,
+      "category": "transport_public",
+      "tags": ["transport"]
+    },
+    {
+      "pattern": "Uber",
+      "is_regex": false,
+      "category": "transport_taxi",
+      "tags": ["transport"]
+    },
+    {
+      "pattern": "Bolt",
+      "is_regex": false,
+      "category": "transport_taxi",
+      "tags": ["transport"]
+    },
+
+    {
+      "pattern": "Netflix",
+      "is_regex": false,
+      "category": "entertainment_streaming",
+      "tags": ["subscription"]
+    },
+    {
+      "pattern": "Spotify",
+      "is_regex": false,
+      "category": "entertainment_streaming",
+      "tags": ["subscription"]
+    },
+    {
+      "pattern": "HBO",
+      "is_regex": false,
+      "category": "entertainment_streaming",
+      "tags": ["subscription"]
+    },
+    {
+      "pattern": "Disney",
+      "is_regex": false,
+      "category": "entertainment_streaming",
+      "tags": ["subscription"]
+    },
+
+    {
+      "pattern": "Telia",
+      "is_regex": false,
+      "category": "utilities_internet",
+      "tags": ["utilities"]
+    },
+    {
+      "pattern": "ComHem",
+      "is_regex": false,
+      "category": "utilities_internet",
+      "tags": ["utilities"]
+    },
+    {
+      "pattern": "fiber",
+      "is_regex": false,
+      "category": "utilities_internet",
+      "tags": ["utilities"]
+    },
+    {
+      "pattern": "electricity",
+      "is_regex": false,
+      "category": "utilities_electricity",
+      "tags": ["utilities"]
+    },
+
+    {
+      "pattern": "café",
+      "is_regex": false,
+      "category": "food_coffee",
+      "tags": ["discretionary"]
+    },
+    {
+      "pattern": "coffee",
+      "is_regex": false,
+      "category": "food_coffee",
+      "tags": ["discretionary"]
+    },
+    {
+      "pattern": "espresso",
+      "is_regex": false,
+      "category": "food_coffee",
+      "tags": ["discretionary"]
+    },
+    {
+      "pattern": "fika",
+      "is_regex": false,
+      "category": "food_coffee",
+      "tags": ["discretionary"]
+    }
+  ],
+  "contra_account_rules": [
+    {
+      "pattern": "credit card",
+      "is_regex": false,
+      "contra_account_id": "CREDIT_CARD_SE"
+    },
+    {
+      "pattern": "SEB Kredit",
+      "is_regex": false,
+      "contra_account_id": "CREDIT_CARD_SE"
+    },
+    {
+      "pattern": "IBKR",
+      "is_regex": false,
+      "contra_account_id": "IBKR_MARGIN"
+    },
+    {
+      "pattern": "broker",
+      "is_regex": false,
+      "contra_account_id": "IBKR_MARGIN"
+    },
+    {
+      "pattern": "savings",
+      "is_regex": false,
+      "contra_account_id": "SE_SAVINGS"
+    },
+    {
+      "pattern": "checking",
+      "is_regex": false,
+      "contra_account_id": "SE_CHECKING"
+    }
+  ],
+  "category_type_map": {
+    "topup": "internal_transfer",
+    "fx_exchange": "internal_transfer"
+  },
+  "default_tags": []
+}
