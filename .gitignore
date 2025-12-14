@@ -1,6 +1,7 @@
 /target
 *.json
 *.xlsx
+*.xls
 !template.json
 !settings.json
 *.csv
