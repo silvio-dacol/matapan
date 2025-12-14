@@ -4,7 +4,7 @@ use std::error::Error;
 fn main() -> Result<(), Box<dyn Error>> {
     // Usage:
     //   revolut <input_csv> [output_json] [settings_json]
-    // If output_json is omitted, defaults to writing to `dashboard/dashboard.json`.
+    // If output_json is omitted, defaults to writing to `dashboard/database.json`.
     // If output_json is set to "-", prints to stdout.
 
     let args: Vec<String> = std::env::args().collect();
@@ -15,7 +15,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         "revolut.csv"
     };
 
-    let default_output = "../../../../database/dashboard.json";
+    let default_output = "../../../../database/database.json";
     let output_path = if args.len() > 2 {
         &args[2]
     } else {
@@ -39,11 +39,13 @@ fn main() -> Result<(), Box<dyn Error>> {
             std::fs::create_dir_all(parent)?;
         }
 
-        // If output is dashboard/dashboard.json, merge into template-style document
+        // If output is a dashboard-style file, merge into template-style document
         let merged = if out_path
             .file_name()
             .and_then(|s| s.to_str())
-            .map(|n| n.eq_ignore_ascii_case("dashboard.json"))
+            .map(|n| {
+                n.eq_ignore_ascii_case("dashboard.json") || n.eq_ignore_ascii_case("database.json")
+            })
             .unwrap_or(false)
         {
             merge_into_dashboard(out_path, &txs)?

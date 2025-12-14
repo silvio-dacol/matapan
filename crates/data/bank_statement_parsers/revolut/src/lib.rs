@@ -228,6 +228,19 @@ pub fn merge_into_dashboard(
 
     let mut root = existing.unwrap_or_else(|| Value::Object(serde_json::Map::new()));
 
+    // If the existing file is a bare array (legacy format), wrap it into an object
+    // under the "transactions" key and ensure other sections exist.
+    if root.is_array() {
+        let arr = root.as_array().cloned().unwrap_or_default();
+        let mut map = serde_json::Map::new();
+        map.insert("transactions".to_string(), Value::Array(arr));
+        map.insert("instruments".to_string(), Value::Array(Vec::new()));
+        map.insert("accounts".to_string(), Value::Array(Vec::new()));
+        map.insert("positions".to_string(), Value::Array(Vec::new()));
+        map.insert("month_end_snapshots".to_string(), Value::Array(Vec::new()));
+        root = Value::Object(map);
+    }
+
     let mut txs_array: Vec<Value> = match root.get("transactions") {
         Some(v) => v.as_array().cloned().unwrap_or_else(|| Vec::new()),
         None => Vec::new(),
@@ -255,10 +268,85 @@ pub fn merge_into_dashboard(
         ad.cmp(bd)
     });
 
-    // Write back transactions
-    root.as_object_mut()
-        .unwrap()
-        .insert("transactions".to_string(), Value::Array(txs_array));
+    // Ensure sections exist and write back transactions
+    let obj = root.as_object_mut().unwrap();
+    obj.insert("transactions".to_string(), Value::Array(txs_array));
+
+    // Ensure instruments/accounts/positions arrays exist if missing
+    obj.entry("instruments")
+        .or_insert_with(|| Value::Array(Vec::new()));
+    obj.entry("accounts")
+        .or_insert_with(|| Value::Array(Vec::new()));
+    obj.entry("positions")
+        .or_insert_with(|| Value::Array(Vec::new()));
+    obj.entry("month_end_snapshots")
+        .or_insert_with(|| Value::Array(Vec::new()));
+
+    // Auto-create missing accounts based on transactions and contra accounts
+    let mut existing_accounts: HashMap<String, Value> = obj
+        .get("accounts")
+        .and_then(|v| v.as_array())
+        .unwrap_or(&Vec::new())
+        .iter()
+        .filter_map(|a| {
+            let id = a.get("account_id").and_then(|x| x.as_str())?.to_string();
+            Some((id, a.clone()))
+        })
+        .collect();
+
+    // Gather candidate account_ids and their observed attributes
+    #[derive(Default)]
+    struct Observed {
+        currencies: HashSet<String>,
+        last_currency: Option<String>,
+    }
+    let mut observed: HashMap<String, Observed> = HashMap::new();
+
+    for tx in new_txs {
+        let ent = observed.entry(tx.account_id.clone()).or_default();
+        ent.currencies.insert(tx.currency.clone());
+        ent.last_currency = Some(tx.currency.clone());
+        if let Some(ca) = &tx.contra_account_id {
+            let entc = observed.entry(ca.clone()).or_default();
+            entc.currencies.insert(tx.currency.clone());
+            entc.last_currency = Some(tx.currency.clone());
+        }
+    }
+
+    // Create missing account entries
+    for (acc_id, obs) in observed.into_iter() {
+        if existing_accounts.contains_key(&acc_id) {
+            continue;
+        }
+
+        // Heuristic defaults for Revolut-generated accounts
+        let account_type = if acc_id.to_uppercase().contains("SAVINGS") {
+            "bank_savings"
+        } else if acc_id.to_uppercase().contains("CREDIT_CARD") {
+            "credit_card"
+        } else {
+            "bank_current"
+        };
+
+        let currency = obs.last_currency.unwrap_or_else(|| "SEK".to_string());
+
+        let mut account_obj = serde_json::Map::new();
+        account_obj.insert("account_id".to_string(), Value::String(acc_id.clone()));
+        account_obj.insert("type".to_string(), Value::String(account_type.to_string()));
+        account_obj.insert(
+            "institution".to_string(),
+            Value::String("Revolut".to_string()),
+        );
+        account_obj.insert("country".to_string(), Value::String("GB".to_string()));
+        account_obj.insert("currency".to_string(), Value::String(currency));
+        account_obj.insert("is_liability".to_string(), Value::Bool(false));
+
+        existing_accounts.insert(acc_id.clone(), Value::Object(account_obj));
+    }
+
+    // Write back accounts list
+    let accounts_vec: Vec<Value> = existing_accounts.into_values().collect();
+    obj.insert("accounts".to_string(), Value::Array(accounts_vec));
 
     Ok(serde_json::to_string_pretty(&root)?)
 }
