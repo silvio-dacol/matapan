@@ -7,120 +7,101 @@
     {
       "pattern": "ICA",
       "is_regex": false,
-      "category": "food_groceries",
-      "tags": ["daily_expense"]
+      "category": "food_groceries"
     },
     {
       "pattern": "Hemköp",
       "is_regex": false,
-      "category": "food_groceries",
-      "tags": ["daily_expense"]
+      "category": "food_groceries"
     },
     {
       "pattern": "Willys",
       "is_regex": false,
-      "category": "food_groceries",
-      "tags": ["daily_expense"]
+      "category": "food_groceries"
     },
     {
       "pattern": "Coop",
       "is_regex": false,
-      "category": "food_groceries",
-      "tags": ["daily_expense"]
+      "category": "food_groceries"
     },
 
     {
       "pattern": "Västtrafik",
       "is_regex": false,
-      "category": "transport_public",
-      "tags": ["transport"]
+      "category": "transport_public"
     },
     {
       "pattern": "Uber",
       "is_regex": false,
-      "category": "transport_taxi",
-      "tags": ["transport"]
+      "category": "transport_taxi"
     },
     {
       "pattern": "Bolt",
       "is_regex": false,
-      "category": "transport_taxi",
-      "tags": ["transport"]
+      "category": "transport_taxi"
     },
 
     {
       "pattern": "Netflix",
       "is_regex": false,
-      "category": "entertainment_streaming",
-      "tags": ["subscription"]
+      "category": "entertainment_streaming"
     },
     {
       "pattern": "Spotify",
       "is_regex": false,
-      "category": "entertainment_streaming",
-      "tags": ["subscription"]
+      "category": "entertainment_streaming"
     },
     {
       "pattern": "HBO",
       "is_regex": false,
-      "category": "entertainment_streaming",
-      "tags": ["subscription"]
+      "category": "entertainment_streaming"
     },
     {
       "pattern": "Disney",
       "is_regex": false,
-      "category": "entertainment_streaming",
-      "tags": ["subscription"]
+      "category": "entertainment_streaming"
     },
 
     {
       "pattern": "Telia",
       "is_regex": false,
-      "category": "utilities_internet",
-      "tags": ["utilities"]
+      "category": "utilities_internet"
     },
     {
       "pattern": "ComHem",
       "is_regex": false,
-      "category": "utilities_internet",
-      "tags": ["utilities"]
+      "category": "utilities_internet"
     },
     {
       "pattern": "fiber",
       "is_regex": false,
-      "category": "utilities_internet",
-      "tags": ["utilities"]
+      "category": "utilities_internet"
     },
     {
       "pattern": "electricity",
       "is_regex": false,
-      "category": "utilities_electricity",
-      "tags": ["utilities"]
+      "category": "utilities_electricity"
     },
 
     {
       "pattern": "café",
       "is_regex": false,
-      "category": "food_coffee",
-      "tags": ["discretionary"]
+      "category": "food_coffee"
     },
     {
       "pattern": "coffee",
       "is_regex": false,
-      "category": "food_coffee",
-      "tags": ["discretionary"]
+      "category": "food_coffee"
     },
     {
       "pattern": "espresso",
       "is_regex": false,
-      "category": "food_coffee",
-      "tags": ["discretionary"]
+      "category": "food_coffee"
     },
     {
       "pattern": "fika",
       "is_regex": false,
-      "category": "food_coffee",
-      "tags": ["discretionary"]
+      "category": "food_coffee"
     }
   ],
   "contra_account_rules": [
@@ -158,6 +139,5 @@
   "category_type_map": {
     "topup": "internal_transfer",
     "fx_exchange": "internal_transfer"
-  },
-  "default_tags": []
+  }
 }
