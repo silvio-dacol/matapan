@@ -45,3 +45,81 @@ To build a bank statement parser, follow these steps:
    - **Positions** should be created for each snapshot date found in the statements. Also in this case, some information may be missing, so a post-check to allow the user to fill in missing information manually might be needed.
    - **Transactions** should be created for each transaction found in the statements. Again, some information may be missing, so a post-check to allow the user to fill in missing information manually might be needed.
    - **Month-end Snapshots** should be created to capture the state of accounts and positions at the end of each month this is mostly manual.
+
+## What Should Be Parsed Automatically (High Frequency)
+
+### 1. Transactions
+
+Parsed fields:
+
+- date
+- account_id
+- amount
+- currency
+- description
+
+### 2. Positions
+
+Parsed fields:
+
+- instrument_id
+- quantity
+- price
+- gross_amount
+- fees
+- trade date
+- currency
+
+Trades update:
+
+- Positions
+- Unrealized and realized P&L
+- Balance Sheet only
+
+## What is Manual now but will become Automatic with APIs (Medium Frequency)
+
+### 1. Month-End Snapshots
+
+Used for:
+
+- Reconciliation
+- Validation
+- Detecting missing transactions
+
+Why manual:
+
+- They are used for validation so it is critical they are correct
+- Once the API is in place, these can be fetched automatically
+
+## What Should Be Defined Manually (Low Frequency)
+
+### 1. Instruments
+
+Examples:
+
+- Cash SEK
+- VWCE ETF
+- TSLA stock
+- Mortgage loan
+- Pension fund
+
+Why manual:
+
+- Instruments are semantic objects
+- Banks name the same thing differently
+- AI can help suggest, but humans decide
+
+### 2. Accounts
+
+Examples:
+
+- SEB Checking
+- Revolut Current
+- IBKR Margin
+- Mortgage Account
+
+Why manual:
+
+- Accounts are stable
+- Needed for clean aggregation
+- Needed to distinguish assets vs liabilities
