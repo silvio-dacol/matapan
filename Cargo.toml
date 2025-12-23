@@ -10,7 +10,7 @@ members = [
     "crates/data/bank_statement_parsers/alipay",
     "crates/data/bank_statement_parsers/skandinaviska_enskilda_banken",
     "crates/data/bank_statement_parsers/wechat",
-    "crates/data/bank_statement_parsers/nordnet", "crates/logger",
+    "crates/data/bank_statement_parsers/nordnet", "crates/logger", "crates/ai",
 ]
 
 resolver = "3"
