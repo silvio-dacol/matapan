@@ -190,14 +190,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "database"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "serde_json",
-]
-
-[[package]]
 name = "derive_arbitrary"
 version = "1.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -436,11 +428,11 @@ dependencies = [
  "anyhow",
  "chrono",
  "csv",
- "database",
  "hex",
  "serde",
  "serde_json",
  "sha2",
+ "utils",
 ]
 
 [[package]]
@@ -567,6 +559,14 @@ name = "unicode-ident"
 version = "1.0.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "462eeb75aeb73aea900253ce739c8e18a67423fadf006037cd3ff27e82748a06"
+
+[[package]]
+name = "utils"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde_json",
+]
 
 [[package]]
 name = "version_check"

@@ -2,7 +2,6 @@
 *.json
 *.xlsx
 *.xls
-!database.json
 !settings.json
 *.csv
 *txt

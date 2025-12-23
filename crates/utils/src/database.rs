@@ -17,7 +17,7 @@ use std::{
 ///
 /// # Example
 /// ```no_run
-/// use database::ensure_database_exists;
+/// use utils::ensure_database_exists;
 /// 
 /// let db_path = ensure_database_exists("../../database").unwrap();
 /// println!("Database ready at: {:?}", db_path);

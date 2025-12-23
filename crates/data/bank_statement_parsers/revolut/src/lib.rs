@@ -169,15 +169,13 @@ fn make_txn_id(
 
 /// Merges Revolut transactions into an existing database.json Value.
 /// Assumes database.json has a top level "transactions": [] array.
+/// Automatically skips duplicate transactions based on txn_id.
+///
+/// # Returns
+/// * `Result<(Value, utils::transactions::MergeStats)>` - The merged database and merge statistics
 pub fn merge_transactions_into_template(
-    mut template: Value,
+    template: Value,
     new_txns: Vec<Value>,
-) -> Result<Value> {
-    let arr = template
-        .get_mut("transactions")
-        .and_then(|v| v.as_array_mut())
-        .ok_or_else(|| anyhow!("database.json missing 'transactions' array"))?;
-
-    arr.extend(new_txns);
-    Ok(template)
+) -> Result<(Value, utils::transactions::MergeStats)> {
+    utils::merge_transactions_with_deduplication(template, new_txns)
 }

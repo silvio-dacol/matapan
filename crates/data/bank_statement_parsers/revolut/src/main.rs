@@ -41,22 +41,27 @@ fn main() -> Result<()> {
     let txns = parser.parse_reader(csv_buf.as_slice())?;
 
     // Read database.json (automatically initializes if missing or invalid)
-    let template = database::read_database(database_path)?;
+    let template = utils::read_database(database_path)?;
 
-    // Merge
-    let merged = merge_transactions_into_template(template, txns)?;
+    // Merge with duplicate detection
+    let (merged, stats) = merge_transactions_into_template(template, txns)?;
 
     // Write to output path (defaults to database path)
     let final_output_path = output_path.unwrap_or(database_path);
-    let written_path = database::write_database(final_output_path, &merged)?;
+    let written_path = utils::write_database(final_output_path, &merged)?;
 
-    println!("✓ Wrote {} transactions to {}", 
+    println!("✓ Processed {} transactions: {} added, {} skipped (duplicates)", 
+        stats.total,
+        stats.added,
+        stats.skipped
+    );
+    println!("✓ Total transactions in database: {}", 
         merged.get("transactions")
             .and_then(|t| t.as_array())
             .map(|a| a.len())
-            .unwrap_or(0),
-        written_path.display()
+            .unwrap_or(0)
     );
+    println!("✓ Database written to: {}", written_path.display());
     
     Ok(())
 }
