@@ -134,9 +134,11 @@ fn infer_type(amount: f64, revolut_type: Option<&str>, description: &str) -> Str
     let rt = revolut_type.unwrap_or("").to_lowercase();
 
     if rt.contains("transfer") {
-        // Check if this is a transfer to another person (not internal)
+        // Check if this is a transfer to/from another person (not internal)
         if description.starts_with("Transfer to ") {
             "expense".to_string()
+        } else if description.starts_with("Transfer from ") {
+            "income".to_string()
         } else {
             "internal_transfer".to_string()
         }
