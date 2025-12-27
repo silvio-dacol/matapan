@@ -8,14 +8,17 @@ use std::io::Read;
 pub const PARSER_NAME: &str = "revolut";
 
 pub struct RevolutCsvParser {
-    pub account_id: String,
+    pub account_id_current: String,
+    pub account_id_savings: String,
     pub only_completed: bool,
 }
 
 impl RevolutCsvParser {
     pub fn new(account_id: impl Into<String>) -> Self {
+        let base = account_id.into();
         Self {
-            account_id: account_id.into(),
+            account_id_current: base.clone(),
+            account_id_savings: format!("{}_SAVINGS", base.trim_end_matches("_CURRENT")),
             only_completed: true,
         }
     }
@@ -49,11 +52,27 @@ impl RevolutCsvParser {
             let description = row.description.clone().unwrap_or_else(|| "".to_string());
             let currency = row.currency.clone();
             let amount = row.amount;
+            
+            // Determine account_id based on Product field
+            let account_id = match row._product.as_deref() {
+                Some("Savings") => &self.account_id_savings,
+                _ => &self.account_id_current,
+            };
 
             let txn_type = infer_type(amount, row.r#type.as_deref(), &description);
+            
+            // Determine from/to accounts
+            let (from_account_id, to_account_id) = determine_accounts(
+                account_id,
+                &txn_type,
+                amount,
+                &description,
+                &self.account_id_current,
+                &self.account_id_savings,
+            );
 
             let txn_id = make_txn_id(
-                &self.account_id,
+                account_id,
                 date,
                 amount,
                 &currency,
@@ -64,13 +83,13 @@ impl RevolutCsvParser {
             let txn = json!({
                 "txn_id": txn_id,
                 "date": date.format("%Y-%m-%d").to_string(),
-                "account_id": self.account_id,
+                "from_account_id": from_account_id,
+                "to_account_id": to_account_id,
                 "type": txn_type,
                 "category": "uncategorized",
                 "amount": amount,
                 "currency": currency,
-                "description": description,
-                "tags": [PARSER_NAME]
+                "description": description
             });
 
             out.push(txn);
@@ -139,6 +158,9 @@ fn infer_type(amount: f64, revolut_type: Option<&str>, description: &str) -> Str
             "expense".to_string()
         } else if description.starts_with("Transfer from ") {
             "income".to_string()
+        } else if description.contains("To pocket") || description.contains("Pocket Withdrawal") {
+            // Internal transfers between accounts/pockets
+            "internal_transfer".to_string()
         } else {
             "internal_transfer".to_string()
         }
@@ -146,6 +168,90 @@ fn infer_type(amount: f64, revolut_type: Option<&str>, description: &str) -> Str
         "fx".to_string()
     } else {
         if amount < 0.0 { "expense" } else { "income" }.to_string()
+    }
+}
+
+/// Determines from_account_id and to_account_id based on transaction type and details
+fn determine_accounts(
+    account_id: &str,
+    txn_type: &str,
+    amount: f64,
+    description: &str,
+    current_account: &str,
+    savings_account: &str,
+) -> (String, String) {
+    match txn_type {
+        "internal_transfer" => {
+            // Parse pocket transfers like "To pocket SEK Cazzate from SEK"
+            if description.contains("To pocket") {
+                // Money moving from Current to Savings pocket
+                if amount > 0.0 {
+                    // Positive amount in Savings means money came FROM Current TO Savings
+                    if account_id == savings_account {
+                        (current_account.to_string(), savings_account.to_string())
+                    } else {
+                        // In Current with positive would be unusual for "To pocket"
+                        (account_id.to_string(), savings_account.to_string())
+                    }
+                } else {
+                    // Negative amount in Current means money going FROM Current TO Savings
+                    if account_id == current_account {
+                        (current_account.to_string(), savings_account.to_string())
+                    } else {
+                        // In Savings with negative would be unusual for "To pocket"
+                        (savings_account.to_string(), account_id.to_string())
+                    }
+                }
+            } else if description.contains("Pocket Withdrawal") {
+                // Money moving back from Savings pocket to Current
+                if amount < 0.0 {
+                    // Negative amount in Savings means money leaving Savings to Current
+                    if account_id == savings_account {
+                        (savings_account.to_string(), current_account.to_string())
+                    } else {
+                        (account_id.to_string(), current_account.to_string())
+                    }
+                } else {
+                    // Positive amount in Current means money came from Savings
+                    if account_id == current_account {
+                        (savings_account.to_string(), current_account.to_string())
+                    } else {
+                        (savings_account.to_string(), account_id.to_string())
+                    }
+                }
+            } else {
+                // Generic internal transfer
+                if amount < 0.0 {
+                    (account_id.to_string(), "INTERNAL_DESTINATION".to_string())
+                } else {
+                    ("INTERNAL_SOURCE".to_string(), account_id.to_string())
+                }
+            }
+        }
+        "expense" => {
+            // Money leaving the account
+            (account_id.to_string(), "EXTERNAL_PAYEE".to_string())
+        }
+        "income" => {
+            // Money coming into the account
+            ("EXTERNAL_PAYER".to_string(), account_id.to_string())
+        }
+        "fx" => {
+            // Currency exchange - special handling
+            if amount < 0.0 {
+                (account_id.to_string(), "FX_EXCHANGE".to_string())
+            } else {
+                ("FX_EXCHANGE".to_string(), account_id.to_string())
+            }
+        }
+        _ => {
+            // Default case
+            if amount < 0.0 {
+                (account_id.to_string(), "EXTERNAL_PAYEE".to_string())
+            } else {
+                ("EXTERNAL_PAYER".to_string(), account_id.to_string())
+            }
+        }
     }
 }
 
