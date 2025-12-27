@@ -50,7 +50,7 @@ impl RevolutCsvParser {
             let currency = row.currency.clone();
             let amount = row.amount;
 
-            let txn_type = infer_type(amount, row.r#type.as_deref());
+            let txn_type = infer_type(amount, row.r#type.as_deref(), &description);
 
             let txn_id = make_txn_id(
                 &self.account_id,
@@ -130,11 +130,16 @@ fn pick_date(started: &Option<String>, completed: &Option<String>) -> Result<Nai
     Err(anyhow!("Unrecognized date format: {}", raw))
 }
 
-fn infer_type(amount: f64, revolut_type: Option<&str>) -> String {
+fn infer_type(amount: f64, revolut_type: Option<&str>, description: &str) -> String {
     let rt = revolut_type.unwrap_or("").to_lowercase();
 
     if rt.contains("transfer") {
-        "internal_transfer".to_string()
+        // Check if this is a transfer to another person (not internal)
+        if description.starts_with("Transfer to ") {
+            "expense".to_string()
+        } else {
+            "internal_transfer".to_string()
+        }
     } else if rt.contains("exchange") {
         "fx".to_string()
     } else {
