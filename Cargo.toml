@@ -13,7 +13,7 @@ members = [
     "crates/data/bank_statement_parsers/nordnet",
     "crates/logger",
     "crates/ai",
-    "crates/utils",
+    "crates/utils", "crates/data/bank_statement_parsers/carpay",
 ]
 
 resolver = "3"

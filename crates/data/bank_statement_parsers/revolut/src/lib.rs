@@ -81,7 +81,6 @@ impl RevolutCsvParser {
             );
 
             let txn = json!({
-                "txn_id": txn_id,
                 "date": date.format("%Y-%m-%d").to_string(),
                 "from_account_id": from_account_id,
                 "to_account_id": to_account_id,
@@ -89,7 +88,8 @@ impl RevolutCsvParser {
                 "category": "uncategorized",
                 "amount": amount,
                 "currency": currency,
-                "description": description
+                "description": description,
+                "txn_id": txn_id
             });
 
             out.push(txn);
