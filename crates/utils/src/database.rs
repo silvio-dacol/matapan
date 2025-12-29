@@ -77,8 +77,8 @@ fn initialize_from_template(db_path: &Path) -> Result<()> {
         "engine_version": template_value.get("engine_version").unwrap_or(&serde_json::json!("0.1")),
         "user_profile": template_value.get("user_profile").unwrap_or(&serde_json::json!({})),
         "hicp_series": [],
-        "instruments": [],
         "accounts": [],
+        "instruments": [],
         "positions": [],
         "transactions": [],
         "recurring_templates": [],
@@ -143,15 +143,4 @@ pub fn write_database<P: AsRef<Path>>(
     file.write_all(formatted.as_bytes())?;
 
     Ok(db_path)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_path_resolution() {
-        // This would need a proper test setup with temp directories
-        // Just showing the structure for now
-    }
 }

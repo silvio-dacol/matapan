@@ -155,8 +155,16 @@ fn infer_type(amount: f64, revolut_type: Option<&str>, description: &str) -> Str
     if rt.contains("transfer") {
         // Check if this is a transfer to/from another person (not internal)
         if description.starts_with("Transfer to ") {
+            // Pattern like "Transfer to Mario Rossi" - payment to person with Revolut Account
+            "expense".to_string()
+        } else if description.starts_with("To ") && !description.contains("To pocket") {
+            // Pattern like "To Mario Rossi" - payment to external person without Revolut
             "expense".to_string()
         } else if description.starts_with("Transfer from ") {
+            // Pattern like "Transfer from Mario Rossi" - payment from person with Revolut Account
+            "income".to_string()
+        } else if description.starts_with("Payment from ") && !description.contains("From pocket") {
+            // Pattern like "From Mario Rossi" - payment from external person without Revolut
             "income".to_string()
         } else if description.contains("To pocket") || description.contains("Pocket Withdrawal") {
             // Internal transfers between accounts/pockets
