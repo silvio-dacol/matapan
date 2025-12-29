@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::collections::HashSet;
 
 /// Merges new accounts into an existing database template with duplicate detection.
@@ -110,6 +110,48 @@ pub fn find_duplicate_account_ids(database: &Value, account_ids: &[String]) -> R
         .collect();
 
     Ok(duplicates)
+}
+
+/// Creates standard system accounts that are used across all parsers.
+/// These accounts represent external parties and are used when money flows
+/// in/out of the user's accounts from/to unknown external sources.
+///
+/// Returns a vector of system account entries.
+pub fn create_system_accounts() -> Vec<Value> {
+    vec![
+        json!({
+            "account_id": "EXTERNAL_PAYER",
+            "structural_type": "external",
+            "institution": "External",
+            "country": null,
+            "iban": null,
+            "bic": null,
+            "account_number": null,
+            "owner": "external",
+            "is_liability": false,
+            "supports_positions": false,
+            "opened_date": null,
+            "closed_date": null,
+            "is_active": true,
+            "notes": "System account representing external income sources"
+        }),
+        json!({
+            "account_id": "EXTERNAL_PAYEE",
+            "structural_type": "external",
+            "institution": "External",
+            "country": null,
+            "iban": null,
+            "bic": null,
+            "account_number": null,
+            "owner": "external",
+            "is_liability": false,
+            "supports_positions": false,
+            "opened_date": null,
+            "closed_date": null,
+            "is_active": true,
+            "notes": "System account representing external expense destinations"
+        })
+    ]
 }
 
 #[cfg(test)]

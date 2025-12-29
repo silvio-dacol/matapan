@@ -40,15 +40,20 @@ fn main() -> Result<()> {
     let parser = RevolutCsvParser::new(account_id);
     let txns = parser.parse_reader(csv_buf.as_slice())?;
     let accounts = parser.create_accounts();
+    let system_accounts = utils::create_system_accounts();
 
     // Read database.json (automatically initializes if missing or invalid)
     let template = utils::read_database(database_path)?;
 
-    // Merge accounts first
-    let (template_with_accounts, account_stats) = 
-        revolut::merge_accounts_into_template(template, accounts)?;
+    // Merge system accounts first (EXTERNAL_PAYER, EXTERNAL_PAYEE, etc.)
+    let (template_with_sys_accounts, sys_account_stats) = 
+        revolut::merge_accounts_into_template(template, system_accounts)?;
 
-    // Then merge transactions with duplicate detection
+    // Then merge parser-specific accounts
+    let (template_with_accounts, account_stats) = 
+        revolut::merge_accounts_into_template(template_with_sys_accounts, accounts)?;
+
+    // Finally merge transactions with duplicate detection
     let (merged, txn_stats) = 
         revolut::merge_transactions_into_template(template_with_accounts, txns)?;
 
@@ -56,6 +61,11 @@ fn main() -> Result<()> {
     let final_output_path = output_path.unwrap_or(database_path);
     let written_path = utils::write_database(final_output_path, &merged)?;
 
+    println!("✓ Processed {} system accounts: {} added, {} skipped (already exist)",
+        sys_account_stats.total,
+        sys_account_stats.added,
+        sys_account_stats.skipped
+    );
     println!("✓ Processed {} accounts: {} added, {} skipped (already exist)",
         account_stats.total,
         account_stats.added,

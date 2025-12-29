@@ -220,7 +220,8 @@ fn infer_type(amount: f64, revolut_type: Option<&str>, description: &str) -> Str
     }
 }
 
-/// Determines from_account_id and to_account_id based on transaction type and details
+/// Determines from_account_id and to_account_id based on transaction type and details.
+/// Uses system accounts (EXTERNAL_PAYER, EXTERNAL_PAYEE) for external parties.
 fn determine_accounts(
     account_id: &str,
     txn_type: &str,
@@ -269,7 +270,7 @@ fn determine_accounts(
                     }
                 }
             } else {
-                // Generic internal transfer
+                // Generic internal transfer to/from unknown internal account
                 if amount < 0.0 {
                     (account_id.to_string(), "INTERNAL_DESTINATION".to_string())
                 } else {
@@ -278,15 +279,16 @@ fn determine_accounts(
             }
         }
         "expense" => {
-            // Money leaving the account
+            // Money leaving the account to external payee
             (account_id.to_string(), "EXTERNAL_PAYEE".to_string())
         }
         "income" => {
-            // Money coming into the account
+            // Money coming into the account from external payer
             ("EXTERNAL_PAYER".to_string(), account_id.to_string())
         }
         "fx" => {
-            // Currency exchange - special handling
+            // Currency exchange - typically between pockets of same account
+            // For now treat as external exchange service
             if amount < 0.0 {
                 (account_id.to_string(), "FX_EXCHANGE".to_string())
             } else {
