@@ -28,6 +28,47 @@ impl RevolutCsvParser {
         self
     }
 
+    /// Creates account entries for the Revolut accounts used by this parser.
+    /// Returns a vector with the current account and optionally a savings account.
+    /// Note: Some fields (like IBAN, BIC, account_number, owner, etc.)
+    /// cannot be determined from CSV files and are left as null for manual completion.
+    pub fn create_accounts(&self) -> Vec<Value> {
+        vec![
+            json!({
+                "account_id": self.account_id_current,
+                "structural_type": "bank",
+                "institution": "Revolut",
+                "country": null,
+                "iban": null,
+                "bic": null,
+                "account_number": null,
+                "owner": "self",
+                "is_liability": false,
+                "supports_positions": false,
+                "opened_date": null,
+                "closed_date": null,
+                "is_active": true,
+                "notes": "Revolut current account - some fields need manual completion"
+            }),
+            json!({
+                "account_id": self.account_id_savings,
+                "structural_type": "bank",
+                "institution": "Revolut",
+                "country": null,
+                "iban": null,
+                "bic": null,
+                "account_number": null,
+                "owner": "self",
+                "is_liability": false,
+                "supports_positions": false,
+                "opened_date": null,
+                "closed_date": null,
+                "is_active": true,
+                "notes": "Revolut savings pocket - some fields need manual completion"
+            })
+        ]
+    }
+
     pub fn parse_reader<R: Read>(&self, reader: R) -> Result<Vec<Value>> {
         let mut csv_reader = csv::ReaderBuilder::new()
             .flexible(true)
@@ -299,4 +340,17 @@ pub fn merge_transactions_into_template(
     new_txns: Vec<Value>,
 ) -> Result<(Value, utils::transactions::MergeStats)> {
     utils::merge_transactions_with_deduplication(template, new_txns)
+}
+
+/// Merges Revolut account entries into an existing database.json Value.
+/// Assumes database.json has a top level "accounts": [] array.
+/// Automatically skips duplicate accounts based on account_id.
+///
+/// # Returns
+/// * `Result<(Value, utils::accounts::MergeStats)>` - The merged database and merge statistics
+pub fn merge_accounts_into_template(
+    template: Value,
+    new_accounts: Vec<Value>,
+) -> Result<(Value, utils::accounts::MergeStats)> {
+    utils::merge_accounts_with_deduplication(template, new_accounts)
 }

@@ -5,7 +5,7 @@ use std::{
     io::Read,
 };
 
-use revolut::{merge_transactions_into_template, RevolutCsvParser};
+use revolut::RevolutCsvParser;
 
 fn main() -> Result<()> {
     // Usage:
@@ -39,23 +39,39 @@ fn main() -> Result<()> {
     // Parse
     let parser = RevolutCsvParser::new(account_id);
     let txns = parser.parse_reader(csv_buf.as_slice())?;
+    let accounts = parser.create_accounts();
 
     // Read database.json (automatically initializes if missing or invalid)
     let template = utils::read_database(database_path)?;
 
-    // Merge with duplicate detection
-    let (merged, stats) = merge_transactions_into_template(template, txns)?;
+    // Merge accounts first
+    let (template_with_accounts, account_stats) = 
+        revolut::merge_accounts_into_template(template, accounts)?;
+
+    // Then merge transactions with duplicate detection
+    let (merged, txn_stats) = 
+        revolut::merge_transactions_into_template(template_with_accounts, txns)?;
 
     // Write to output path (defaults to database path)
     let final_output_path = output_path.unwrap_or(database_path);
     let written_path = utils::write_database(final_output_path, &merged)?;
 
-    println!("✓ Processed {} transactions: {} added, {} skipped (duplicates)", 
-        stats.total,
-        stats.added,
-        stats.skipped
+    println!("✓ Processed {} accounts: {} added, {} skipped (already exist)",
+        account_stats.total,
+        account_stats.added,
+        account_stats.skipped
     );
-    println!("✓ Total transactions in database: {}", 
+    println!("✓ Processed {} transactions: {} added, {} skipped (duplicates)", 
+        txn_stats.total,
+        txn_stats.added,
+        txn_stats.skipped
+    );
+    println!("✓ Total accounts in database: {}",
+        merged.get("accounts")
+            .and_then(|a| a.as_array())
+            .map(|a| a.len())
+            .unwrap_or(0)
+    );    println!("✓ Total transactions in database: {}", 
         merged.get("transactions")
             .and_then(|t| t.as_array())
             .map(|a| a.len())
