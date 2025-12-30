@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use std::{
     env,
-    fs::File,
+    fs::{self, File},
     io::Read,
 };
 
@@ -9,40 +9,124 @@ use revolut::RevolutCsvParser;
 
 fn main() -> Result<()> {
     // Usage:
-    //   revolut_parser <revolut.csv> <database_path> [output_path] [account_id]
+    //   revolut_parser [file1.csv file2.csv ...] [database_path] [output_path]
+    //
+    // If no .csv files specified, will auto-discover all .csv files in current directory
     //
     // Defaults:
-    //   revolut.csv
-    //   ../../../../database (resolves to database.json)
+    //   Auto-discover all .csv files in current directory
+    //   database_path: ../../../../database (resolves to database.json)
     //   output = same as database_path
-    //   account_id = REVOLUT_CURRENT
 
     let args: Vec<String> = env::args().collect();
 
-    let input_csv = args.get(1).map(|s| s.as_str()).unwrap_or("revolut.csv");
-
-    // Arg2 can be either a JSON file path or a folder path.
-    let database_path = args.get(2).map(|s| s.as_str()).unwrap_or("../../../../database");
+    // Separate .csv files from other arguments
+    let mut csv_files: Vec<String> = Vec::new();
+    let mut other_args: Vec<String> = Vec::new();
     
-    let output_path = args.get(3).map(|s| s.as_str());
-    let account_id = args
-        .get(4)
-        .cloned()
-        .unwrap_or_else(|| "REVOLUT_CURRENT".to_string());
+    for arg in args.iter().skip(1) {
+        if arg.ends_with(".csv") {
+            csv_files.push(arg.clone());
+        } else {
+            other_args.push(arg.clone());
+        }
+    }
 
-    // Read CSV
-    let mut csv_file =
-        File::open(input_csv).with_context(|| format!("Cannot open {}", input_csv))?;
-    let mut csv_buf = Vec::new();
-    csv_file.read_to_end(&mut csv_buf)?;
+    // If no .csv files specified, auto-discover them
+    if csv_files.is_empty() {
+        println!("📂 No .csv files specified, scanning current directory...");
+        let current_dir = env::current_dir()?;
+        for entry in fs::read_dir(&current_dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.extension().and_then(|s| s.to_str()) == Some("csv") {
+                if let Some(filename) = path.file_name().and_then(|s| s.to_str()) {
+                    csv_files.push(filename.to_string());
+                    println!("  ✓ Found: {}", filename);
+                }
+            }
+        }
+    }
 
-    // Parse
-    let parser = RevolutCsvParser::new(account_id);
-    let txns = parser.parse_reader(csv_buf.as_slice())?;
-    let accounts = parser.create_accounts();
+    if csv_files.is_empty() {
+        eprintln!("❌ No .csv files found!");
+        return Ok(());
+    }
+
+    // Parse remaining arguments
+    let database_path = other_args.get(0).map(|s| s.as_str()).unwrap_or("../../../../database");
+    let output_path = other_args.get(1).map(|s| s.as_str());
+
+    // Parse all discovered .csv files
+    let mut all_txns = Vec::new();
+
+    for (idx, csv_file_path) in csv_files.iter().enumerate() {
+        // Determine account ID based on filename or use default
+        let account_id = if csv_file_path.to_lowercase().contains("saving") {
+            "REVOLUT_SAVINGS".to_string()
+        } else if csv_file_path.to_lowercase().contains("current") {
+            "REVOLUT_CURRENT".to_string()
+        } else {
+            // Default: first file is CURRENT, others get numbered
+            if idx == 0 {
+                "REVOLUT_CURRENT".to_string()
+            } else {
+                format!("REVOLUT_ACCOUNT_{}", idx + 1)
+            }
+        };
+
+        println!("\n📖 Parsing {} (account: {})", csv_file_path, account_id);
+        
+        // Read CSV
+        let mut csv_file = File::open(csv_file_path)
+            .with_context(|| format!("Cannot open {}", csv_file_path))?;
+        let mut csv_buf = Vec::new();
+        csv_file.read_to_end(&mut csv_buf)?;
+
+        // Parse
+        let parser = RevolutCsvParser::new(&account_id);
+        match parser.parse_reader(csv_buf.as_slice()) {
+            Ok(txns) => {
+                println!("  ✓ Found {} transactions", txns.len());
+                all_txns.extend(txns);
+            }
+            Err(e) => {
+                eprintln!("  ⚠ Warning: Could not parse file: {}", e);
+                eprintln!("    Continuing with next file...");
+            }
+        }
+    }
+
+    if all_txns.is_empty() {
+        eprintln!("❌ No transactions found in any file!");
+        return Ok(());
+    }
+
+    // Collect all unique accounts from parsed transactions
+    let mut unique_account_ids = std::collections::HashSet::new();
+    for txn in &all_txns {
+        if let Some(from_account) = txn.get("from_account_id").and_then(|v| v.as_str()) {
+            if from_account.starts_with("REVOLUT") {
+                unique_account_ids.insert(from_account.to_string());
+            }
+        }
+        if let Some(to_account) = txn.get("to_account_id").and_then(|v| v.as_str()) {
+            if to_account.starts_with("REVOLUT") {
+                unique_account_ids.insert(to_account.to_string());
+            }
+        }
+    }
+
+    // Create accounts for all unique account IDs found
+    let mut all_accounts = Vec::new();
+    for account_id in unique_account_ids {
+        let parser = RevolutCsvParser::new(&account_id);
+        all_accounts.extend(parser.create_accounts());
+    }
     let system_accounts = utils::create_system_accounts();
 
     // Read database.json (automatically initializes if missing or invalid)
+    println!("\n📖 Reading database from: {}", database_path);
     let template = utils::read_database(database_path)?;
 
     // Merge system accounts first (EXTERNAL_PAYER, EXTERNAL_PAYEE, etc.)
@@ -51,16 +135,18 @@ fn main() -> Result<()> {
 
     // Then merge parser-specific accounts
     let (template_with_accounts, account_stats) = 
-        revolut::merge_accounts_into_template(template_with_sys_accounts, accounts)?;
+        revolut::merge_accounts_into_template(template_with_sys_accounts, all_accounts)?;
 
     // Finally merge transactions with duplicate detection
     let (merged, txn_stats) = 
-        revolut::merge_transactions_into_template(template_with_accounts, txns)?;
+        revolut::merge_transactions_into_template(template_with_accounts, all_txns)?;
 
     // Write to output path (defaults to database path)
     let final_output_path = output_path.unwrap_or(database_path);
     let written_path = utils::write_database(final_output_path, &merged)?;
 
+    println!("\n📊 Summary:");
+    println!("─────────────────────────────────────────");
     println!("✓ Processed {} system accounts: {} added, {} skipped (already exist)",
         sys_account_stats.total,
         sys_account_stats.added,
@@ -87,7 +173,8 @@ fn main() -> Result<()> {
             .map(|a| a.len())
             .unwrap_or(0)
     );
-    println!("✓ Database written to: {}", written_path.display());
+    println!("─────────────────────────────────────────");
+    println!("✅ Database written to: {}", written_path.display());
     
     Ok(())
 }
