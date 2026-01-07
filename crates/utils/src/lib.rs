@@ -1,5 +1,6 @@
 pub mod accounts;
 pub mod database;
+pub mod rules;
 pub mod transactions;
 
 // Re-export commonly used items

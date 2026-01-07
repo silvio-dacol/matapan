@@ -19,11 +19,23 @@ pub enum ApiError {
     #[error("Invalid date format: {0}")]
     InvalidDateFormat(String),
 
+    #[error("Resource not found: {0}")]
+    NotFound(String),
+
+    #[error("Bad request: {0}")]
+    BadRequest(String),
+
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
 
     #[error("JSON parsing error: {0}")]
     JsonError(#[from] serde_json::Error),
+
+    #[error("Anyhow error: {0}")]
+    AnyhowError(#[from] anyhow::Error),
+
+    #[error("Internal server error: {0}")]
+    InternalError(String),
 
     #[error("Internal server error: {0}")]
     Internal(String),
@@ -34,9 +46,13 @@ impl IntoResponse for ApiError {
         let (status, error_message) = match self {
             ApiError::DashboardNotFound => (StatusCode::NOT_FOUND, self.to_string()),
             ApiError::SnapshotNotFound(_) => (StatusCode::NOT_FOUND, self.to_string()),
+            ApiError::NotFound(_) => (StatusCode::NOT_FOUND, self.to_string()),
             ApiError::InvalidDateFormat(_) => (StatusCode::BAD_REQUEST, self.to_string()),
+            ApiError::BadRequest(_) => (StatusCode::BAD_REQUEST, self.to_string()),
             ApiError::IoError(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
             ApiError::JsonError(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
+            ApiError::AnyhowError(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
+            ApiError::InternalError(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
             ApiError::Internal(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
         };
 

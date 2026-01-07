@@ -1,11 +1,12 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use crate::{repository::DashboardRepository, router::create_router};
+use crate::{repository::{DashboardRepository, RuleRepository}, router::create_router};
 
 /// Run the API server
 pub async fn run_server(
-    repo: Arc<dyn DashboardRepository>,
+    dashboard_repo: Arc<dyn DashboardRepository>,
+    rule_repo: Arc<dyn RuleRepository>,
     host: &str,
     port: u16,
 ) -> anyhow::Result<()> {
@@ -17,7 +18,7 @@ pub async fn run_server(
         )
         .init();
 
-    let app = create_router(repo);
+    let app = create_router(dashboard_repo, rule_repo);
 
     let addr = format!("{}:{}", host, port).parse::<SocketAddr>()?;
     tracing::info!("Starting server on http://{}", addr);

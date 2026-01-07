@@ -29,5 +29,6 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # Local dependencies
-models = { path = "../models" }
-data_pipeline = { path = "../data_pipeline" }
+# models = { path = "../models" }
+# data_pipeline = { path = "../data_pipeline" }
+utils = { path = "../utils" }

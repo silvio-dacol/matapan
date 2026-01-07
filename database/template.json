@@ -423,6 +423,8 @@
     }
   ],
 
+  "rules": [],
+
   "recurring_templates": [
     {
       "template_id": "RENT",

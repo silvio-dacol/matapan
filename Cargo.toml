@@ -2,6 +2,7 @@
 
 [workspace]
 members = [
+    "crates/api",
     "crates/data/bank_statement_parsers/revolut",
     "crates/data/bank_statement_parsers/intesa_sanpaolo",
     "crates/data/bank_statement_parsers/interactive_brokers",
