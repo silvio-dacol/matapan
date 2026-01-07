@@ -1,11 +1,10 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use crate::{repository::{DashboardRepository, RuleRepository}, router::create_router};
+use crate::{repository::RuleRepository, router::create_router};
 
 /// Run the API server
 pub async fn run_server(
-    dashboard_repo: Arc<dyn DashboardRepository>,
     rule_repo: Arc<dyn RuleRepository>,
     host: &str,
     port: u16,
@@ -18,10 +17,10 @@ pub async fn run_server(
         )
         .init();
 
-    let app = create_router(dashboard_repo, rule_repo);
+    let app = create_router(rule_repo);
 
     let addr = format!("{}:{}", host, port).parse::<SocketAddr>()?;
-    tracing::info!("Starting server on http://{}", addr);
+    tracing::info!("Starting Matapan Rule Engine API on http://{}", addr);
 
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, app).await?;

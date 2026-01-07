@@ -1,5 +1,5 @@
 [package]
-name = "backend_api"
+name = "api"
 version = "0.1.0"
 edition = "2021"
 
@@ -20,9 +20,6 @@ thiserror = "1.0"
 
 # Async trait
 async-trait = "0.1"
-
-# DateTime
-chrono = "0.4"
 
 # Logging
 tracing = "0.1"
