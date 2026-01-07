@@ -1,5 +1,6 @@
 pub mod error;
 pub mod handlers;
+pub mod models_stub;
 pub mod repository;
 pub mod router;
 pub mod rule_handlers;

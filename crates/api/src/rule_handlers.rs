@@ -7,7 +7,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::sync::Arc;
-use utils::rules::{Action, Condition, ConditionOperator, Rule, RuleEngine};
+use utils::rules::{Rule, RuleEngine};
 
 use crate::{error::ApiError, repository::RuleRepository, Result};
 

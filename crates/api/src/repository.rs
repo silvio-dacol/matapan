@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use chrono::NaiveDate;
-use models::{DashboardOutput, MonthlyInput, SnapshotOutput};
+use crate::models_stub::{DashboardOutput, MonthlyInput, SnapshotOutput};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::sync::RwLock;
