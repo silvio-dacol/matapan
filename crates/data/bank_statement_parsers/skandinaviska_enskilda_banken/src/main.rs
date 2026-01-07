@@ -1,7 +1,7 @@
 use anyhow::Result;
 use std::{env, fs};
 
-use skandinaviska_enskilda_banken::SebXlsxParser;
+use seb::SebXlsxParser;
 
 fn main() -> Result<()> {
     // Usage:
@@ -10,7 +10,6 @@ fn main() -> Result<()> {
     // If no .xlsx files specified, will auto-discover all .xlsx files in current directory
     //
     // Defaults:
-    //   Auto-discover all .xlsx files in current directory
     //   database_path: ../../../../database (resolves to database.json)
     //   output = same as database_path
 
@@ -19,23 +18,22 @@ fn main() -> Result<()> {
     // Separate .xlsx files from other arguments
     let mut xlsx_files: Vec<String> = Vec::new();
     let mut other_args: Vec<String> = Vec::new();
-    
+
     for arg in args.iter().skip(1) {
-        if arg.ends_with(".xlsx") {
+        if arg.to_lowercase().ends_with(".xlsx") {
             xlsx_files.push(arg.clone());
         } else {
             other_args.push(arg.clone());
         }
     }
 
-    // If no .xlsx files specified, auto-discover them
     if xlsx_files.is_empty() {
         println!("📂 No .xlsx files specified, scanning current directory...");
         let current_dir = env::current_dir()?;
         for entry in fs::read_dir(&current_dir)? {
             let entry = entry?;
             let path = entry.path();
-            if path.extension().and_then(|s| s.to_str()) == Some("xlsx") {
+            if path.extension().and_then(|s| s.to_str()).map(|s| s.eq_ignore_ascii_case("xlsx")) == Some(true) {
                 if let Some(filename) = path.file_name().and_then(|s| s.to_str()) {
                     xlsx_files.push(filename.to_string());
                     println!("  ✓ Found: {}", filename);
@@ -49,31 +47,38 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    // Parse remaining arguments
     let database_path = other_args.get(0).map(|s| s.as_str()).unwrap_or("../../../../database");
     let output_path = other_args.get(1).map(|s| s.as_str());
 
-    // Create parser with default account IDs
-    let parser = SebXlsxParser::new("SEB_CHECKING", "SEB_SAVINGS");
+    // Your canonical account IDs (keep stable)
+    let checking_id = "SEB_CHECKING".to_string();
+    let savings_id = "SEB_SAVINGS".to_string();
 
-    // Parse all discovered .xlsx files
+    // Optional: digits-only account numbers for better internal transfer mapping
+    // From your files these are:
+    // Checking: 5020 01 052 05 -> "50200105205"
+    // Savings:  5037 18 077 86 -> "50371807786"
+    let parser = SebXlsxParser::new(checking_id.clone(), savings_id.clone())
+        .with_account_numbers(Some("50200105205".to_string()), Some("50371807786".to_string()));
+
     let mut all_txns = Vec::new();
 
-    for (idx, xlsx_file) in xlsx_files.iter().enumerate() {
-        // Determine account ID based on filename
-        let account_id = if xlsx_file.to_lowercase().contains("saving") ||
-                           xlsx_file.to_lowercase().contains("spar") {
-            parser.account_id_savings.clone()
-        } else if xlsx_file.to_lowercase().contains("check") ||
-                  xlsx_file.to_lowercase().contains("transaction") {
-            parser.account_id_checking.clone()
+    for xlsx_path in &xlsx_files {
+        let lower = xlsx_path.to_lowercase();
+
+        let account_id = if lower.contains("saving") || lower.contains("savings") || lower.contains("spark") {
+            &savings_id
+        } else if lower.contains("check") || lower.contains("current") || lower.contains("privat") {
+            &checking_id
         } else {
-            // Default: assign based on order or use generic naming
-            format!("SEB_ACCOUNT_{}", idx + 1)
+            // Fallback: guess based on smaller file name patterns
+            // Default to checking so you don’t silently mis-route salary etc.
+            &checking_id
         };
 
-        println!("\n📖 Parsing {} (account: {})", xlsx_file, account_id);
-        match parser.parse_file(xlsx_file, &account_id) {
+        println!("\n📖 Parsing {} (account: {})", xlsx_path, account_id);
+
+        match parser.parse_file(xlsx_path, account_id) {
             Ok(txns) => {
                 println!("  ✓ Found {} transactions", txns.len());
                 all_txns.extend(txns);
@@ -86,66 +91,48 @@ fn main() -> Result<()> {
     }
 
     if all_txns.is_empty() {
-        eprintln!("❌ No transactions found in either file!");
+        eprintln!("❌ No transactions found in any file!");
         return Ok(());
     }
 
-    // Create accounts
-    let accounts = parser.create_accounts();
+    // Accounts to insert
+    let all_accounts = parser.create_accounts();
     let system_accounts = utils::create_system_accounts();
 
-    // Read database.json (automatically initializes if missing or invalid)
-    println!("📖 Reading database from: {}", database_path);
+    println!("\n📖 Reading database from: {}", database_path);
     let template = utils::read_database(database_path)?;
 
-    // Merge system accounts first (EXTERNAL_PAYER, EXTERNAL_PAYEE, etc.)
-    let (template_with_sys_accounts, sys_account_stats) = 
-        skandinaviska_enskilda_banken::merge_accounts_into_template(template, system_accounts)?;
+    // Merge system accounts first
+    let (template_with_sys, sys_stats) = seb::merge_accounts_into_template(template, system_accounts)?;
 
-    // Then merge parser-specific accounts
-    let (template_with_accounts, account_stats) = 
-        skandinaviska_enskilda_banken::merge_accounts_into_template(template_with_sys_accounts, accounts)?;
+    // Then merge SEB accounts
+    let (template_with_accounts, acc_stats) = seb::merge_accounts_into_template(template_with_sys, all_accounts)?;
 
-    // Finally merge transactions with duplicate detection
-    let (merged, txn_stats) = 
-        skandinaviska_enskilda_banken::merge_transactions_into_template(template_with_accounts, all_txns)?;
+    // Then merge transactions (dedupe by txn_id)
+    let (merged, txn_stats) = seb::merge_transactions_into_template(template_with_accounts, all_txns)?;
 
-    // Write to output path (defaults to database path)
     let final_output_path = output_path.unwrap_or(database_path);
     let written_path = utils::write_database(final_output_path, &merged)?;
 
     println!("\n📊 Summary:");
     println!("─────────────────────────────────────────");
-    println!("✓ Processed {} system accounts: {} added, {} skipped (already exist)",
-        sys_account_stats.total,
-        sys_account_stats.added,
-        sys_account_stats.skipped
+    println!("✓ Processed {} system accounts: {} added, {} skipped",
+        sys_stats.total, sys_stats.added, sys_stats.skipped
     );
-    println!("✓ Processed {} accounts: {} added, {} skipped (already exist)",
-        account_stats.total,
-        account_stats.added,
-        account_stats.skipped
+    println!("✓ Processed {} accounts: {} added, {} skipped",
+        acc_stats.total, acc_stats.added, acc_stats.skipped
     );
-    println!("✓ Processed {} transactions: {} added, {} skipped (duplicates)", 
-        txn_stats.total,
-        txn_stats.added,
-        txn_stats.skipped
+    println!("✓ Processed {} transactions: {} added, {} skipped (duplicates)",
+        txn_stats.total, txn_stats.added, txn_stats.skipped
     );
     println!("✓ Total accounts in database: {}",
-        merged.get("accounts")
-            .and_then(|a| a.as_array())
-            .map(|a| a.len())
-            .unwrap_or(0)
-    );    
-    println!("✓ Total transactions in database: {}", 
-        merged.get("transactions")
-            .and_then(|t| t.as_array())
-            .map(|a| a.len())
-            .unwrap_or(0)
+        merged.get("accounts").and_then(|a| a.as_array()).map(|a| a.len()).unwrap_or(0)
+    );
+    println!("✓ Total transactions in database: {}",
+        merged.get("transactions").and_then(|t| t.as_array()).map(|a| a.len()).unwrap_or(0)
     );
     println!("─────────────────────────────────────────");
     println!("✅ Database written to: {}", written_path.display());
-    
+
     Ok(())
 }
-

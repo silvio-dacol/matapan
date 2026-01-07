@@ -7,9 +7,19 @@ use std::path::Path;
 
 pub const PARSER_NAME: &str = "skandinaviska_enskilda_banken";
 
+#[derive(Clone, Debug)]
+struct SebMeta {
+    // Normalized digits-only, e.g. "50200105205"
+    account_number_digits: Option<String>,
+}
+
 pub struct SebXlsxParser {
     pub account_id_checking: String,
     pub account_id_savings: String,
+
+    // Optional, but helps internal transfer mapping
+    pub checking_account_number_digits: Option<String>,
+    pub savings_account_number_digits: Option<String>,
 }
 
 impl SebXlsxParser {
@@ -17,13 +27,23 @@ impl SebXlsxParser {
         Self {
             account_id_checking: checking_account_id.into(),
             account_id_savings: savings_account_id.into(),
+            checking_account_number_digits: None,
+            savings_account_number_digits: None,
         }
     }
 
-    /// Creates account entries for the SEB accounts used by this parser.
-    /// Returns a vector with the checking account and savings account.
-    /// Note: Some fields (like IBAN, BIC, account_number, owner, etc.)
-    /// cannot be determined from Excel files and are left as null for manual completion.
+    /// If you know the account numbers (digits-only) you can set them and improve internal transfer detection.
+    /// Example digits-only: "50200105205", "50371807786"
+    pub fn with_account_numbers(
+        mut self,
+        checking_digits: Option<String>,
+        savings_digits: Option<String>,
+    ) -> Self {
+        self.checking_account_number_digits = checking_digits;
+        self.savings_account_number_digits = savings_digits;
+        self
+    }
+
     pub fn create_accounts(&self) -> Vec<Value> {
         vec![
             json!({
@@ -57,17 +77,16 @@ impl SebXlsxParser {
                 "closed_date": null,
                 "is_active": true,
                 "notes": "SEB savings account - some fields need manual completion"
-            })
+            }),
         ]
     }
 
-    /// Parse a single Excel file and return transactions
-    /// account_id: which account these transactions belong to
+    /// Parse a single Excel file and return transactions.
+    /// Pass `account_id` as either checking or savings id.
     pub fn parse_file<P: AsRef<Path>>(&self, path: P, account_id: &str) -> Result<Vec<Value>> {
         let mut workbook: Xlsx<_> = open_workbook(path.as_ref())
             .with_context(|| format!("Failed to open Excel file: {}", path.as_ref().display()))?;
 
-        // Get the first worksheet
         let sheet_name = workbook
             .sheet_names()
             .first()
@@ -78,63 +97,52 @@ impl SebXlsxParser {
             .worksheet_range(&sheet_name)
             .context("Failed to read worksheet range")?;
 
-        let mut transactions = Vec::new();
-
-        // Assuming Excel format has headers in first row
-        // Expected columns: Date, Description, Amount, Balance (or similar)
-        // We'll need to detect the actual format from the first few rows
-        
-        let rows: Vec<_> = range.rows().collect();
+        let rows: Vec<&[Data]> = range.rows().collect();
         if rows.is_empty() {
-            return Ok(transactions);
+            return Ok(vec![]);
         }
 
-        // Try to find header row and column indices
-        let (header_row_idx, col_date, col_description, col_amount, _col_balance, col_currency) = 
-            find_columns(&rows)?;
+        // Grab account number from the preamble (helps transfer mapping)
+        let file_meta = extract_meta(&rows);
 
-        // Process data rows (skip header)
+        // Find header and columns
+        let (header_row_idx, col_date, col_description, col_amount, col_currency) = find_columns(&rows)?;
+
+        let mut out = Vec::new();
+
         for (idx, row) in rows.iter().enumerate().skip(header_row_idx + 1) {
-            // Skip empty rows
-            if row.is_empty() || row.iter().all(|cell| matches!(cell, Data::Empty)) {
+            if row.is_empty() || row.iter().all(|c| matches!(c, Data::Empty)) {
                 continue;
             }
 
-            // Extract fields
-            let date = parse_date_cell(&row, col_date)
+            let date = parse_date_cell(row, col_date)
                 .with_context(|| format!("Failed to parse date at row {}", idx + 1))?;
 
-            let description = get_string_cell(&row, col_description)
-                .unwrap_or_else(|| "".to_string());
+            let description = get_string_cell(row, col_description).unwrap_or_default();
 
-            let amount = parse_amount_cell(&row, col_amount)
+            let amount = parse_amount_cell(row, col_amount)
                 .with_context(|| format!("Failed to parse amount at row {}", idx + 1))?;
 
-            // Currency might be in a separate column or part of the amount cell
-            let currency = if let Some(curr_col) = col_currency {
-                get_string_cell(&row, curr_col).unwrap_or_else(|| "SEK".to_string())
+            let currency = if let Some(c) = col_currency {
+                get_string_cell(row, c).unwrap_or_else(|| "SEK".to_string())
             } else {
                 "SEK".to_string()
             };
 
-            // Determine transaction type and accounts
             let txn_type = infer_type(amount, &description);
+
             let (from_account_id, to_account_id) = determine_accounts(
                 account_id,
                 &txn_type,
                 amount,
                 &description,
+                &file_meta,
+                self,
             );
 
-            let txn_id = make_txn_id(
-                account_id,
-                date,
-                amount,
-                &currency,
-                &description,
-                idx + 1,
-            );
+            let txn_id = make_txn_id(account_id, date, amount, &currency, &description, idx + 1);
 
+            // Important: keep amount positive in the final JSON, direction is encoded by from/to.
             let txn = json!({
                 "date": date.format("%Y-%m-%d").to_string(),
                 "from_account_id": from_account_id,
@@ -147,65 +155,67 @@ impl SebXlsxParser {
                 "txn_id": txn_id
             });
 
-            transactions.push(txn);
+            out.push(txn);
         }
 
-        Ok(transactions)
+        Ok(out)
     }
 }
 
-/// Try to find column indices for expected fields
-/// Returns: (header_row_idx, date_col, description_col, amount_col, balance_col, currency_col)
-fn find_columns(rows: &[&[Data]]) -> Result<(usize, usize, usize, usize, Option<usize>, Option<usize>)> {
-    // Try to find header row (usually first few rows)
-    for (row_idx, row) in rows.iter().enumerate().take(20) {
-        let headers: Vec<String> = row.iter()
-            .map(|cell| cell.to_string().to_lowercase())
-            .collect();
+/// Returns (header_row_idx, date_col, description_col, amount_col, currency_col)
+fn find_columns(rows: &[&[Data]]) -> Result<(usize, usize, usize, usize, Option<usize>)> {
+    for (row_idx, row) in rows.iter().enumerate().take(30) {
+        let headers: Vec<String> = row.iter().map(|c| c.to_string().to_lowercase()).collect();
 
-        // Look for date column - SEB specific patterns
-        let date_col = headers.iter().position(|h| 
-            h.contains("booking date") || h.contains("bokföringsdatum") ||
-            h.contains("date") || h.contains("datum")
-        );
+        let date_col = headers.iter().position(|h| {
+            h.contains("booking date") || h.contains("bokföringsdatum") || h == "date" || h == "datum"
+        });
 
-        // Look for description column - SEB specific patterns
-        let desc_col = headers.iter().position(|h| 
-            h.contains("text") || h.contains("description") || 
-            h.contains("beskrivning") || h.contains("transaktion")
-        );
+        let desc_col = headers.iter().position(|h| {
+            h == "text" || h.contains("description") || h.contains("beskrivning") || h.contains("transaktion")
+        });
 
-        // Look for amount column - SEB specific patterns
-        let amount_col = headers.iter().position(|h| 
-            (h.contains("amount") || h.contains("belopp") || h.contains("summa")) &&
-            !h.contains("balance") && !h.contains("saldo")
-        );
+        let amount_col = headers.iter().position(|h| {
+            (h == "amount" || h.contains("belopp") || h.contains("summa"))
+                && !h.contains("balance")
+                && !h.contains("saldo")
+        });
 
-        // Look for balance column (optional)
-        let balance_col = headers.iter().position(|h| 
-            h.contains("balance") || h.contains("saldo")
-        );
+        let currency_col = headers
+            .iter()
+            .position(|h| h.contains("currency") || h.contains("valuta"));
 
-        // Look for currency column (optional)
-        let currency_col = headers.iter().position(|h| 
-            h.contains("currency") || h.contains("valuta")
-        );
-
-        if let (Some(date), Some(desc), Some(amt)) = (date_col, desc_col, amount_col) {
-            return Ok((row_idx, date, desc, amt, balance_col, currency_col));
-        }
-    }
-
-    // If no header found, assume standard layout: Date(0), Description(1), Amount(2), Balance(3)
-    if rows.len() > 1 {
-        // Verify this looks like data by checking if we can parse amounts
-        let test_row = rows[1];
-        if test_row.len() >= 3 {
-            return Ok((0, 0, 1, 2, Some(3), None));
+        if let (Some(d), Some(t), Some(a)) = (date_col, desc_col, amount_col) {
+            return Ok((row_idx, d, t, a, currency_col));
         }
     }
 
     Err(anyhow!("Could not determine column layout from Excel file"))
+}
+
+fn extract_meta(rows: &[&[Data]]) -> SebMeta {
+    // SEB line example:
+    // "Privatkonto (5020 01 052 05)"
+    // "Enkla sparkontot (5037 18 077 86)"
+    for row in rows.iter().take(20) {
+        for cell in row.iter() {
+            let s = cell.to_string();
+            if s.contains('(') && s.contains(')') {
+                if let Some(inner) = s.split('(').nth(1).and_then(|x| x.split(')').next()) {
+                    let digits: String = inner.chars().filter(|c| c.is_ascii_digit()).collect();
+                    if digits.len() >= 8 {
+                        return SebMeta {
+                            account_number_digits: Some(digits),
+                        };
+                    }
+                }
+            }
+        }
+    }
+
+    SebMeta {
+        account_number_digits: None,
+    }
 }
 
 fn parse_date_cell(row: &[Data], col: usize) -> Result<NaiveDate> {
@@ -214,38 +224,34 @@ fn parse_date_cell(row: &[Data], col: usize) -> Result<NaiveDate> {
     }
 
     match &row[col] {
+        Data::String(s) => parse_date_string(s),
         Data::DateTime(dt) => {
-            // calamine DateTime is days since 1899-12-30
-            let base = NaiveDate::from_ymd_opt(1899, 12, 30)
-                .ok_or_else(|| anyhow!("Invalid base date"))?;
+            // Excel serial date
+            let base = NaiveDate::from_ymd_opt(1899, 12, 30).ok_or_else(|| anyhow!("Invalid base date"))?;
             let days = dt.as_f64().floor() as i64;
             base.checked_add_signed(chrono::Duration::days(days))
                 .ok_or_else(|| anyhow!("Date calculation overflow"))
         }
-        Data::DateTimeIso(s) | Data::DurationIso(s) => parse_date_string(s),
-        Data::String(s) => parse_date_string(s),
         Data::Float(f) => {
-            // Sometimes dates are stored as float (Excel serial date)
-            let base = NaiveDate::from_ymd_opt(1899, 12, 30)
-                .ok_or_else(|| anyhow!("Invalid base date"))?;
+            let base = NaiveDate::from_ymd_opt(1899, 12, 30).ok_or_else(|| anyhow!("Invalid base date"))?;
             let days = f.floor() as i64;
             base.checked_add_signed(chrono::Duration::days(days))
                 .ok_or_else(|| anyhow!("Date calculation overflow"))
         }
         Data::Int(i) => {
-            let base = NaiveDate::from_ymd_opt(1899, 12, 30)
-                .ok_or_else(|| anyhow!("Invalid base date"))?;
+            let base = NaiveDate::from_ymd_opt(1899, 12, 30).ok_or_else(|| anyhow!("Invalid base date"))?;
             base.checked_add_signed(chrono::Duration::days(*i))
                 .ok_or_else(|| anyhow!("Date calculation overflow"))
         }
+        Data::DateTimeIso(s) | Data::DurationIso(s) => parse_date_string(s),
         _ => Err(anyhow!("Unsupported date cell type: {:?}", row[col])),
     }
 }
 
 fn parse_date_string(s: &str) -> Result<NaiveDate> {
-    // Try common date formats
-    let formats = vec![
+    let formats = [
         "%Y-%m-%d",
+        "%Y-%m-%d %H:%M:%S",
         "%d/%m/%Y",
         "%d.%m.%Y",
         "%Y/%m/%d",
@@ -254,8 +260,8 @@ fn parse_date_string(s: &str) -> Result<NaiveDate> {
     ];
 
     for fmt in formats {
-        if let Ok(date) = NaiveDate::parse_from_str(s, fmt) {
-            return Ok(date);
+        if let Ok(d) = NaiveDate::parse_from_str(s, fmt) {
+            return Ok(d);
         }
     }
 
@@ -268,12 +274,12 @@ fn get_string_cell(row: &[Data], col: usize) -> Option<String> {
     }
 
     match &row[col] {
-        Data::String(s) => Some(s.clone()),
+        Data::String(s) => Some(s.trim().to_string()),
         Data::Float(f) => Some(f.to_string()),
         Data::Int(i) => Some(i.to_string()),
         Data::Bool(b) => Some(b.to_string()),
         Data::Empty => None,
-        _ => Some(row[col].to_string()),
+        other => Some(other.to_string()),
     }
 }
 
@@ -286,34 +292,28 @@ fn parse_amount_cell(row: &[Data], col: usize) -> Result<f64> {
         Data::Float(f) => Ok(*f),
         Data::Int(i) => Ok(*i as f64),
         Data::String(s) => {
-            // Try to parse string as number, removing common formatting
             let cleaned = s
-                .replace(" ", "")
-                .replace("\u{A0}", "") // non-breaking space
-                .replace(",", ".");
-            
-            cleaned.parse::<f64>()
-                .with_context(|| format!("Failed to parse amount: {}", s))
+                .replace(' ', "")
+                .replace('\u{A0}', "")
+                .replace(',', ".");
+            cleaned.parse::<f64>().with_context(|| format!("Failed to parse amount: {}", s))
         }
         _ => Err(anyhow!("Unsupported amount cell type: {:?}", row[col])),
     }
 }
 
 fn infer_type(amount: f64, description: &str) -> String {
-    let desc_lower = description.to_lowercase();
+    let d = description.to_lowercase();
 
-    // Check for internal transfers
-    if desc_lower.contains("överföring") || desc_lower.contains("transfer") {
+    // SEB internal transfer words
+    if d.contains("överför") || d.contains("overfor") || d.contains("transfer") {
         return "internal_transfer".to_string();
     }
 
-    // Check for specific income patterns
-    if desc_lower.contains("lön") || desc_lower.contains("salary") || 
-       desc_lower.contains("income") || desc_lower.contains("inkomst") {
+    if d.contains("lön") || d.contains("salary") || d.contains("income") || d.contains("inkomst") {
         return "income".to_string();
     }
 
-    // Default based on amount sign
     if amount < 0.0 {
         "expense".to_string()
     } else {
@@ -321,36 +321,77 @@ fn infer_type(amount: f64, description: &str) -> String {
     }
 }
 
+fn normalize_digits(s: &str) -> String {
+    s.chars().filter(|c| c.is_ascii_digit()).collect()
+}
+
 fn determine_accounts(
-    account_id: &str,
+    this_account_id: &str,
     txn_type: &str,
     amount: f64,
-    _description: &str,
+    description: &str,
+    file_meta: &SebMeta,
+    parser: &SebXlsxParser,
 ) -> (String, String) {
     match txn_type {
         "internal_transfer" => {
-            // For internal transfers, we'd need more context
-            // For now, treat as transfer to/from unknown internal account
-            if amount < 0.0 {
-                (account_id.to_string(), "INTERNAL_DESTINATION".to_string())
+            // Best-effort: infer counterpart SEB account by scanning "Text" for the other account number.
+            let desc_digits = normalize_digits(description);
+
+            // Known digits (prefer explicitly configured, else use file meta)
+            let checking_digits = parser.checking_account_number_digits.clone();
+            let savings_digits = parser.savings_account_number_digits.clone();
+            let this_digits = file_meta.account_number_digits.clone();
+
+            let is_checking = this_account_id == parser.account_id_checking;
+            let is_savings = this_account_id == parser.account_id_savings;
+
+            let counterpart_id = if is_checking {
+                // if description contains savings account number -> savings
+                if let Some(sd) = savings_digits.as_deref() {
+                    if !sd.is_empty() && desc_digits.contains(sd) {
+                        Some(parser.account_id_savings.clone())
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            } else if is_savings {
+                // if description contains checking account number -> checking
+                if let Some(cd) = checking_digits.as_deref() {
+                    if !cd.is_empty() && desc_digits.contains(cd) {
+                        Some(parser.account_id_checking.clone())
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
             } else {
-                ("INTERNAL_SOURCE".to_string(), account_id.to_string())
+                None
+            }
+            .or_else(|| {
+                // fallback: if we know this file's account digits, and the description includes some digits,
+                // but doesn't include the "this" digits, we still can't reliably map. Keep generic.
+                let _ = this_digits;
+                None
+            })
+            .unwrap_or_else(|| "INTERNAL_UNKNOWN".to_string());
+
+            if amount < 0.0 {
+                (this_account_id.to_string(), counterpart_id)
+            } else {
+                (counterpart_id, this_account_id.to_string())
             }
         }
-        "expense" => {
-            // Money leaving the account
-            (account_id.to_string(), "EXTERNAL_PAYEE".to_string())
-        }
-        "income" => {
-            // Money coming into the account
-            ("EXTERNAL_PAYER".to_string(), account_id.to_string())
-        }
+        "expense" => (this_account_id.to_string(), "EXTERNAL_PAYEE".to_string()),
+        "income" => ("EXTERNAL_PAYER".to_string(), this_account_id.to_string()),
         _ => {
-            // Default case
             if amount < 0.0 {
-                (account_id.to_string(), "EXTERNAL_PAYEE".to_string())
+                (this_account_id.to_string(), "EXTERNAL_PAYEE".to_string())
             } else {
-                ("EXTERNAL_PAYER".to_string(), account_id.to_string())
+                ("EXTERNAL_PAYER".to_string(), this_account_id.to_string())
             }
         }
     }
@@ -359,7 +400,7 @@ fn determine_accounts(
 fn make_txn_id(
     account_id: &str,
     date: NaiveDate,
-    amount: f64,
+    signed_amount: f64,
     currency: &str,
     description: &str,
     row_index: usize,
@@ -368,7 +409,7 @@ fn make_txn_id(
         "{}|{}|{:.8}|{}|{}|{}",
         account_id,
         date.format("%Y-%m-%d"),
-        amount,
+        signed_amount,
         currency,
         description.trim(),
         row_index
@@ -381,12 +422,6 @@ fn make_txn_id(
     format!("SEB-{}", hex::encode(&hash[..12]))
 }
 
-/// Merges SEB transactions into an existing database.json Value.
-/// Assumes database.json has a top level "transactions": [] array.
-/// Automatically skips duplicate transactions based on txn_id.
-///
-/// # Returns
-/// * `Result<(Value, utils::transactions::MergeStats)>` - The merged database and merge statistics
 pub fn merge_transactions_into_template(
     template: Value,
     new_txns: Vec<Value>,
@@ -394,12 +429,6 @@ pub fn merge_transactions_into_template(
     utils::merge_transactions_with_deduplication(template, new_txns)
 }
 
-/// Merges SEB account entries into an existing database.json Value.
-/// Assumes database.json has a top level "accounts": [] array.
-/// Automatically skips duplicate accounts based on account_id.
-///
-/// # Returns
-/// * `Result<(Value, utils::accounts::MergeStats)>` - The merged database and merge statistics
 pub fn merge_accounts_into_template(
     template: Value,
     new_accounts: Vec<Value>,

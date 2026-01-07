@@ -3,11 +3,13 @@ name = "skandinaviska_enskilda_banken"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "seb"
+
 [dependencies]
 anyhow = "1"
-calamine = "0.28"
-chrono = "0.4"
-serde = { version = "1", features = ["derive"] }
+calamine = "0.32"
+chrono = { version = "0.4", features = ["serde"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 sha2 = "0.10"
 hex = "0.4"
