@@ -1,11 +1,13 @@
 # Transaction Rule Engine
 
-A flexible and scalable rule engine for automatically processing transactions in the Matapan financial application.
+A lean and efficient rule engine for automatically processing transactions in the Matapan financial application.
 
 ## Features
 
-- ✅ **Flexible Conditions**: Match on description, amount, date, account, category, type, currency
-- ✅ **Multiple Actions**: Set categories, tags, accounts, mark for review
+- ✅ **Description Matching**: Match transactions by description text (contains, equals, regex)
+- ✅ **Auto-Categorization**: Automatically set transaction categories
+- ✅ **Account Routing**: Auto-assign from/to accounts
+- ✅ **Type Classification**: Set transaction types (income/expense/transfer)
 - ✅ **Priority-based**: Rules execute in order based on priority
 - ✅ **AND/OR Logic**: Combine conditions with AND or OR operators
 - ✅ **RESTful API**: Full CRUD operations via HTTP endpoints
@@ -191,39 +193,12 @@ Apply all enabled rules to a batch of transactions.
 
 ## Condition Types
 
+All conditions are based on transaction descriptions to keep the engine lean and focused.
+
 ### Description Conditions
 - `description_contains`: Check if description contains text (case-insensitive)
-- `description_matches`: Match against regex pattern
+- `description_matches`: Match against regex pattern for complex patterns
 - `description_equals`: Exact match (case-insensitive)
-
-### Amount Conditions
-- `amount_greater_than`: Amount > value
-- `amount_less_than`: Amount < value
-- `amount_equals`: Amount == value (with 0.01 tolerance)
-- `amount_between`: min <= Amount <= max
-
-### Category Conditions
-- `category_equals`: Category matches exactly
-- `category_in`: Category is in list
-
-### Type Conditions
-- `type_equals`: Transaction type (income/expense/transfer)
-
-### Account Conditions
-- `from_account_equals`: Match source account
-- `to_account_equals`: Match destination account
-
-### Date Conditions
-- `date_before`: Date < value
-- `date_after`: Date > value
-- `date_between`: start <= Date <= end
-
-### Currency Conditions
-- `currency_equals`: Match currency code
-
-### Custom Field Conditions
-- `custom_field_contains`: Check custom field contains value
-- `custom_field_equals`: Check custom field equals value
 
 ## Action Types
 
@@ -255,10 +230,25 @@ Apply all enabled rules to a batch of transactions.
 ### Set Accounts
 ```json
 {
+Automatically categorize transactions based on their description.
+```json
+{
+  "type": "set_category",
+  "category": "housing"
+}
+```
+
+### Set From Account
+Set the source account for the transaction.
+```json
+{
   "type": "set_from_account",
   "account_id": "SEB_CHECKING"
 }
 ```
+
+### Set To Account
+Set the destination account for the transaction.
 ```json
 {
   "type": "set_to_account",
@@ -266,42 +256,8 @@ Apply all enabled rules to a batch of transactions.
 }
 ```
 
-### Mark for Review
-```json
-{
-  "type": "mark_for_review",
-  "reason": "Large expense"
-}
-```
-
 ### Set Type
-```json
-{
-  "type": "set_type",
-  "transaction_type": "expense"
-}
-```
-
-## Rule Examples
-
-### 1. Categorize Rent
-```json
-{
-  "rule_id": "rent-rule",
-  "name": "Categorize Rent",
-  "enabled": true,
-  "priority": 1,
-  "conditions": [
-    {
-      "type": "description_contains",
-      "value": "RENT"
-    }
-  ],
-  "condition_operator": "AND",
-  "actions": [
-    {
-      "type": "set_category",
-      "category": "housing"
+Set the transaction type (income, expense, or transfer).ory": "housing"
     }
   ]
 }
@@ -448,25 +404,32 @@ Apply all enabled rules to a batch of transactions.
 
 ## Best Practices
 
-1. **Priority Management**: Lower numbers execute first. Critical rules (e.g., salary) should have low priority numbers.
+1. **Priority Management**: Lower numbers execute first. Critical rules (e.g., salary, rent) should have low priority numbers.
 
-2. **Specific Before General**: Put specific rules (e.g., "APPLE COM/BI" for specific subscription) before general rules (e.g., "APPLE" for all Apple transactions).
+2. **Specific Before General**: Put specific rules before general rules. For example, "APPLE COM/BILL" for a specific subscription before "APPLE" for all Apple transactions.
 
 3. **Test Rules**: Always use `/api/rules/test` endpoint before creating rules to verify behavior.
 
-4. **Use OR for Variations**: When merchants appear with variations, use OR conditions:
+4. **Use OR for Merchant Variations**: When merchants appear with different spellings, use OR conditions:
    ```json
    "conditions": [
      {"type": "description_contains", "value": "FOODMARKET"},
      {"type": "description_contains", "value": "FOOD MARKET"},
-     {"type": "description_contains", "value": "FOODMRKT"}
+     {"type": "description_contains", "value": "ICA"}
    ],
    "condition_operator": "OR"
    ```
 
-5. **Review Flags**: Use `mark_for_review` for unusual patterns that need human verification.
+5. **Use Regex for Complex Patterns**: When you need to match multiple variations or complex patterns, use `description_matches` with regex:
+   ```json
+   "conditions": [
+     {"type": "description_matches", "pattern": "(NETFLIX|SPOTIFY|APPLE)"}
+   ]
+   ```
 
-6. **Incremental Implementation**: Start with high-volume, easy-to-categorize transactions (rent, salary, subscriptions), then expand.
+6. **Combine Multiple Actions**: You can set category, type, and accounts all in one rule for complete transaction automation.
+
+7. **Incremental Implementation**: Start with high-volume, easy-to-categorize transactions (rent, salary, groceries), then expand.
 
 ## Integration with Transaction Import
 
@@ -474,16 +437,7 @@ When importing transactions from bank statements, you can:
 
 1. Import raw transactions
 2. Apply all rules via `/api/rules/apply`
-3. Review flagged transactions
+3. Review auto-categorized transactions
 4. Save to database
 
 This ensures consistent categorization across all transactions.
-
-## Future Enhancements
-
-- [ ] Rule templates library
-- [ ] Machine learning suggestions for new rules
-- [ ] Rule effectiveness analytics
-- [ ] Scheduled rule application
-- [ ] Rule conflicts detection
-- [ ] Import/export rule sets

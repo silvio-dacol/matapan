@@ -1,4 +1,4 @@
-use backend_api::{run_server, FileRuleRepository};
+use api::{run_server, FileRuleRepository};
 use std::sync::Arc;
 use std::{env, path::PathBuf};
 
