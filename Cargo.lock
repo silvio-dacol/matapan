@@ -47,6 +47,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "axum",
+ "rules",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
@@ -55,7 +56,6 @@ dependencies = [
  "tower-http",
  "tracing",
  "tracing-subscriber",
- "utils",
 ]
 
 [[package]]
@@ -890,6 +890,16 @@ dependencies = [
  "serde_json",
  "sha2",
  "utils",
+]
+
+[[package]]
+name = "rules"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "regex",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

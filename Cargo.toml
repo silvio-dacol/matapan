@@ -13,6 +13,7 @@ members = [
     "crates/logger",
     "crates/ai",
     "crates/utils", "crates/data/bank_statement_parsers/carpay",
+    "crates/rules",
 ]
 
 resolver = "3"
