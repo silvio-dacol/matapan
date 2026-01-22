@@ -8,5 +8,6 @@ pub use crate::accounts::{
 };
 pub use crate::database::{ensure_database_exists, read_database, write_database};
 pub use crate::transactions::{
-    find_duplicate_txn_ids, merge_transactions_with_deduplication, MergeStats,
+    find_duplicate_txn_ids, merge_transactions_with_deduplication, dedup_transactions_by_signature,
+    mark_duplicates_by_signature, MergeStats,
 };

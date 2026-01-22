@@ -5,6 +5,7 @@ use serde_json::{Map, Value};
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use utils::dedup_transactions_by_signature;
 use utils::{read_database, write_database};
 
 /// Simple rules runner for transactions in database.json.
@@ -54,41 +55,52 @@ fn main() -> Result<()> {
         builtin_rules()
     });
 
-    let txns = db
-        .get_mut("transactions")
-        .and_then(|v| v.as_array_mut())
-        .ok_or_else(|| anyhow::anyhow!("database.json missing 'transactions' array"))?;
+    let (txn_count, matched, changed) = {
+        let txns = db
+            .get_mut("transactions")
+            .and_then(|v| v.as_array_mut())
+            .ok_or_else(|| anyhow::anyhow!("database.json missing 'transactions' array"))?;
 
-    let mut matched = 0usize;
-    let mut changed = 0usize;
+        let mut matched = 0usize;
+        let mut changed = 0usize;
 
-    for txn in txns.iter_mut() {
-        if let Some(obj) = txn.as_object_mut() {
-            let before = obj.clone();
-            let mut applied_any = false;
+        for txn in txns.iter_mut() {
+            if let Some(obj) = txn.as_object_mut() {
+                let before = obj.clone();
+                let mut applied_any = false;
 
-            for rule in &rules.rules {
-                if matches(obj, &rule.when) {
-                    matched += 1;
-                    // Apply set operations
-                    for (k, v) in &rule.set {
-                        obj.insert(k.clone(), v.clone());
+                for rule in &rules.rules {
+                    if matches(obj, &rule.when) {
+                        matched += 1;
+                        // Apply set operations
+                        for (k, v) in &rule.set {
+                            obj.insert(k.clone(), v.clone());
+                        }
+                        applied_any = true;
                     }
-                    applied_any = true;
+                }
+
+                if applied_any && &before != obj {
+                    changed += 1;
                 }
             }
-
-            if applied_any && &before != obj {
-                changed += 1;
-            }
         }
+
+        (txns.len(), matched, changed)
+    };
+
+    // After rules application, run a conservative deduplication pass.
+    let removed = dedup_transactions_by_signature(&mut db)?;
+    if removed > 0 {
+        println!(
+            "Dedup: removed {} duplicate transactions by signature.",
+            removed
+        );
     }
 
     println!(
         "Processed {} transactions. Rules matched: {}, changed: {}.",
-        txns.len(),
-        matched,
-        changed
+        txn_count, matched, changed
     );
 
     if args.write {
