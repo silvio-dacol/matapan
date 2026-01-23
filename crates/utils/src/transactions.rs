@@ -31,6 +31,11 @@ pub fn merge_transactions_with_deduplication(
         .and_then(|v| v.as_array_mut())
         .ok_or_else(|| anyhow!("database.json missing 'transactions' array"))?;
 
+    // Ensure existing transactions have standard fields and correct ordering
+    for txn in arr.iter_mut() {
+        ensure_description_en_position(txn);
+    }
+
     // Build a set of existing transaction IDs
     let existing_ids: HashSet<String> = arr
         .iter()
@@ -48,7 +53,7 @@ pub fn merge_transactions_with_deduplication(
     };
 
     // Only add transactions that don't already exist
-    for txn in new_txns {
+    for mut txn in new_txns {
         let txn_id = txn
             .get("txn_id")
             .and_then(|id| id.as_str())
@@ -57,6 +62,8 @@ pub fn merge_transactions_with_deduplication(
         if existing_ids.contains(txn_id) {
             stats.skipped += 1;
         } else {
+            // Add standard fields and ordering before storing
+            ensure_description_en_position(&mut txn);
             arr.push(txn);
             stats.added += 1;
         }
@@ -167,6 +174,43 @@ pub fn mark_duplicates_by_signature(database: &mut Value) -> Result<usize> {
     Ok(marked)
 }
 
+/// Ensure a transaction contains "description-en" and place it right after "description".
+fn ensure_description_en_position(txn: &mut Value) {
+    let Some(obj) = txn.as_object_mut() else {
+        return;
+    };
+
+    // Determine the value for description-en (preserve existing if present), default ""
+    let desc_en_value = obj
+        .get("description-en")
+        .and_then(|v| v.as_str())
+        .map(|s| Value::String(s.to_string()))
+        .unwrap_or_else(|| Value::String(String::new()));
+
+    let mut new_obj = serde_json::Map::with_capacity(obj.len() + 1);
+    let mut inserted_desc_en = false;
+
+    for (k, v) in obj.iter() {
+        if k == "description-en" {
+            // Skip for now; we'll insert after description or at end
+            continue;
+        }
+
+        new_obj.insert(k.clone(), v.clone());
+
+        if k == "description" {
+            new_obj.insert("description-en".to_string(), desc_en_value.clone());
+            inserted_desc_en = true;
+        }
+    }
+
+    if !inserted_desc_en {
+        new_obj.insert("description-en".to_string(), desc_en_value);
+    }
+
+    *obj = new_obj;
+}
+
 /// Finds and returns a list of transaction IDs that already exist in the database.
 /// This can be useful for reporting which transactions were duplicates.
 ///
@@ -226,6 +270,56 @@ mod tests {
 
         let txns = merged.get("transactions").unwrap().as_array().unwrap();
         assert_eq!(txns.len(), 3);
+        // Ensure description-en is present on all
+        for t in txns {
+            assert!(t.get("description-en").is_some());
+            assert_eq!(t.get("description-en").unwrap().as_str().unwrap(), "");
+        }
+    }
+
+    #[test]
+    fn test_description_en_positioning() {
+        let database = json!({
+            "transactions": [
+                {
+                    "date": "2025-01-01",
+                    "from_account_id": "A",
+                    "to_account_id": "B",
+                    "type": "expense",
+                    "category": "uncategorized",
+                    "amount": 10.0,
+                    "currency": "SEK",
+                    "description": "Foo",
+                    "txn_id": "X1"
+                }
+            ]
+        });
+
+        let new_txns = vec![json!({
+            "date": "2025-01-02",
+            "from_account_id": "A",
+            "to_account_id": "B",
+            "type": "expense",
+            "category": "uncategorized",
+            "amount": 20.0,
+            "currency": "SEK",
+            "description": "Bar",
+            "txn_id": "X2"
+        })];
+
+        let (merged, _stats) = merge_transactions_with_deduplication(database, new_txns).unwrap();
+        let txns = merged.get("transactions").unwrap().as_array().unwrap();
+
+        for t in txns {
+            let obj = t.as_object().unwrap();
+            // Only check adjacency when description is present
+            if obj.get("description").is_some() {
+                let keys: Vec<String> = obj.keys().cloned().collect();
+                let desc_idx = keys.iter().position(|k| k == "description").unwrap();
+                let desc_en_idx = keys.iter().position(|k| k == "description-en").unwrap();
+                assert_eq!(desc_idx + 1, desc_en_idx);
+            }
+        }
     }
 
     #[test]
