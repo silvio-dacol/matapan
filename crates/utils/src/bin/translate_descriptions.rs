@@ -116,8 +116,14 @@ fn main() -> Result<()> {
         let result = if let Some(r) = cache.get(desc) {
             r
         } else {
-            let r = classify_and_translate(&client, desc)
-                .with_context(|| format!("Failed to classify/translate description: '{desc}'"))?;
+            let r = if requires_translation_due_to_script(desc) {
+                translate_always(&client, desc)
+                    .with_context(|| format!("Failed to translate (non-Latin script): '{desc}'"))?
+            } else {
+                classify_and_translate(&client, desc).with_context(|| {
+                    format!("Failed to classify/translate description: '{desc}'")
+                })?
+            };
             cache.insert(desc.clone(), r);
             cache.get(desc).expect("just inserted")
         };
@@ -221,6 +227,91 @@ Output: {"is_english_or_name": false, "translation_en": "Refund"}
         .with_context(|| format!("Model did not return valid JSON. Raw: {raw}"))?;
 
     Ok(parsed)
+}
+
+fn translate_always(client: &OllamaClient, description: &str) -> Result<ClassificationResponse> {
+    let system_prompt = r#"You are a strict JSON-only translator for bank transaction descriptions.
+
+Task:
+- Translate the input text to concise English.
+- Always translate (even if it looks like a proper name / merchant name) when the input contains non-Latin scripts.
+
+Rules:
+- Preserve IDs, card masks, dates, amounts, currency symbols, and reference codes exactly.
+- Do NOT add commentary.
+- Output MUST be valid JSON with exactly these keys: is_english_or_name (boolean), translation_en (string).
+- is_english_or_name MUST be false.
+"#;
+
+    let raw = client.chat(system_prompt, description)?;
+
+    let parsed: ClassificationResponse = serde_json::from_str(&raw)
+        .with_context(|| format!("Model did not return valid JSON. Raw: {raw}"))?;
+
+    if parsed.is_english_or_name {
+        return Err(anyhow!(
+            "Model returned is_english_or_name=true but translation was required"
+        ));
+    }
+
+    Ok(parsed)
+}
+
+/// Returns true if the text contains characters from scripts that are clearly not the English/Latin alphabet.
+///
+/// This is intentionally conservative: it targets common non-Latin scripts seen in bank exports
+/// (CJK, Cyrillic, Greek, Hangul, etc.). If present, we always translate to English.
+fn requires_translation_due_to_script(s: &str) -> bool {
+    s.chars().any(is_non_latin_script_char)
+}
+
+fn is_non_latin_script_char(ch: char) -> bool {
+    let u = ch as u32;
+
+    // CJK Unified Ideographs + extensions (common Chinese)
+    if (0x4E00..=0x9FFF).contains(&u)
+        || (0x3400..=0x4DBF).contains(&u)
+        || (0x20000..=0x2A6DF).contains(&u)
+        || (0x2A700..=0x2B73F).contains(&u)
+        || (0x2B740..=0x2B81F).contains(&u)
+        || (0x2B820..=0x2CEAF).contains(&u)
+        || (0x2CEB0..=0x2EBEF).contains(&u)
+    {
+        return true;
+    }
+
+    // Japanese
+    if (0x3040..=0x309F).contains(&u) // Hiragana
+        || (0x30A0..=0x30FF).contains(&u) // Katakana
+        || (0x31F0..=0x31FF).contains(&u)
+    // Katakana Phonetic Extensions
+    {
+        return true;
+    }
+
+    // Korean
+    if (0xAC00..=0xD7AF).contains(&u) // Hangul Syllables
+        || (0x1100..=0x11FF).contains(&u) // Hangul Jamo
+        || (0x3130..=0x318F).contains(&u)
+    // Hangul Compatibility Jamo
+    {
+        return true;
+    }
+
+    // Cyrillic (Russian, etc.)
+    if (0x0400..=0x052F).contains(&u)
+        || (0x2DE0..=0x2DFF).contains(&u)
+        || (0xA640..=0xA69F).contains(&u)
+    {
+        return true;
+    }
+
+    // Greek
+    if (0x0370..=0x03FF).contains(&u) || (0x1F00..=0x1FFF).contains(&u) {
+        return true;
+    }
+
+    false
 }
 
 fn set_description_en_preserving_order(obj: &mut Map<String, Value>, translated: String) {

@@ -18,11 +18,11 @@ pub struct OllamaClientConfig {
 impl OllamaClientConfig {
     /// Loads config from env vars:
     /// - `OLLAMA_BASE_URL` (default: `http://localhost:11434`)
-    /// - `OLLAMA_MODEL`    (default: `llama3.2`)
+    /// - `OLLAMA_MODEL`    (default: `qwen2.5:7b`)
     pub fn from_env() -> Self {
         let base_url = std::env::var("OLLAMA_BASE_URL")
             .unwrap_or_else(|_| "http://localhost:11434".to_string());
-        let model = std::env::var("OLLAMA_MODEL").unwrap_or_else(|_| "llama3.2".to_string());
+        let model = std::env::var("OLLAMA_MODEL").unwrap_or_else(|_| "qwen2.5:7b".to_string());
         Self { base_url, model }
     }
 }
