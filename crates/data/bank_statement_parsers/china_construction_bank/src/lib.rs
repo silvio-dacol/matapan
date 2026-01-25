@@ -184,9 +184,7 @@ impl CcbXlsParser {
     }
 }
 
-fn find_header_row_ccb(
-    range: &calamine::Range<Data>,
-) -> Result<(usize, HashMap<String, usize>)> {
+fn find_header_row_ccb(range: &calamine::Range<Data>) -> Result<(usize, HashMap<String, usize>)> {
     for (r_idx, row) in range.rows().enumerate() {
         let first = cell_str(row.get(0)).trim().to_string();
         if first == "序号" {
