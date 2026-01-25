@@ -1,6 +1,15 @@
 [package]
 name = "alipay"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 
 [dependencies]
+anyhow = "1"
+csv = "1"
+chrono = "0.4"
+serde_json = { version = "1", features = ["preserve_order"] }
+sha2 = "0.10"
+hex = "0.4"
+encoding_rs = "0.8"
+html-escape = "0.2"
+utils = { path = "../../../utils" }

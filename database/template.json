@@ -1,7 +1,7 @@
 {
   "engine_version": "0.1",
   "user_profile": {
-    "user_id": "silvio",
+    "user_id": "example_user",
     "home_country": "IT",
     "residence_country": "SE",
     "tax_residency": "SE",
@@ -43,7 +43,7 @@
     {
       "instrument_id": "VWCE",
       "type": "etf",
-      "name": "Vanguard FTSE All-World UCITS ETF",
+      "name": "Global equity ETF (example)",
       "currency": "EUR",
       "asset_class": "equity",
       "isin": "IE00BK5BQT80"
@@ -51,7 +51,7 @@
     {
       "instrument_id": "TSLA",
       "type": "stock",
-      "name": "Tesla Inc",
+      "name": "Example tech stock",
       "currency": "USD",
       "asset_class": "equity",
       "ticker": "TSLA"
@@ -59,21 +59,21 @@
     {
       "instrument_id": "SE_PENSION_FUND",
       "type": "fund",
-      "name": "AP7 Såfa",
+      "name": "Example pension fund",
       "currency": "SEK",
       "asset_class": "pension"
     },
     {
       "instrument_id": "MORTGAGE_SEK",
       "type": "loan",
-      "name": "Mortgage on apartment in Gothenburg",
+      "name": "Mortgage loan (example)",
       "currency": "SEK",
       "asset_class": "liability"
     },
     {
       "instrument_id": "CC_SEK",
       "type": "credit_card",
-      "name": "Swedish credit card",
+      "name": "Credit card (example)",
       "currency": "SEK",
       "asset_class": "liability"
     }
@@ -81,52 +81,132 @@
 
   "accounts": [
     {
+      "account_id": "EXTERNAL_PAYER",
+      "structural_type": "external",
+      "institution": "External",
+      "country": null,
+      "iban": null,
+      "bic": null,
+      "account_number": null,
+      "owner": "external",
+      "is_liability": false,
+      "supports_positions": false,
+      "opened_date": null,
+      "closed_date": null,
+      "is_active": true,
+      "notes": "System account representing external income sources"
+    },
+    {
+      "account_id": "EXTERNAL_PAYEE",
+      "structural_type": "external",
+      "institution": "External",
+      "country": null,
+      "iban": null,
+      "bic": null,
+      "account_number": null,
+      "owner": "external",
+      "is_liability": false,
+      "supports_positions": false,
+      "opened_date": null,
+      "closed_date": null,
+      "is_active": true,
+      "notes": "System account representing external expense destinations"
+    },
+    {
       "account_id": "SE_CHECKING",
-      "type": "bank_current",
-      "institution": "SEB",
+      "structural_type": "bank",
+      "institution": "Example Bank",
       "country": "SE",
-      "currency": "SEK",
-      "is_liability": false
+      "iban": null,
+      "bic": null,
+      "account_number": null,
+      "owner": "self",
+      "is_liability": false,
+      "supports_positions": false,
+      "opened_date": null,
+      "closed_date": null,
+      "is_active": true,
+      "notes": "Checking account - some fields need manual completion"
     },
     {
       "account_id": "SE_SAVINGS",
-      "type": "bank_savings",
-      "institution": "SEB",
+      "structural_type": "bank",
+      "institution": "Example Bank",
       "country": "SE",
-      "currency": "SEK",
-      "is_liability": false
+      "iban": null,
+      "bic": null,
+      "account_number": null,
+      "owner": "self",
+      "is_liability": false,
+      "supports_positions": false,
+      "opened_date": null,
+      "closed_date": null,
+      "is_active": true,
+      "notes": "Savings account - some fields need manual completion"
     },
     {
       "account_id": "IBKR_MARGIN",
-      "type": "brokerage_margin",
-      "institution": "IBKR",
+      "structural_type": "brokerage",
+      "institution": "Example Broker",
       "country": "US",
-      "currency": "EUR",
-      "is_liability": false
+      "iban": null,
+      "bic": null,
+      "account_number": null,
+      "owner": "self",
+      "is_liability": false,
+      "supports_positions": false,
+      "opened_date": null,
+      "closed_date": null,
+      "is_active": true,
+      "notes": "Brokerage account - some fields need manual completion"
     },
     {
       "account_id": "PENSION_SE",
-      "type": "pension",
-      "institution": "Pensionsmyndigheten",
+      "structural_type": "pension",
+      "institution": "Example Pension Provider",
       "country": "SE",
-      "currency": "SEK",
-      "is_liability": false
+      "iban": null,
+      "bic": null,
+      "account_number": null,
+      "owner": "self",
+      "is_liability": false,
+      "supports_positions": false,
+      "opened_date": null,
+      "closed_date": null,
+      "is_active": true,
+      "notes": "Pension account - some fields need manual completion"
     },
     {
       "account_id": "MORTGAGE_APT",
-      "type": "mortgage",
-      "institution": "Handelsbanken",
+      "structural_type": "loan",
+      "institution": "Example Lender",
       "country": "SE",
-      "currency": "SEK",
-      "is_liability": true
+      "iban": null,
+      "bic": null,
+      "account_number": null,
+      "owner": "self",
+      "is_liability": true,
+      "supports_positions": false,
+      "opened_date": null,
+      "closed_date": null,
+      "is_active": true,
+      "notes": "Mortgage/loan account - some fields need manual completion"
     },
     {
       "account_id": "CREDIT_CARD_SE",
-      "type": "credit_card",
-      "institution": "SEB",
+      "structural_type": "credit_card",
+      "institution": "Example Card Issuer",
       "country": "SE",
-      "currency": "SEK",
-      "is_liability": true
+      "iban": null,
+      "bic": null,
+      "account_number": null,
+      "owner": "self",
+      "is_liability": true,
+      "supports_positions": false,
+      "opened_date": null,
+      "closed_date": null,
+      "is_active": true,
+      "notes": "Credit card account - some fields need manual completion"
     }
   ],
 
@@ -213,273 +293,148 @@
 
   "transactions": [
     {
-      "txn_id": "2025-03-01-SALARY",
       "date": "2025-03-01",
-      "account_id": "SE_CHECKING",
+      "from_account_id": "EXTERNAL_PAYER",
+      "to_account_id": "SE_CHECKING",
       "type": "income",
-      "category": "salary_main_job",
+      "category": "uncategorized",
       "amount": 42000.0,
       "currency": "SEK",
-      "description": "Net salary Volvo Cars",
-      "tags": ["recurring", "employment"]
+      "description": "SALARY",
+      "description-en": "Salary",
+      "txn_id": "EXAMPLE-0001"
     },
     {
-      "txn_id": "2025-03-03-RENT",
       "date": "2025-03-03",
-      "account_id": "SE_CHECKING",
+      "from_account_id": "SE_CHECKING",
+      "to_account_id": "EXTERNAL_PAYEE",
       "type": "expense",
-      "category": "housing_rent",
-      "amount": -9000.0,
+      "category": "uncategorized",
+      "amount": 9000.0,
       "currency": "SEK",
-      "description": "Apartment rent",
-      "tags": ["recurring", "fixed_cost"]
+      "description": "RENT",
+      "description-en": "Rent",
+      "txn_id": "EXAMPLE-0002"
     },
     {
-      "txn_id": "2025-03-04-UTIL_ELEC",
       "date": "2025-03-04",
-      "account_id": "SE_CHECKING",
+      "from_account_id": "SE_CHECKING",
+      "to_account_id": "EXTERNAL_PAYEE",
       "type": "expense",
-      "category": "utilities_electricity",
-      "amount": -600.0,
+      "category": "uncategorized",
+      "amount": 600.0,
       "currency": "SEK",
-      "description": "Electricity bill",
-      "tags": ["utilities"]
+      "description": "ELECTRICITY",
+      "description-en": "Electricity",
+      "txn_id": "EXAMPLE-0003"
     },
     {
-      "txn_id": "2025-03-05-UTIL_INTERNET",
       "date": "2025-03-05",
-      "account_id": "SE_CHECKING",
+      "from_account_id": "SE_CHECKING",
+      "to_account_id": "EXTERNAL_PAYEE",
       "type": "expense",
-      "category": "utilities_internet",
-      "amount": -400.0,
+      "category": "uncategorized",
+      "amount": 400.0,
       "currency": "SEK",
-      "description": "Fiber internet",
-      "tags": ["utilities"]
+      "description": "INTERNET",
+      "description-en": "Internet",
+      "txn_id": "EXAMPLE-0004"
     },
     {
-      "txn_id": "2025-03-06-GROCERIES",
       "date": "2025-03-06",
-      "account_id": "CREDIT_CARD_SE",
+      "from_account_id": "CREDIT_CARD_SE",
+      "to_account_id": "EXTERNAL_PAYEE",
       "type": "expense",
-      "category": "food_groceries",
-      "amount": -1200.0,
+      "category": "uncategorized",
+      "amount": 1200.0,
       "currency": "SEK",
-      "description": "ICA groceries",
-      "tags": ["daily_expense"]
+      "description": "GROCERIES",
+      "description-en": "Groceries",
+      "txn_id": "EXAMPLE-0005"
     },
     {
-      "txn_id": "2025-03-07-CAFE",
       "date": "2025-03-07",
-      "account_id": "CREDIT_CARD_SE",
+      "from_account_id": "CREDIT_CARD_SE",
+      "to_account_id": "EXTERNAL_PAYEE",
       "type": "expense",
-      "category": "food_coffee",
-      "amount": -90.0,
+      "category": "uncategorized",
+      "amount": 90.0,
       "currency": "SEK",
-      "description": "Fika with friend",
-      "tags": ["daily_expense", "discretionary"]
+      "description": "CAFE",
+      "description-en": "Cafe",
+      "txn_id": "EXAMPLE-0006"
     },
     {
-      "txn_id": "2025-03-10-TRAM",
       "date": "2025-03-10",
-      "account_id": "CREDIT_CARD_SE",
+      "from_account_id": "CREDIT_CARD_SE",
+      "to_account_id": "EXTERNAL_PAYEE",
       "type": "expense",
-      "category": "transport_public",
-      "amount": -350.0,
+      "category": "uncategorized",
+      "amount": 350.0,
       "currency": "SEK",
-      "description": "Västtrafik monthly card",
-      "tags": ["transport"]
+      "description": "PUBLIC TRANSPORT",
+      "description-en": "Public transport",
+      "txn_id": "EXAMPLE-0007"
     },
     {
-      "txn_id": "2025-03-12-SUB_NETFLIX",
       "date": "2025-03-12",
-      "account_id": "SE_CHECKING",
+      "from_account_id": "SE_CHECKING",
+      "to_account_id": "EXTERNAL_PAYEE",
       "type": "expense",
-      "category": "entertainment_streaming",
-      "amount": -149.0,
+      "category": "uncategorized",
+      "amount": 149.0,
       "currency": "SEK",
-      "description": "Netflix subscription",
-      "tags": ["subscription"]
+      "description": "SUBSCRIPTION",
+      "description-en": "Subscription",
+      "txn_id": "EXAMPLE-0008"
     },
     {
-      "txn_id": "2025-03-15-EXTRA_INCOME_FREELANCE",
       "date": "2025-03-15",
-      "account_id": "SE_CHECKING",
+      "from_account_id": "EXTERNAL_PAYER",
+      "to_account_id": "SE_CHECKING",
       "type": "income",
-      "category": "freelance",
+      "category": "uncategorized",
       "amount": 3000.0,
       "currency": "SEK",
-      "description": "Consulting on diagnostics project",
-      "tags": ["side_income"]
+      "description": "EXTRA INCOME",
+      "description-en": "Extra income",
+      "txn_id": "EXAMPLE-0009"
     },
     {
-      "txn_id": "2025-03-18-TRANSFER_SAVINGS",
       "date": "2025-03-18",
-      "account_id": "SE_CHECKING",
-      "contra_account_id": "SE_SAVINGS",
+      "from_account_id": "SE_CHECKING",
+      "to_account_id": "SE_SAVINGS",
       "type": "internal_transfer",
-      "category": "saving",
-      "amount": -5000.0,
-      "currency": "SEK",
-      "description": "Monthly savings transfer"
-    },
-    {
-      "txn_id": "2025-03-18-TRANSFER_SAVINGS_IN",
-      "date": "2025-03-18",
-      "account_id": "SE_SAVINGS",
-      "contra_account_id": "SE_CHECKING",
-      "type": "internal_transfer",
-      "category": "saving",
+      "category": "uncategorized",
       "amount": 5000.0,
       "currency": "SEK",
-      "description": "Monthly savings transfer"
+      "description": "TRANSFER",
+      "description-en": "Transfer",
+      "txn_id": "EXAMPLE-0010"
     },
     {
-      "txn_id": "2025-03-20-BROKER_DEPOSIT",
-      "date": "2025-03-20",
-      "account_id": "SE_SAVINGS",
-      "contra_account_id": "IBKR_MARGIN",
-      "type": "internal_transfer",
-      "category": "investment_deposit",
-      "amount": -10000.0,
-      "currency": "SEK",
-      "description": "Deposit to IBKR"
-    },
-    {
-      "txn_id": "2025-03-21-BROKER_DEPOSIT_IN",
-      "date": "2025-03-21",
-      "account_id": "IBKR_MARGIN",
-      "contra_account_id": "SE_SAVINGS",
-      "type": "internal_transfer",
-      "category": "investment_deposit",
-      "amount": 880.0,
-      "currency": "EUR",
-      "fx_rate_to_reporting": 11.36,
-      "description": "Deposit from SE savings (SEK converted to EUR)"
-    },
-    {
-      "txn_id": "2025-03-22-BUY_VWCE",
-      "date": "2025-03-22",
-      "account_id": "IBKR_MARGIN",
-      "type": "trade",
-      "category": "investment_buy",
-      "instrument_id": "VWCE",
-      "quantity": 10.0,
-      "price_per_unit": 105.0,
-      "gross_amount": -1050.0,
-      "currency": "EUR",
-      "fees": -2.0,
-      "description": "Buy 10 VWCE",
-      "tags": ["investment"]
-    },
-    {
-      "txn_id": "2025-03-23-BUY_TSLA",
-      "date": "2025-03-23",
-      "account_id": "IBKR_MARGIN",
-      "type": "trade",
-      "category": "investment_buy",
-      "instrument_id": "TSLA",
-      "quantity": 2.0,
-      "price_per_unit": 190.0,
-      "gross_amount": -380.0,
-      "currency": "USD",
-      "fees": -1.0,
-      "description": "Buy 2 TSLA",
-      "tags": ["investment"]
-    },
-    {
-      "txn_id": "2025-03-25-CREDIT_CARD_PAYMENT",
       "date": "2025-03-25",
-      "account_id": "SE_CHECKING",
-      "contra_account_id": "CREDIT_CARD_SE",
+      "from_account_id": "SE_CHECKING",
+      "to_account_id": "CREDIT_CARD_SE",
       "type": "internal_transfer",
-      "category": "credit_card_payment",
-      "amount": -2500.0,
-      "currency": "SEK",
-      "description": "Pay credit card bill"
-    },
-    {
-      "txn_id": "2025-03-25-CREDIT_CARD_PAYMENT_IN",
-      "date": "2025-03-25",
-      "account_id": "CREDIT_CARD_SE",
-      "contra_account_id": "SE_CHECKING",
-      "type": "internal_transfer",
-      "category": "credit_card_payment",
+      "category": "uncategorized",
       "amount": 2500.0,
       "currency": "SEK",
-      "description": "Credit card bill paid"
+      "description": "CARD PAYMENT",
+      "description-en": "Card payment",
+      "txn_id": "EXAMPLE-0011"
     },
     {
-      "txn_id": "2025-03-27-MORTGAGE_PAYMENT",
       "date": "2025-03-27",
-      "account_id": "SE_CHECKING",
-      "contra_account_id": "MORTGAGE_APT",
+      "from_account_id": "SE_CHECKING",
+      "to_account_id": "MORTGAGE_APT",
       "type": "loan_payment",
-      "category": "mortgage_principal_interest_split",
-      "amount": -8500.0,
+      "category": "uncategorized",
+      "amount": 8500.0,
       "currency": "SEK",
-      "principal_component": -5500.0,
-      "interest_component": -3000.0,
-      "description": "Monthly mortgage payment"
-    }
-  ],
-
-  "rules": [],
-
-  "recurring_templates": [
-    {
-      "template_id": "RENT",
-      "category": "housing_rent",
-      "default_amount": -9000.0,
-      "currency": "SEK",
-      "frequency": "monthly",
-      "day_of_month": 3,
-      "description": "Apartment rent"
-    },
-    {
-      "template_id": "SALARY_MAIN",
-      "category": "salary_main_job",
-      "default_amount": 42000.0,
-      "currency": "SEK",
-      "frequency": "monthly",
-      "day_of_month": 1,
-      "description": "Net salary Volvo Cars"
-    }
-  ],
-
-  "month_end_snapshots": [
-    {
-      "date": "2025-03-31",
-
-      "hicp": 113.0,
-
-      "fx_rates": {
-        "EUR": 1.0,
-        "SEK": 0.088743,
-        "CNY": 0.132128
-      },
-
-      "account_balances": [
-        {
-          "account_id": "SE_CHECKING",
-          "closing_balance": 15000.0,
-          "currency": "SEK"
-        },
-        {
-          "account_id": "SE_SAVINGS",
-          "closing_balance": 75000.0,
-          "currency": "SEK"
-        },
-        {
-          "account_id": "CREDIT_CARD_SE",
-          "closing_balance": -5000.0,
-          "currency": "SEK"
-        },
-        {
-          "account_id": "MORTGAGE_APT",
-          "closing_balance": -1450000.0,
-          "currency": "SEK"
-        }
-      ]
+      "description": "LOAN PAYMENT",
+      "description-en": "Loan payment",
+      "txn_id": "EXAMPLE-0012"
     }
   ]
 }
