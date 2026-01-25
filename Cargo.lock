@@ -209,8 +209,17 @@ dependencies = [
 ]
 
 [[package]]
-name = "carpay"
+name = "carpay_parser"
 version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "calamine 0.32.0",
+ "chrono",
+ "hex",
+ "serde_json",
+ "sha2",
+ "utils",
+]
 
 [[package]]
 name = "cc"
