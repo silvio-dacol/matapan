@@ -44,6 +44,25 @@ This is a financial clarity tool.
 - Monthly snapshots instead of noisy daily tracking
 - Explicit separation between balance and performance
 
+## Local AI (Ollama only)
+
+Matapan is local-first: it never calls online model providers.
+
+If/when AI features are enabled, they are powered by a local Ollama server running on your machine.
+The AI client refuses to run if the configured URL is not local (e.g. it must be `localhost` / `127.0.0.1`).
+
+Environment variables:
+
+- `OLLAMA_BASE_URL` (default: `http://localhost:11434`)
+- `OLLAMA_MODEL` (default: `llama3.2`)
+
+Example:
+
+```bash
+set OLLAMA_BASE_URL=http://localhost:11434
+set OLLAMA_MODEL=llama3.2
+```
+
 ## Tracked categories
 
 ### Assets
@@ -85,7 +104,7 @@ The structure is designed so automation does not break historical data.
 - Solid net worth dashboard with insights on cash flow, income statements, and balance sheets.
 - Fiscal guidance per Country: Where are you from? Where do you live? How to optimize your own situation?
 - Plug and play legislation modules for each Country.
-- Proprietary AI models trained on your own data to give you tailored financial advice.
+- Local AI models (Ollama) trained on your own data to give you tailored financial advice.
 - AI digital twin of yourself so to take the most unbiased financial decisions in tough moments.
 
 ## Status
