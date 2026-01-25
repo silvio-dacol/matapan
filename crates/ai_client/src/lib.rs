@@ -1,6 +1,7 @@
 use anyhow::{anyhow, Context, Result};
 use reqwest::blocking::Client;
 use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE};
+use reqwest::StatusCode;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 
@@ -82,14 +83,30 @@ impl OllamaClient {
             }),
         };
 
-        let response: OllamaChatResponse = self
+        let resp = self
             .http
             .post(endpoint.clone())
             .json(&request)
             .send()
-            .with_context(|| format!("POST {endpoint} failed"))?
-            .error_for_status()
-            .with_context(|| format!("POST {endpoint} returned non-success status"))?
+            .with_context(|| format!("POST {endpoint} failed"))?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().unwrap_or_default();
+
+            if status == StatusCode::NOT_FOUND {
+                return Err(anyhow!(
+                    "Ollama returned 404 for {endpoint}. This often means the model '{}' is not installed. Set OLLAMA_MODEL to an installed model (see GET /api/tags or `ollama list`) or run `ollama pull <model>`. Response body: {body}",
+                    self.model
+                ));
+            }
+
+            return Err(anyhow!(
+                "Ollama returned {status} for {endpoint}. Response body: {body}"
+            ));
+        }
+
+        let response: OllamaChatResponse = resp
             .json()
             .with_context(|| format!("Failed to parse JSON response from {endpoint}"))?;
 
