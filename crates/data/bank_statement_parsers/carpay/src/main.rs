@@ -165,8 +165,13 @@ fn read_database_no_init(database_path: &str) -> Result<serde_json::Value> {
 
     let mut template_contents = String::new();
     template_file.read_to_string(&mut template_contents)?;
-    let template_value: serde_json::Value = serde_json::from_str(&template_contents)
-        .with_context(|| format!("template.json at {} is not valid JSON", template_path.display()))?;
+    let template_value: serde_json::Value =
+        serde_json::from_str(&template_contents).with_context(|| {
+            format!(
+                "template.json at {} is not valid JSON",
+                template_path.display()
+            )
+        })?;
 
     Ok(serde_json::json!({
         "engine_version": template_value.get("engine_version").unwrap_or(&serde_json::json!("0.1")),

@@ -97,7 +97,8 @@ fn find_header_row_loose(range: &calamine::Range<Data>) -> Option<(usize, Vec<St
         }
 
         let joined = norm(&headers.join(" | "));
-        let looks_like_txn = joined.contains("datum") && (joined.contains("belopp") || joined.contains("summa"));
+        let looks_like_txn =
+            joined.contains("datum") && (joined.contains("belopp") || joined.contains("summa"));
         if looks_like_txn {
             return Some((r_idx, headers));
         }
