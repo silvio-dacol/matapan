@@ -98,7 +98,8 @@ fn main() -> Result<()> {
 
     let mut translated_unique = 0usize;
     let mut translated_txns = 0usize;
-    let mut skipped_unique = 0usize;
+    let mut copied_unique = 0usize;
+    let mut copied_txns = 0usize;
 
     // Simple in-process cache for model results.
     let mut cache: HashMap<String, ClassificationResponse> = HashMap::new();
@@ -132,7 +133,18 @@ fn main() -> Result<()> {
         );
 
         if result.is_english_or_name {
-            skipped_unique += 1;
+            copied_unique += 1;
+
+            // Not translating: still ensure description-en is populated by copying description.
+            for idx in indices {
+                let Some(obj) = txns.get_mut(*idx).and_then(|v| v.as_object_mut()) else {
+                    continue;
+                };
+
+                set_description_en_preserving_order(obj, desc.to_string());
+                copied_txns += 1;
+            }
+
             continue;
         }
 
@@ -160,10 +172,12 @@ fn main() -> Result<()> {
     }
 
     println!(
-        "Done. Unique checked: {}. Unique skipped(true): {}. Unique translated(false): {}. Transactions updated: {}.",
+        "Done. Unique checked: {}. Unique copied(true): {}. Unique translated(false): {}. Transactions updated: {} (copied: {}, translated: {}).",
         processed,
-        skipped_unique,
+        copied_unique,
         translated_unique,
+        copied_txns + translated_txns,
+        copied_txns,
         translated_txns
     );
 
