@@ -436,5 +436,63 @@
       "description-en": "Loan payment",
       "txn_id": "EXAMPLE-0012"
     }
+  ],
+
+  "recurring_templates": [
+    {
+      "template_id": "RENT",
+      "category": "housing_rent",
+      "default_amount": -9000.0,
+      "currency": "SEK",
+      "frequency": "monthly",
+      "day_of_month": 3,
+      "description": "Apartment rent"
+    },
+    {
+      "template_id": "SALARY_MAIN",
+      "category": "salary_main_job",
+      "default_amount": 42000.0,
+      "currency": "SEK",
+      "frequency": "monthly",
+      "day_of_month": 1,
+      "description": "Net salary Volvo Cars"
+    }
+  ],
+
+  "month_end_snapshots": [
+    {
+      "date": "2025-03-31",
+
+      "hicp": 113.0,
+
+      "fx_rates": {
+        "EUR": 1.0,
+        "SEK": 0.088743,
+        "CNY": 0.132128
+      },
+
+      "account_balances": [
+        {
+          "account_id": "SE_CHECKING",
+          "closing_balance": 15000.0,
+          "currency": "SEK"
+        },
+        {
+          "account_id": "SE_SAVINGS",
+          "closing_balance": 75000.0,
+          "currency": "SEK"
+        },
+        {
+          "account_id": "CREDIT_CARD_SE",
+          "closing_balance": -5000.0,
+          "currency": "SEK"
+        },
+        {
+          "account_id": "MORTGAGE_APT",
+          "closing_balance": -1450000.0,
+          "currency": "SEK"
+        }
+      ]
+    }
   ]
 }
