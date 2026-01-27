@@ -68,7 +68,7 @@ impl IbkrCsvParser {
             }),
             json!({
                 "account_id": self.account_id_savings,
-                "structural_type": "bank",
+                "structural_type": "brokerage",
                 "institution": "IBKR",
                 "country": null,
                 "iban": null,
@@ -76,11 +76,11 @@ impl IbkrCsvParser {
                 "account_number": null,
                 "owner": "self",
                 "is_liability": false,
-                "supports_positions": false,
+                "supports_positions": true,
                 "opened_date": null,
                 "closed_date": null,
                 "is_active": true,
-                "notes": "IBKR savings bucket (OPTION 1): interest income goes here, no trades touch this account directly"
+                "notes": "IBKR investment account: holds stock/ETF positions and receives interest income"
             }),
         ]
     }
@@ -284,7 +284,7 @@ impl IbkrCsvParser {
 
                 let position_id = make_hash_id(&format!(
                     "{}|{}|{}",
-                    self.account_id_checking,
+                    self.account_id_savings,
                     as_of.format("%Y-%m-%d"),
                     instrument_id
                 ));
@@ -292,7 +292,7 @@ impl IbkrCsvParser {
                     "position_id": format!("IBKRPOS-{}", &position_id[..12]),
                     "source": "IBKR",
                     "as_of_date": as_of.format("%Y-%m-%d").to_string(),
-                    "account_id": self.account_id_checking,
+                    "account_id": self.account_id_savings,
                     "instrument_id": instrument_id,
                     "quantity": qty,
                     "currency": null_if_empty(&currency),
@@ -504,9 +504,26 @@ impl IbkrCsvParser {
                     _ => continue,
                 };
 
-                // Gross cash movement
-                let (txn_type, from_acc, to_acc, amount_abs) =
-                    cashflow_to_txn(&self.account_id_checking, proceeds);
+                // Trade proceeds flow between IBKR accounts:
+                // - Buying (negative proceeds): CHECKING -> SAVINGS (cash moves to investment account)
+                // - Selling (positive proceeds): SAVINGS -> CHECKING (cash returns from sale)
+                let (txn_type, from_acc, to_acc, amount_abs) = if proceeds >= 0.0 {
+                    // Selling: money comes back from investment account to checking
+                    (
+                        "transfer".to_string(),
+                        self.account_id_savings.clone(),
+                        self.account_id_checking.clone(),
+                        proceeds.abs(),
+                    )
+                } else {
+                    // Buying: money leaves checking to pay for investment
+                    (
+                        "transfer".to_string(),
+                        self.account_id_checking.clone(),
+                        self.account_id_savings.clone(),
+                        proceeds.abs(),
+                    )
+                };
 
                 let desc = format!(
                     "Trade {} qty={} price={}",
@@ -528,24 +545,20 @@ impl IbkrCsvParser {
                     "txn_id": txn_id
                 }));
 
-                // Fee line (optional)
+                // Fee line (optional) - fees are paid from the investment account
                 if let Some(fee) = parse_f64_opt(fee_raw) {
                     if fee.abs() > 0.0 {
-                        let signed_fee = if fee > 0.0 { -fee } else { fee };
-                        let (t2, f2, tacc2, a2) =
-                            cashflow_to_txn(&self.account_id_checking, signed_fee);
-
                         let desc2 = format!("Trade fee {}", symbol);
                         let txn_id2 =
-                            build_txn_id("IBKR-TRFEE", date, a2, &currency, &desc2, &dt_raw);
+                            build_txn_id("IBKR-TRFEE", date, fee.abs(), &currency, &desc2, &dt_raw);
 
                         transactions.push(json!({
                             "date": date.format("%Y-%m-%d").to_string(),
-                            "from_account_id": f2,
-                            "to_account_id": tacc2,
-                            "type": t2,
+                            "from_account_id": self.account_id_savings,
+                            "to_account_id": "EXTERNAL_PAYEE",
+                            "type": "expense",
                             "category": "uncategorized",
-                            "amount": a2,
+                            "amount": fee.abs(),
                             "currency": currency,
                             "description": desc2,
                             "txn_id": txn_id2
