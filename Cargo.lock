@@ -711,6 +711,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "ibkr_parser"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "csv",
+ "hex",
+ "serde_json",
+ "sha2",
+ "utils",
+]
+
+[[package]]
 name = "icu_collections"
 version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -820,14 +833,6 @@ checksum = "0ad4bb2b565bca0645f4d68c5c9af97fba094e9791da685bf83cb5f3ce74acf2"
 dependencies = [
  "equivalent",
  "hashbrown",
-]
-
-[[package]]
-name = "interactive_brokers"
-version = "0.1.0"
-dependencies = [
- "csv",
- "serde_json",
 ]
 
 [[package]]
