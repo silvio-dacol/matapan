@@ -839,10 +839,14 @@ dependencies = [
 name = "intesa_sanpaolo"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "calamine 0.26.1",
  "chrono",
+ "hex",
  "serde",
  "serde_json",
+ "sha2",
+ "utils",
 ]
 
 [[package]]
