@@ -194,16 +194,18 @@ impl IbkrCsvParser {
 
                 // Check if a placeholder already exists for this symbol
                 if let Some(existing_id) = instrument_key_to_id.get(&key).cloned() {
-                    // Find and update the placeholder instrument, keeping the existing ID
+                    // Find and update the placeholder instrument with the new ISIN-based ID
                     if let Some(placeholder) = instruments.iter_mut().find(|i| {
                         i.get("instrument_id")
                             .and_then(|v| v.as_str())
                             .map(|id| id == &existing_id)
                             .unwrap_or(false)
                     }) {
-                        // Update placeholder with full details but keep the original instrument_id
+                        // Recalculate instrument_id with actual security_id (ISIN)
+                        let new_instrument_id =
+                            build_instrument_id(&conid, &security_id, &asset_category, &symbol);
                         *placeholder = json!({
-                            "instrument_id": existing_id,
+                            "instrument_id": new_instrument_id,
                             "source": "IBKR",
                             "asset_category": null_if_empty(&asset_category),
                             "symbol": null_if_empty(&symbol),
@@ -215,6 +217,8 @@ impl IbkrCsvParser {
                             "underlying": null_if_empty(&underlying),
                             "multiplier": mult_f
                         });
+                        // Update the key map with the new ID
+                        instrument_key_to_id.insert(key.clone(), new_instrument_id);
                     }
                 } else {
                     // No placeholder exists, add as new
@@ -619,6 +623,46 @@ impl IbkrCsvParser {
             }
         }
 
+        // After all sections are processed, update positions with corrected instrument IDs
+        // (in case placeholders were created first and later updated with ISIN-based IDs)
+        for pos in positions.iter_mut() {
+            if let Some(old_inst_id) = pos.get("instrument_id").and_then(|v| v.as_str()) {
+                // Try to find if this instrument was updated in the key map
+                // by searching for the key that matches this instrument
+                if let Some(inst) = instruments.iter().find(|i| {
+                    i.get("instrument_id")
+                        .and_then(|v| v.as_str())
+                        .map(|id| id == old_inst_id)
+                        .unwrap_or(false)
+                }) {
+                    // Get the asset_category and symbol to look up the correct ID
+                    let ac = inst
+                        .get("asset_category")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    let sym = inst.get("symbol").and_then(|v| v.as_str()).unwrap_or("");
+                    let key = format!("{}|{}", ac, sym);
+
+                    if let Some(correct_id) = instrument_key_to_id.get(&key) {
+                        if let Some(inst_id_field) = pos.get_mut("instrument_id") {
+                            *inst_id_field = Value::String(correct_id.clone());
+                        }
+                        // Also update position_id since it includes the instrument_id
+                        if let Some(as_of) = pos.get("as_of_date").and_then(|v| v.as_str()) {
+                            let new_position_id = make_hash_id(&format!(
+                                "{}|{}|{}",
+                                self.account_id_savings, as_of, correct_id
+                            ));
+                            if let Some(pos_id_field) = pos.get_mut("position_id") {
+                                *pos_id_field =
+                                    Value::String(format!("IBKRPOS-{}", &new_position_id[..12]));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         Ok(ParsedIbkr {
             statement_end,
             instruments,
@@ -792,14 +836,14 @@ fn build_instrument_id(
     asset_category: &str,
     symbol: &str,
 ) -> String {
+    let sid = security_id.trim();
+    if looks_like_isin(sid) {
+        return format!("IBKR_{}", sid);
+    }
+
     let conid = conid.trim();
     if !conid.is_empty() {
         return format!("IBKR_CONID_{}", conid);
-    }
-
-    let sid = security_id.trim();
-    if looks_like_isin(sid) {
-        return format!("ISIN_{}", sid);
     }
 
     let ac = asset_category.trim().replace(' ', "_");
