@@ -2,8 +2,7 @@
 *.json
 *.xlsx
 *.xls
-!settings.json
 *.csv
 *txt
+!template.json
 minpension.png
-/database_old
