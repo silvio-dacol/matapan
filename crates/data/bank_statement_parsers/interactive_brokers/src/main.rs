@@ -1,23 +1,43 @@
 use anyhow::{Context, Result};
-use std::{env, fs::File, io::Read};
+use std::{env, fs, fs::File, io::Read, path::PathBuf};
 
 use ibkr_parser::{
     merge_instruments_with_deduplication, merge_positions_with_deduplication, IbkrCsvParser,
 };
 
+fn find_csv_file() -> Option<PathBuf> {
+    let current_dir = env::current_dir().ok()?;
+    let entries = fs::read_dir(&current_dir).ok()?;
+    
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("csv") {
+            return Some(path);
+        }
+    }
+    None
+}
+
 fn main() -> Result<()> {
     // Usage:
-    //   ibkr_parser interactive_brokers.csv [database_path] [output_path]
+    //   ibkr_parser [csv_file] [database_path] [output_path]
     //
+    // If csv_file is not provided, will automatically find the first .csv file in current directory
     // Defaults:
     //   database_path: ../../../../database
     //   output_path: same as database_path
 
     let args: Vec<String> = env::args().collect();
-    let csv_path = args
-        .get(1)
-        .map(|s| s.as_str())
-        .unwrap_or("interactive_brokers.csv");
+    
+    let csv_path_string = if let Some(arg) = args.get(1) {
+        arg.clone()
+    } else if let Some(found) = find_csv_file() {
+        found.to_string_lossy().to_string()
+    } else {
+        anyhow::bail!("No CSV file found in current directory. Please provide a CSV file path as the first argument.");
+    };
+    
+    let csv_path = csv_path_string.as_str();
     let database_path = args
         .get(2)
         .map(|s| s.as_str())
