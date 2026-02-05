@@ -15,10 +15,17 @@ pub struct RevolutCsvParser {
 
 impl RevolutCsvParser {
     pub fn new(account_id: impl Into<String>) -> Self {
-        let base = account_id.into();
+        let input = account_id.into();
+        
+        // Extract base name by removing common suffixes
+        let base = input
+            .trim_end_matches("_CURRENT")
+            .trim_end_matches("_SAVINGS")
+            .to_string();
+        
         Self {
-            account_id_current: base.clone(),
-            account_id_savings: format!("{}_SAVINGS", base.trim_end_matches("_CURRENT")),
+            account_id_current: format!("{}_CURRENT", base),
+            account_id_savings: format!("{}_SAVINGS", base),
             only_completed: true,
         }
     }
@@ -69,13 +76,14 @@ impl RevolutCsvParser {
         ]
     }
 
-    pub fn parse_reader<R: Read>(&self, reader: R) -> Result<Vec<Value>> {
+    pub fn parse_reader<R: Read>(&self, reader: R) -> Result<(Vec<Value>, Vec<String>)> {
         let mut csv_reader = csv::ReaderBuilder::new()
             .flexible(true)
             .trim(csv::Trim::All)
             .from_reader(reader);
 
         let mut out: Vec<Value> = Vec::new();
+        let mut used_accounts = std::collections::HashSet::new();
 
         for (idx, row) in csv_reader.deserialize::<RevolutRow>().enumerate() {
             let row = row.with_context(|| format!("CSV deserialize error at row {}", idx + 1))?;
@@ -112,6 +120,14 @@ impl RevolutCsvParser {
                 &self.account_id_savings,
             );
 
+            // Track which accounts are actually used
+            if from_account_id == self.account_id_current || to_account_id == self.account_id_current {
+                used_accounts.insert(self.account_id_current.clone());
+            }
+            if from_account_id == self.account_id_savings || to_account_id == self.account_id_savings {
+                used_accounts.insert(self.account_id_savings.clone());
+            }
+
             let txn_id = make_txn_id(
                 account_id,
                 date,
@@ -127,7 +143,7 @@ impl RevolutCsvParser {
                 "to_account_id": to_account_id,
                 "type": txn_type,
                 "category": "uncategorized",
-                "amount": amount,
+                "amount": amount.abs(),
                 "currency": currency,
                 "description": description,
                 "txn_id": txn_id
@@ -136,7 +152,52 @@ impl RevolutCsvParser {
             out.push(txn);
         }
 
-        Ok(out)
+        Ok((out, used_accounts.into_iter().collect()))
+    }
+
+    /// Creates only the accounts that are actually used in transactions
+    pub fn create_used_accounts(&self, used_account_ids: &[String]) -> Vec<Value> {
+        let mut accounts = Vec::new();
+        
+        for account_id in used_account_ids {
+            if account_id == &self.account_id_current {
+                accounts.push(json!({
+                    "account_id": self.account_id_current,
+                    "structural_type": "bank",
+                    "institution": "Revolut",
+                    "country": null,
+                    "iban": null,
+                    "bic": null,
+                    "account_number": null,
+                    "owner": "self",
+                    "is_liability": false,
+                    "supports_positions": false,
+                    "opened_date": null,
+                    "closed_date": null,
+                    "is_active": true,
+                    "notes": "Revolut current account - some fields need manual completion"
+                }));
+            } else if account_id == &self.account_id_savings {
+                accounts.push(json!({
+                    "account_id": self.account_id_savings,
+                    "structural_type": "bank",
+                    "institution": "Revolut",
+                    "country": null,
+                    "iban": null,
+                    "bic": null,
+                    "account_number": null,
+                    "owner": "self",
+                    "is_liability": false,
+                    "supports_positions": false,
+                    "opened_date": null,
+                    "closed_date": null,
+                    "is_active": true,
+                    "notes": "Revolut savings pocket - some fields need manual completion"
+                }));
+            }
+        }
+        
+        accounts
     }
 }
 
@@ -211,7 +272,8 @@ fn infer_type(amount: f64, revolut_type: Option<&str>, description: &str) -> Str
             // Internal transfers between accounts/pockets
             "internal_transfer".to_string()
         } else {
-            "internal_transfer".to_string()
+            // Unknown transfer pattern - fallback to amount-based classification
+            if amount < 0.0 { "expense" } else { "income" }.to_string()
         }
     } else if rt.contains("exchange") {
         "fx".to_string()

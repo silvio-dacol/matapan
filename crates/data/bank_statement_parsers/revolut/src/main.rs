@@ -59,6 +59,7 @@ fn main() -> Result<()> {
 
     // Parse all discovered .csv files
     let mut all_txns = Vec::new();
+    let mut all_used_account_ids = std::collections::HashSet::new();
 
     for (idx, csv_file_path) in csv_files.iter().enumerate() {
         // Determine account ID based on filename or use default
@@ -86,9 +87,10 @@ fn main() -> Result<()> {
         // Parse
         let parser = RevolutCsvParser::new(&account_id);
         match parser.parse_reader(csv_buf.as_slice()) {
-            Ok(txns) => {
+            Ok((txns, used_accounts)) => {
                 println!("  ✓ Found {} transactions", txns.len());
                 all_txns.extend(txns);
+                all_used_account_ids.extend(used_accounts);
             }
             Err(e) => {
                 eprintln!("  ⚠ Warning: Could not parse file: {}", e);
@@ -102,27 +104,10 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    // Collect all unique accounts from parsed transactions
-    let mut unique_account_ids = std::collections::HashSet::new();
-    for txn in &all_txns {
-        if let Some(from_account) = txn.get("from_account_id").and_then(|v| v.as_str()) {
-            if from_account.starts_with("REVOLUT") {
-                unique_account_ids.insert(from_account.to_string());
-            }
-        }
-        if let Some(to_account) = txn.get("to_account_id").and_then(|v| v.as_str()) {
-            if to_account.starts_with("REVOLUT") {
-                unique_account_ids.insert(to_account.to_string());
-            }
-        }
-    }
-
-    // Create accounts for all unique account IDs found
-    let mut all_accounts = Vec::new();
-    for account_id in unique_account_ids {
-        let parser = RevolutCsvParser::new(&account_id);
-        all_accounts.extend(parser.create_accounts());
-    }
+    // Create only the accounts that were actually used
+    let parser = RevolutCsvParser::new("REVOLUT"); // Base name doesn't matter here
+    let used_account_ids: Vec<String> = all_used_account_ids.into_iter().collect();
+    let all_accounts = parser.create_used_accounts(&used_account_ids);
     let system_accounts = utils::create_system_accounts();
 
     // Read database.json (automatically initializes if missing or invalid)
