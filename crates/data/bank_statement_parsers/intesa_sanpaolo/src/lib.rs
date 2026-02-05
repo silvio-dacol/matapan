@@ -210,69 +210,154 @@ impl IntesaSanpaoloParser {
         let mut valuta_col = None;
         let mut importo_col = None;
 
-        for row_idx in 0..height.min(20) {
+        // Additional columns for newer format
+        let mut data_valuta_col = None;
+        let mut descrizione_col = None;
+        let mut accrediti_col = None;
+        let mut addebiti_col = None;
+
+        for row_idx in 0..height.min(30) {
             for col_idx in 0..width {
                 if let Some(cell) = range.get((row_idx, col_idx)) {
                     let text = cell.to_string().to_lowercase();
-                    if text == "data" && data_col.is_none() {
+                    // Support both "data" and "data contabile"
+                    if (text == "data" || text == "data contabile") && data_col.is_none() {
                         data_col = Some(col_idx);
                         header_row = Some(row_idx);
                     }
+                    if text == "data valuta" && data_valuta_col.is_none() {
+                        data_valuta_col = Some(col_idx);
+                    }
+                    // Support both "operazione" and "descrizione"
                     if text == "operazione" && operazione_col.is_none() {
                         operazione_col = Some(col_idx);
                     }
-                    if text == "dettagli" && dettagli_col.is_none() {
+                    if text == "descrizione" && descrizione_col.is_none() {
+                        descrizione_col = Some(col_idx);
+                    }
+                    if (text == "dettagli" || text == "descrizione estesa") && dettagli_col.is_none() {
                         dettagli_col = Some(col_idx);
                     }
-                    if (text.contains("conto") || text.contains("carta")) && conto_col.is_none() {
+                    if (text.contains("conto") || text.contains("carta") || text == "effettuata tramite:") && conto_col.is_none() {
                         conto_col = Some(col_idx);
                     }
                     if text == "valuta" && valuta_col.is_none() {
                         valuta_col = Some(col_idx);
                     }
+                    // Support both "importo" and "accrediti"/"addebiti"
                     if text == "importo" && importo_col.is_none() {
                         importo_col = Some(col_idx);
                     }
+                    if text == "accrediti" && accrediti_col.is_none() {
+                        accrediti_col = Some(col_idx);
+                    }
+                    if text == "addebiti" && addebiti_col.is_none() {
+                        addebiti_col = Some(col_idx);
+                    }
                 }
             }
-            if data_col.is_some() && operazione_col.is_some() && importo_col.is_some() {
-                break;
+            // Check if we found the header - support both old and new formats
+            if data_col.is_some() {
+                if (operazione_col.is_some() || descrizione_col.is_some()) 
+                   && (importo_col.is_some() || (accrediti_col.is_some() && addebiti_col.is_some())) {
+                    break;
+                }
             }
         }
 
-        if data_col.is_none() || importo_col.is_none() || header_row.is_none() {
+        // Use descrizione if operazione not found
+        if operazione_col.is_none() && descrizione_col.is_some() {
+            operazione_col = descrizione_col;
+        }
+
+        if data_col.is_none() || header_row.is_none() {
             // No valid transaction data found
+            return Ok(transactions);
+        }
+
+        // Need either importo OR both accrediti and addebiti
+        let has_amount_columns = importo_col.is_some() || (accrediti_col.is_some() && addebiti_col.is_some());
+        if !has_amount_columns {
             return Ok(transactions);
         }
 
         let header_row = header_row.unwrap();
         let data_col = data_col.unwrap();
-        let importo_col = importo_col.unwrap();
 
         // Parse data rows
         for row_idx in (header_row + 1)..height {
             let date_cell = range.get((row_idx, data_col));
-            let importo_cell = range.get((row_idx, importo_col));
 
-            if date_cell.is_none() || importo_cell.is_none() {
+            if date_cell.is_none() {
                 continue;
             }
 
             let date_str = date_cell.unwrap().to_string().trim().to_string();
-            let importo_str = importo_cell.unwrap().to_string().trim().to_string();
 
-            if date_str.is_empty() || importo_str.is_empty() {
+            if date_str.is_empty() {
                 continue;
             }
+
+            // Skip summary rows (like "Saldo contabile finale in Euro")
+            if date_str.to_lowercase().contains("saldo") {
+                continue;
+            }
+
+            // Parse amount - support both single importo column and accrediti/addebiti columns
+            let amount = if let Some(importo_col) = importo_col {
+                // Old format: single importo column
+                let importo_cell = range.get((row_idx, importo_col));
+                if importo_cell.is_none() {
+                    continue;
+                }
+                let importo_str = importo_cell.unwrap().to_string().trim().to_string();
+                if importo_str.is_empty() {
+                    continue;
+                }
+                parse_amount(&importo_str).with_context(|| {
+                    format!("Failed to parse amount: {} at row {}", importo_str, row_idx)
+                })?
+            } else {
+                // New format: separate accrediti and addebiti columns
+                let accrediti_str = if let Some(col) = accrediti_col {
+                    range
+                        .get((row_idx, col))
+                        .map(|c| c.to_string().trim().to_string())
+                        .unwrap_or_default()
+                } else {
+                    String::new()
+                };
+
+                let addebiti_str = if let Some(col) = addebiti_col {
+                    range
+                        .get((row_idx, col))
+                        .map(|c| c.to_string().trim().to_string())
+                        .unwrap_or_default()
+                } else {
+                    String::new()
+                };
+
+                // Skip if both are empty
+                if accrediti_str.is_empty() && addebiti_str.is_empty() {
+                    continue;
+                }
+
+                // Parse accrediti (positive) or addebiti (negative)
+                if !accrediti_str.is_empty() {
+                    parse_amount(&accrediti_str).with_context(|| {
+                        format!("Failed to parse accrediti: {} at row {}", accrediti_str, row_idx)
+                    })?
+                } else {
+                    let addebiti_amount = parse_amount(&addebiti_str).with_context(|| {
+                        format!("Failed to parse addebiti: {} at row {}", addebiti_str, row_idx)
+                    })?;
+                    -addebiti_amount // Addebiti are negative
+                }
+            };
 
             // Parse date (could be Excel serial date or formatted string)
             let date = parse_date_or_serial(&date_str).with_context(|| {
                 format!("Failed to parse date: {} at row {}", date_str, row_idx)
-            })?;
-
-            // Parse amount
-            let amount = parse_amount(&importo_str).with_context(|| {
-                format!("Failed to parse amount: {} at row {}", importo_str, row_idx)
             })?;
 
             // Build description from available columns
