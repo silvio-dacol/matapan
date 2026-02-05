@@ -121,13 +121,20 @@ impl WeChatXlsxParser {
             let status = status.trim().to_string();
             if self.only_successful {
                 // Keep the common successful states
-                // Examples: 支付成功, 对方已收钱, 充值完成
+                // Examples: 支付成功, 对方已收钱, 充值完成, 已到账, 已收款, 已存入零钱
                 // Also WeChat exports sometimes include refund states; we keep those too (still real movements).
                 let is_ok = status.contains("成功")
                     || status.contains("已收钱")
                     || status.contains("完成")
-                    || status.contains("退款");
+                    || status.contains("退款")
+                    || status.contains("已到账")
+                    || status.contains("已收款")
+                    || status.contains("已入账")
+                    || status.contains("已存入");
                 if !is_ok {
+                    let inout_preview = cell_str(row.get(c_inout)).trim().to_string();
+                    let amount_preview = cell_str(row.get(c_amount)).trim().to_string();
+                    println!("⚠️  Skipping transaction with status '{}' (收/支: {}, 金额: {})", status, inout_preview, amount_preview);
                     continue;
                 }
             }

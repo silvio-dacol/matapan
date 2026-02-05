@@ -7,10 +7,10 @@ fn main() -> Result<()> {
     // Usage:
     //   wechat [file1.xlsx file2.xlsx ...] [database_path] [output_path]
     //
-    // If no .xlsx files specified, will auto-discover all wechat_*.xlsx in current directory
+    // If no .xlsx files specified, will auto-discover all .xlsx files in current directory
     //
     // Defaults:
-    //   Auto-discover wechat_*.xlsx in current directory
+    //   Auto-discover all .xlsx files in current directory
     //   database_path: ../../../../database (resolves to database.json)
     //   output = same as database_path
 
@@ -28,17 +28,16 @@ fn main() -> Result<()> {
         }
     }
 
-    // If no .xlsx files specified, auto-discover wechat_*.xlsx
+    // If no .xlsx files specified, auto-discover all .xlsx files
     if xlsx_files.is_empty() {
         println!("📂 No .xlsx files specified, scanning current directory...");
         for entry in fs::read_dir(".").context("Cannot read current directory")? {
-            let path = entry?.path();
-            if let Some(name) = path.file_name().and_then(|s| s.to_str()) {
-                if name.to_lowercase().starts_with("wechat_")
-                    && name.to_lowercase().ends_with(".xlsx")
-                {
-                    xlsx_files.push(name.to_string());
-                    println!("  ✓ Found: {}", name);
+            let entry = entry?;
+            let path = entry.path();
+            if path.extension().and_then(|s| s.to_str()) == Some("xlsx") {
+                if let Some(filename) = path.file_name().and_then(|s| s.to_str()) {
+                    xlsx_files.push(filename.to_string());
+                    println!("  ✓ Found: {}", filename);
                 }
             }
         }
@@ -46,7 +45,7 @@ fn main() -> Result<()> {
     }
 
     if xlsx_files.is_empty() {
-        println!("❌ No .xlsx input files found (expected wechat_*.xlsx or explicit paths).");
+        println!("❌ No .xlsx input files found.");
         return Ok(());
     }
 

@@ -9,6 +9,5 @@ chrono = "0.4"
 serde_json = { version = "1", features = ["preserve_order"] }
 sha2 = "0.10"
 hex = "0.4"
-calamine = "0.32"
+calamine = "0.33"
 utils = { path = "../../../utils" }
-
