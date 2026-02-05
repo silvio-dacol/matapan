@@ -9,7 +9,7 @@ fn main() -> Result<()> {
     // Usage:
     //   carpay_parser carpay.xlsx other.xlsx ... [database_path] [output_path]
     //
-    // If no .xlsx files are provided, it will try to parse files matching "carpay*.xlsx" in cwd.
+    // If no .xlsx files are provided, it will auto-discover all .xlsx files in current directory.
     //
     // Defaults:
     //   database_path: ../../../../database
@@ -48,12 +48,14 @@ fn main() -> Result<()> {
     }
 
     if xlsx_paths.is_empty() {
+        println!("📂 No .xlsx files specified, scanning current directory...");
         for entry in fs::read_dir(".").context("Cannot read current directory")? {
-            let path = entry?.path();
-            if let Some(name) = path.file_name().and_then(|s| s.to_str()) {
-                let low = name.to_lowercase();
-                if low.starts_with("carpay") && low.ends_with(".xlsx") {
-                    xlsx_paths.push(name.to_string());
+            let entry = entry?;
+            let path = entry.path();
+            if path.extension().and_then(|s| s.to_str()) == Some("xlsx") {
+                if let Some(filename) = path.file_name().and_then(|s| s.to_str()) {
+                    xlsx_paths.push(filename.to_string());
+                    println!("  ✓ Found: {}", filename);
                 }
             }
         }
@@ -61,7 +63,7 @@ fn main() -> Result<()> {
     }
 
     if xlsx_paths.is_empty() {
-        println!("❌ No .xlsx input files found (expected carpay*.xlsx or explicit paths).");
+        println!("❌ No .xlsx input files found.");
         return Ok(());
     }
 
