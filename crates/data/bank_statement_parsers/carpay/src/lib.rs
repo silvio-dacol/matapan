@@ -122,6 +122,9 @@ impl CarPayXlsxParser {
 
                 let txn_type = if amount > 0.0 { "expense" } else { "income" };
 
+                // Normalize: amounts are always stored as positive numbers.
+                let norm_amount = amount.abs();
+
                 let reference = c_ref
                     .and_then(|idx| cell_str(row.get(idx)))
                     .unwrap_or_default()
@@ -190,7 +193,7 @@ impl CarPayXlsxParser {
                 let txn_id = make_txn_id(
                     &self.account_id,
                     date,
-                    amount,
+                    norm_amount,
                     &self.currency,
                     &description,
                     &sheet_name,
@@ -203,7 +206,7 @@ impl CarPayXlsxParser {
                     "to_account_id": to_account_id,
                     "type": txn_type,
                     "category": "uncategorized",
-                    "amount": amount,
+                    "amount": norm_amount,
                     "currency": self.currency.clone(),
                     "description": description,
                     "txn_id": txn_id
