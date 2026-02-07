@@ -95,7 +95,7 @@ impl AlipayCsvParser {
             let rec = rec.with_context(|| format!("CSV read error at row {}", row_idx + 2))?;
 
             let status = rec.get(idx_status).unwrap_or("").trim();
-            if self.only_successful && status != "交易成功" {
+            if self.only_successful && !(status == "交易成功" || status == "退款成功") {
                 continue;
             }
 
@@ -109,18 +109,19 @@ impl AlipayCsvParser {
             })?;
 
             let inout = rec.get(idx_inout).unwrap_or("").trim();
-            let txn_type = match inout {
+            let mut txn_type = match inout {
                 "支出" => "expense",
                 "收入" => "income",
                 "不计收支" => "internal_transfer",
                 _ => {
-                    if amount < 0.0 {
-                        "expense"
-                    } else {
-                        "income"
-                    }
+                    if amount < 0.0 { "expense" } else { "income" }
                 }
             };
+
+            // If this is a refund, money comes back into the wallet
+            if status == "退款成功" {
+                txn_type = "income";
+            }
 
             let mut desc = rec.get(idx_item).unwrap_or("").trim().to_string();
             if desc.is_empty() {
