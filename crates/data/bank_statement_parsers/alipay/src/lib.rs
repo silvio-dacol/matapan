@@ -109,32 +109,65 @@ impl AlipayCsvParser {
             })?;
 
             let inout = rec.get(idx_inout).unwrap_or("").trim();
+
+            // Raw text fields (used for semantic classification)
+            let item_raw = rec.get(idx_item).unwrap_or("").trim();
+            let counterparty_raw = rec.get(idx_counterparty).unwrap_or("").trim();
+            let cat_raw = rec.get(idx_category).unwrap_or("").trim();
+
+            // Default type from Alipay's "收/支" column
             let mut txn_type = match inout {
                 "支出" => "expense",
                 "收入" => "income",
-                "不计收支" => "internal_transfer",
+                // Alipay often uses "不计收支" for refunds/top-ups/withdrawals.
+                // For cashflow correctness we treat it by sign (and then refine semantically below).
+                "不计收支" => {
+                    if amount < 0.0 { "expense" } else { "income" }
+                }
                 _ => {
                     if amount < 0.0 { "expense" } else { "income" }
                 }
             };
 
-            // If this is a refund, money comes back into the wallet
-            if status == "退款成功" {
+            // Semantic overrides (strict):
+            // - Refunds must be treated as income back into the wallet
+            // - Top-ups (充值) are income into the wallet from an external funding source
+            // - Withdrawals (提现) are expense out of the wallet to an external destination
+            // - Receipts (收款 / 收钱码收款) are income into the wallet
+            let semantic_blob = format!("{} {} {}", item_raw, counterparty_raw, cat_raw);
+
+            let mut semantic_tag: Option<&str> = None;
+
+            if status == "退款成功" || semantic_blob.contains("退款") {
                 txn_type = "income";
+                semantic_tag = Some("退款");
+            } else if semantic_blob.contains("充值") {
+                txn_type = "income";
+                semantic_tag = Some("充值");
+            } else if semantic_blob.contains("提现") {
+                txn_type = "expense";
+                semantic_tag = Some("提现");
+            } else if semantic_blob.contains("收钱码收款") || semantic_blob.contains("收款") {
+                txn_type = "income";
+                semantic_tag = Some("收款");
             }
 
-            let mut desc = rec.get(idx_item).unwrap_or("").trim().to_string();
+            let mut desc = item_raw.to_string();
             if desc.is_empty() {
-                desc = rec.get(idx_counterparty).unwrap_or("").trim().to_string();
+                desc = counterparty_raw.to_string();
             }
 
             desc = html_escape::decode_html_entities(&desc).to_string();
             desc = desc.replace('\u{00A0}', " ");
             desc = desc.split_whitespace().collect::<Vec<_>>().join(" ");
 
-            let cat = rec.get(idx_category).unwrap_or("").trim();
-            if !cat.is_empty() {
-                desc = format!("{} [{}]", desc, cat);
+            if !cat_raw.is_empty() {
+                desc = format!("{} [{}]", desc, cat_raw);
+            }
+
+            if let Some(tag) = semantic_tag {
+                // Extra breadcrumb to make audits/reconciliation easier
+                desc = format!("{} [{}]", desc, tag);
             }
 
             if let Some(i) = idx_note {
@@ -153,7 +186,6 @@ impl AlipayCsvParser {
             let (from_account_id, to_account_id) = match txn_type {
                 "expense" => (self.account_id.clone(), "EXTERNAL_PAYEE".to_string()),
                 "income" => ("EXTERNAL_PAYER".to_string(), self.account_id.clone()),
-                "internal_transfer" => (self.account_id.clone(), self.account_id.clone()),
                 _ => {
                     if amount < 0.0 {
                         (self.account_id.clone(), "EXTERNAL_PAYEE".to_string())
@@ -162,6 +194,20 @@ impl AlipayCsvParser {
                     }
                 }
             };
+
+
+            // Final invariant: never allow wallet->wallet transactions in the output.
+            // If we cannot prove it's a true internal transfer, we model it by sign so cashflow stays correct.
+            let (from_account_id, to_account_id, txn_type) =
+                if from_account_id == to_account_id || txn_type == "internal_transfer" {
+                    if amount < 0.0 {
+                        (self.account_id.clone(), "EXTERNAL_PAYEE".to_string(), "expense")
+                    } else {
+                        ("EXTERNAL_PAYER".to_string(), self.account_id.clone(), "income")
+                    }
+                } else {
+                    (from_account_id, to_account_id, txn_type)
+                };
 
             let txn_id = make_alipay_txn_id(
                 &self.account_id,
