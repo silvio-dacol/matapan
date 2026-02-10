@@ -114,8 +114,13 @@ impl CcbXlsParser {
             let date = parse_ccb_date(&date_raw)
                 .with_context(|| format!("Invalid date '{}' in {}", date_raw, xls_path))?;
 
-            let amount = parse_ccb_amount(&amount_raw)
+            let amount_signed = parse_ccb_amount(&amount_raw)
                 .with_context(|| format!("Invalid amount '{}' in {}", amount_raw, xls_path))?;
+
+            // Determine direction from the original signed amount,
+            // but store normalized positive amount in the database.
+            let txn_type = if amount_signed < 0.0 { "expense" } else { "income" };
+            let amount = amount_signed.abs();
 
             let currency_raw = cell_str(row.get(c_currency)).trim().to_string();
             let currency = normalize_ccb_currency(&currency_raw);
@@ -131,8 +136,6 @@ impl CcbXlsParser {
                 .unwrap_or_default()
                 .trim()
                 .to_string();
-
-            let txn_type = if amount < 0.0 { "expense" } else { "income" };
 
             let mut desc_parts = Vec::new();
             if !summary.is_empty() {
