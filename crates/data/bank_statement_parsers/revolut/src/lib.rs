@@ -150,6 +150,34 @@ impl RevolutCsvParser {
             });
 
             out.push(txn);
+
+            // If Revolut provided a fee, emit it as a separate expense
+            if let Some(fee) = row.fee {
+                if fee != 0.0 {
+                    let fee_txn_id = make_txn_id(
+                        account_id,
+                        date,
+                        fee,
+                        &currency,
+                        &format!("FEE|{}", description),
+                        idx + 1,
+                    );
+
+                    let fee_txn = json!({
+                        "date": date.format("%Y-%m-%d").to_string(),
+                        "from_account_id": account_id,
+                        "to_account_id": "EXTERNAL_PAYEE",
+                        "type": "expense",
+                        "category": "uncategorized",
+                        "amount": fee.abs(),
+                        "currency": currency,
+                        "description": format!("Fees: {}", description),
+                        "txn_id": fee_txn_id
+                    });
+
+                    out.push(fee_txn);
+                }
+            }
         }
 
         Ok((out, used_accounts.into_iter().collect()))
@@ -222,7 +250,7 @@ struct RevolutRow {
     amount: f64,
 
     #[serde(rename = "Fee")]
-    _fee: Option<f64>,
+    fee: Option<f64>,
 
     #[serde(rename = "Currency")]
     currency: String,
@@ -255,28 +283,22 @@ fn infer_type(amount: f64, revolut_type: Option<&str>, description: &str) -> Str
     let rt = revolut_type.unwrap_or("").to_lowercase();
 
     if rt.contains("transfer") {
-        // Check if this is a transfer to/from another person (not internal)
         if description.starts_with("Transfer to ") {
-            // Pattern like "Transfer to Mario Rossi" - payment to person with Revolut Account
             "expense".to_string()
         } else if description.starts_with("To ") && !description.contains("To pocket") {
-            // Pattern like "To Mario Rossi" - payment to external person without Revolut
             "expense".to_string()
         } else if description.starts_with("Transfer from ") {
-            // Pattern like "Transfer from Mario Rossi" - payment from person with Revolut Account
             "income".to_string()
         } else if description.starts_with("Payment from ") && !description.contains("From pocket") {
-            // Pattern like "From Mario Rossi" - payment from external person without Revolut
             "income".to_string()
         } else if description.contains("To pocket") || description.contains("Pocket Withdrawal") {
-            // Internal transfers between accounts/pockets
             "internal_transfer".to_string()
         } else {
-            // Unknown transfer pattern - fallback to amount-based classification
             if amount < 0.0 { "expense" } else { "income" }.to_string()
         }
     } else if rt.contains("exchange") {
-        "fx".to_string()
+        // Revolut currency exchange is internal movement between currency pockets
+        "internal_transfer".to_string()
     } else {
         if amount < 0.0 { "expense" } else { "income" }.to_string()
     }
@@ -294,7 +316,10 @@ fn determine_accounts(
 ) -> (String, String) {
     match txn_type {
         "internal_transfer" => {
-            // Parse pocket transfers like "To pocket SEK Cazzate from SEK"
+            // Currency exchange: keep it internal to the same Revolut account
+            if description.to_lowercase().contains("exchanged") {
+                return (account_id.to_string(), account_id.to_string());
+            }
             if description.contains("To pocket") {
                 // Money moving from Current to Savings pocket
                 if amount > 0.0 {
