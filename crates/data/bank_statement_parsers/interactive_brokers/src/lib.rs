@@ -423,7 +423,7 @@ impl IbkrCsvParser {
                     .with_context(|| format!("Bad amount '{}' in Interest", amount_raw))?;
 
                 let (txn_type, from_acc, to_acc, amount) =
-                    cashflow_to_txn(&self.account_id_savings, signed);
+                    cashflow_to_txn(&self.account_id_checking, signed);
 
                 let desc = format!("IBKR Interest: {}", description);
                 let txn_id = build_txn_id("IBKR-INT", date, amount, &currency, &desc, &date_raw);
