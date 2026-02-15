@@ -418,8 +418,16 @@ impl IntesaSanpaoloParser {
                 &self.account_id_checking
             };
 
-            let (txn_type, from_account, to_account) =
+            let (mut txn_type, mut from_account, mut to_account) =
                 determine_transaction_type(account_id, amount);
+
+            // Intesa sometimes prints debits as positive numbers.
+            // If wording indicates a cost, force expense.
+            if intesa_force_expense(&description) {
+                txn_type = "expense".to_string();
+                from_account = self.account_id_checking.clone();
+                to_account = "EXTERNAL_PAYEE".to_string();
+            }
 
             let txn_id = make_txn_id("INTESA", date, amount.abs(), &currency, &description);
 
@@ -504,9 +512,8 @@ impl IntesaSanpaoloParser {
                     if text == "controvalore €"
                         || (text.contains("controvalore") && !text.contains("totale"))
                     {
-                        if controvalore_col.is_none() {
-                            controvalore_col = Some(col_idx);
-                        }
+                        // take the LAST occurrence, not the first
+                        controvalore_col = Some(col_idx);
                     }
                     if text.contains("valore carico") && valore_carico_col.is_none() {
                         valore_carico_col = Some(col_idx);
@@ -774,6 +781,11 @@ fn make_hash(s: &str) -> String {
     hasher.update(s.as_bytes());
     let hash = hasher.finalize();
     hex::encode(hash)
+}
+
+fn intesa_force_expense(desc: &str) -> bool {
+    let d = desc.to_lowercase();
+    d.contains("canone") || d.contains("spese") || d.contains("imposta")
 }
 
 // ------------------------
