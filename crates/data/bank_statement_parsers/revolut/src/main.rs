@@ -61,22 +61,8 @@ fn main() -> Result<()> {
     let mut all_txns = Vec::new();
     let mut all_used_account_ids = std::collections::HashSet::new();
 
-    for (idx, csv_file_path) in csv_files.iter().enumerate() {
-        // Determine account ID based on filename or use default
-        let account_id = if csv_file_path.to_lowercase().contains("saving") {
-            "REVOLUT_SAVINGS".to_string()
-        } else if csv_file_path.to_lowercase().contains("current") {
-            "REVOLUT_CURRENT".to_string()
-        } else {
-            // Default: first file is CURRENT, others get numbered
-            if idx == 0 {
-                "REVOLUT_CURRENT".to_string()
-            } else {
-                format!("REVOLUT_ACCOUNT_{}", idx + 1)
-            }
-        };
-
-        println!("\n📖 Parsing {} (account: {})", csv_file_path, account_id);
+    for csv_file_path in csv_files.iter() {
+        println!("\n📖 Parsing {} (account base: REVOLUT)", csv_file_path);
         
         // Read CSV
         let mut csv_file = File::open(csv_file_path)
@@ -85,7 +71,7 @@ fn main() -> Result<()> {
         csv_file.read_to_end(&mut csv_buf)?;
 
         // Parse
-        let parser = RevolutCsvParser::new(&account_id);
+        let parser = RevolutCsvParser::new("REVOLUT");
         match parser.parse_reader(csv_buf.as_slice()) {
             Ok((txns, used_accounts)) => {
                 println!("  ✓ Found {} transactions", txns.len());
