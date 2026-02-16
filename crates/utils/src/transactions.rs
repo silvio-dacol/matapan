@@ -2,6 +2,31 @@ use anyhow::{anyhow, Result};
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 
+/// Sort transactions in-place by `date` ascending.
+///
+/// Sorting is stable. Transactions with missing/non-string `date` are placed at the end,
+/// preserving their relative order.
+pub fn sort_transactions_by_date(database: &mut Value) -> Result<()> {
+    let arr = database
+        .get_mut("transactions")
+        .and_then(|v| v.as_array_mut())
+        .ok_or_else(|| anyhow!("database.json missing 'transactions' array"))?;
+
+    arr.sort_by(|a, b| {
+        let da = a.get("date").and_then(|v| v.as_str());
+        let db = b.get("date").and_then(|v| v.as_str());
+
+        match (da, db) {
+            (Some(left), Some(right)) => left.cmp(right),
+            (Some(_), None) => std::cmp::Ordering::Less,
+            (None, Some(_)) => std::cmp::Ordering::Greater,
+            (None, None) => std::cmp::Ordering::Equal,
+        }
+    });
+
+    Ok(())
+}
+
 /// Merges new transactions into an existing database template with duplicate detection.
 /// Transactions are considered duplicates if they have the same `txn_id`.
 ///
@@ -368,6 +393,28 @@ mod tests {
         assert!(duplicates.contains(&"TXN001".to_string()));
         assert!(duplicates.contains(&"TXN002".to_string()));
         assert!(!duplicates.contains(&"TXN003".to_string()));
+    }
+
+    #[test]
+    fn test_sort_transactions_by_date() {
+        let mut database = json!({
+            "transactions": [
+                {"txn_id": "A", "date": "2026-01-10"},
+                {"txn_id": "B", "date": "2025-12-01"},
+                {"txn_id": "C", "date": "2026-01-10"},
+                {"txn_id": "D"}
+            ]
+        });
+
+        sort_transactions_by_date(&mut database).unwrap();
+
+        let txns = database.get("transactions").unwrap().as_array().unwrap();
+        let ids: Vec<&str> = txns
+            .iter()
+            .map(|t| t.get("txn_id").unwrap().as_str().unwrap())
+            .collect();
+
+        assert_eq!(ids, vec!["B", "A", "C", "D"]);
     }
 
     #[test]

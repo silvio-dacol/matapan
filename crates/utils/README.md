@@ -51,6 +51,26 @@ Other flags:
 - `--force`: overwrite existing non-empty `description-en`
 - `--limit N`: only process at most N unique descriptions
 
+## Sort Transactions by Date
+
+Sort all entries in `transactions` by `date` ascending (stable sort).
+
+Dry-run:
+
+```powershell
+cargo run -p utils --bin sort_transactions
+```
+
+Write changes to `database.json`:
+
+```powershell
+cargo run -p utils --bin sort_transactions -- --write
+```
+
+Optional path override:
+
+- `--db <path>`: database directory or `database.json` file (default: `./database`)
+
 ## Duplicate Handling
 
 Two approaches are provided, both using a strict signature of core fields:
