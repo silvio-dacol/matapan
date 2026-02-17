@@ -4,6 +4,7 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::io::Read;
+use utils::{build_position, PositionInput};
 
 pub const PARSER_NAME: &str = "ibkr";
 
@@ -285,17 +286,6 @@ impl IbkrCsvParser {
                 let close_price = parse_f64_opt(h.get(&row, "Close Price").unwrap_or(""));
                 let value = parse_f64_opt(h.get(&row, "Value").unwrap_or(""));
                 let upl = parse_f64_opt(h.get(&row, "Unrealized P/L").unwrap_or(""));
-                let (unrealized_profit, unrealized_loss) = if let Some(pnl) = upl {
-                    if pnl > 0.0 {
-                        (Some(pnl), Some(0.0))
-                    } else if pnl < 0.0 {
-                        (Some(0.0), Some(-pnl))
-                    } else {
-                        (Some(0.0), Some(0.0))
-                    }
-                } else {
-                    (None, None)
-                };
 
                 let position_id = make_hash_id(&format!(
                     "{}|{}|{}",
@@ -303,21 +293,23 @@ impl IbkrCsvParser {
                     as_of.format("%Y-%m-%d"),
                     instrument_id
                 ));
-                let pos = json!({
-                    "position_id": format!("IBKRPOS-{}", &position_id[..12]),
-                    "source": "IBKR",
-                    "as_of_date": as_of.format("%Y-%m-%d").to_string(),
-                    "account_id": self.account_id_savings,
-                    "instrument_id": instrument_id,
-                    "quantity": qty,
-                    "currency": null_if_empty(&currency),
-                    "cost_price": cost_price,
-                    "cost_basis": cost_basis,
-                    "close_price": close_price,
-                    "market_value": value,
-                    "unrealized_profit": unrealized_profit,
-                    "unrealized_loss": unrealized_loss
-                });
+                let currency_value = null_if_empty(&currency);
+                let pos = build_position(
+                    &PositionInput {
+                        position_id: format!("IBKRPOS-{}", &position_id[..12]),
+                        source: "IBKR".to_string(),
+                        as_of_date: as_of.format("%Y-%m-%d").to_string(),
+                        account_id: self.account_id_savings.clone(),
+                        instrument_id: instrument_id.clone(),
+                        quantity: qty,
+                        currency: currency_value.as_str().map(|s| s.to_string()),
+                        cost_price,
+                        cost_basis,
+                        close_price,
+                        market_value: value,
+                    },
+                    upl,
+                );
 
                 positions.push(pos);
                 continue;
@@ -729,47 +721,6 @@ pub fn merge_instruments_with_deduplication(
             stats.skipped += 1;
         } else {
             arr.push(inst);
-            stats.added += 1;
-        }
-    }
-
-    Ok((template, stats))
-}
-
-pub fn merge_positions_with_deduplication(
-    mut template: Value,
-    new_positions: Vec<Value>,
-) -> Result<(Value, utils::MergeStats)> {
-    let arr = template
-        .get_mut("positions")
-        .and_then(|v| v.as_array_mut())
-        .ok_or_else(|| anyhow!("database.json missing 'positions' array"))?;
-
-    let existing: HashSet<String> = arr
-        .iter()
-        .filter_map(|v| {
-            v.get("position_id")
-                .and_then(|x| x.as_str())
-                .map(|s| s.to_string())
-        })
-        .collect();
-
-    let mut stats = utils::MergeStats {
-        added: 0,
-        skipped: 0,
-        total: new_positions.len(),
-    };
-
-    for pos in new_positions {
-        let id = pos
-            .get("position_id")
-            .and_then(|x| x.as_str())
-            .ok_or_else(|| anyhow!("Position missing position_id"))?;
-
-        if existing.contains(id) {
-            stats.skipped += 1;
-        } else {
-            arr.push(pos);
             stats.added += 1;
         }
     }

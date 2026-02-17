@@ -140,7 +140,7 @@ fn main() -> Result<()> {
     };
 
     let (db4, pos_stats) = if !all_positions.is_empty() {
-        intesa_sanpaolo::merge_positions_with_deduplication(db3, all_positions)?
+        utils::merge_positions_with_deduplication(db3, all_positions)?
     } else {
         (
             db3,

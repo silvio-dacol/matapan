@@ -1,9 +1,7 @@
 use anyhow::{Context, Result};
 use std::{env, fs, fs::File, io::Read, path::PathBuf};
 
-use ibkr_parser::{
-    merge_instruments_with_deduplication, merge_positions_with_deduplication, IbkrCsvParser,
-};
+use ibkr_parser::{merge_instruments_with_deduplication, IbkrCsvParser};
 
 fn find_csv_file() -> Option<PathBuf> {
     let current_dir = env::current_dir().ok()?;
@@ -82,7 +80,7 @@ fn main() -> Result<()> {
     let (db2, acc_stats) = utils::merge_accounts_with_deduplication(db1, accounts)?;
 
     let (db3, inst_stats) = merge_instruments_with_deduplication(db2, parsed.instruments)?;
-    let (db4, pos_stats) = merge_positions_with_deduplication(db3, parsed.positions)?;
+    let (db4, pos_stats) = utils::merge_positions_with_deduplication(db3, parsed.positions)?;
 
     let (merged, txn_stats) =
         utils::merge_transactions_with_deduplication(db4, parsed.transactions)?;

@@ -4,6 +4,7 @@ use chrono::{Datelike, NaiveDate};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::path::Path;
+use utils::{build_position, PositionInput};
 
 pub const PARSER_NAME: &str = "intesa_sanpaolo";
 
@@ -606,35 +607,28 @@ impl IntesaSanpaoloParser {
                 instrument_id
             ));
 
-            let (unrealized_profit, unrealized_loss) =
-                if let (Some(mv), Some(cb)) = (market_value, cost_basis) {
-                    let pnl = mv - cb;
-                    if pnl > 0.0 {
-                        (Some(pnl), Some(0.0))
-                    } else if pnl < 0.0 {
-                        (Some(0.0), Some(-pnl))
-                    } else {
-                        (Some(0.0), Some(0.0))
-                    }
-                } else {
-                    (None, None)
-                };
+            let unrealized_pnl = if let (Some(mv), Some(cb)) = (market_value, cost_basis) {
+                Some(mv - cb)
+            } else {
+                None
+            };
 
-            positions.push(json!({
-                "position_id": format!("INTESAPOS-{}", &position_id[..12]),
-                "source": "Intesa Sanpaolo",
-                "as_of_date": as_of_date.format("%Y-%m-%d").to_string(),
-                "account_id": self.account_id_trading,
-                "instrument_id": instrument_id,
-                "quantity": quantity,
-                "currency": "EUR",
-                "cost_price": cost_price,
-                "cost_basis": cost_basis,
-                "close_price": market_price,
-                "market_value": market_value,
-                "unrealized_profit": unrealized_profit,
-                "unrealized_loss": unrealized_loss
-            }));
+            positions.push(build_position(
+                &PositionInput {
+                    position_id: format!("INTESAPOS-{}", &position_id[..12]),
+                    source: "Intesa Sanpaolo".to_string(),
+                    as_of_date: as_of_date.format("%Y-%m-%d").to_string(),
+                    account_id: self.account_id_trading.clone(),
+                    instrument_id: instrument_id.clone(),
+                    quantity,
+                    currency: Some("EUR".to_string()),
+                    cost_price,
+                    cost_basis,
+                    close_price: market_price,
+                    market_value,
+                },
+                unrealized_pnl,
+            ));
         }
 
         Ok((instruments, positions))
@@ -844,45 +838,3 @@ pub fn merge_instruments_with_deduplication(
     Ok((template, stats))
 }
 
-pub fn merge_positions_with_deduplication(
-    mut template: Value,
-    new_positions: Vec<Value>,
-) -> Result<(Value, utils::MergeStats)> {
-    use std::collections::HashSet;
-
-    let arr = template
-        .get_mut("positions")
-        .and_then(|v| v.as_array_mut())
-        .ok_or_else(|| anyhow!("database.json missing 'positions' array"))?;
-
-    let existing: HashSet<String> = arr
-        .iter()
-        .filter_map(|v| {
-            v.get("position_id")
-                .and_then(|x| x.as_str())
-                .map(|s| s.to_string())
-        })
-        .collect();
-
-    let mut stats = utils::MergeStats {
-        added: 0,
-        skipped: 0,
-        total: new_positions.len(),
-    };
-
-    for pos in new_positions {
-        let id = pos
-            .get("position_id")
-            .and_then(|x| x.as_str())
-            .ok_or_else(|| anyhow!("Position missing position_id"))?;
-
-        if existing.contains(id) {
-            stats.skipped += 1;
-        } else {
-            arr.push(pos);
-            stats.added += 1;
-        }
-    }
-
-    Ok((template, stats))
-}
