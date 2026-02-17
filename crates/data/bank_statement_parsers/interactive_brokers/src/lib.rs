@@ -285,6 +285,17 @@ impl IbkrCsvParser {
                 let close_price = parse_f64_opt(h.get(&row, "Close Price").unwrap_or(""));
                 let value = parse_f64_opt(h.get(&row, "Value").unwrap_or(""));
                 let upl = parse_f64_opt(h.get(&row, "Unrealized P/L").unwrap_or(""));
+                let (unrealized_profit, unrealized_loss) = if let Some(pnl) = upl {
+                    if pnl > 0.0 {
+                        (Some(pnl), Some(0.0))
+                    } else if pnl < 0.0 {
+                        (Some(0.0), Some(-pnl))
+                    } else {
+                        (Some(0.0), Some(0.0))
+                    }
+                } else {
+                    (None, None)
+                };
 
                 let position_id = make_hash_id(&format!(
                     "{}|{}|{}",
@@ -304,7 +315,8 @@ impl IbkrCsvParser {
                     "cost_basis": cost_basis,
                     "close_price": close_price,
                     "market_value": value,
-                    "unrealized_pnl": upl
+                    "unrealized_profit": unrealized_profit,
+                    "unrealized_loss": unrealized_loss
                 });
 
                 positions.push(pos);

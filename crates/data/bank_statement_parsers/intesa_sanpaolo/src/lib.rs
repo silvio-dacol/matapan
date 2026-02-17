@@ -606,11 +606,19 @@ impl IntesaSanpaoloParser {
                 instrument_id
             ));
 
-            let unrealized_pnl = if let (Some(mv), Some(cb)) = (market_value, cost_basis) {
-                Some(mv - cb)
-            } else {
-                None
-            };
+            let (unrealized_profit, unrealized_loss) =
+                if let (Some(mv), Some(cb)) = (market_value, cost_basis) {
+                    let pnl = mv - cb;
+                    if pnl > 0.0 {
+                        (Some(pnl), Some(0.0))
+                    } else if pnl < 0.0 {
+                        (Some(0.0), Some(-pnl))
+                    } else {
+                        (Some(0.0), Some(0.0))
+                    }
+                } else {
+                    (None, None)
+                };
 
             positions.push(json!({
                 "position_id": format!("INTESAPOS-{}", &position_id[..12]),
@@ -624,7 +632,8 @@ impl IntesaSanpaoloParser {
                 "cost_basis": cost_basis,
                 "close_price": market_price,
                 "market_value": market_value,
-                "unrealized_pnl": unrealized_pnl
+                "unrealized_profit": unrealized_profit,
+                "unrealized_loss": unrealized_loss
             }));
         }
 
