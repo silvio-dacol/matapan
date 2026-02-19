@@ -125,19 +125,10 @@ fn main() -> Result<()> {
     let (db1, sys_stats) = utils::merge_accounts_with_deduplication(template, system_accounts)?;
     let (db2, acc_stats) = utils::merge_accounts_with_deduplication(db1, all_accounts)?;
 
-    // Merge instruments and positions (if any)
-    let (db3, inst_stats) = if !all_instruments.is_empty() {
-        intesa_sanpaolo::merge_instruments_with_deduplication(db2, all_instruments)?
-    } else {
-        (
-            db2,
-            utils::MergeStats {
-                added: 0,
-                skipped: 0,
-                total: 0,
-            },
-        )
-    };
+    // Always merge instruments to enforce canonical instrument normalization,
+    // even when this run only contains transactions.
+    let (db3, inst_stats) =
+        intesa_sanpaolo::merge_instruments_with_deduplication(db2, all_instruments)?;
 
     let (db4, pos_stats) = if !all_positions.is_empty() {
         utils::merge_positions_with_deduplication(db3, all_positions)?

@@ -111,6 +111,8 @@ impl IbkrCsvParser {
 
         // instrument lookup by (asset_category|symbol) -> instrument_id
         let mut instrument_key_to_id: HashMap<String, String> = HashMap::new();
+        // remap old instrument_id -> new instrument_id when placeholders are replaced
+        let mut instrument_id_remap: HashMap<String, String> = HashMap::new();
 
         for rec in csvr.records() {
             let rec = rec?;
@@ -163,9 +165,6 @@ impl IbkrCsvParser {
                 let description = h.get(&row, "Description").unwrap_or("").trim().to_string();
                 let conid = h.get(&row, "Conid").unwrap_or("").trim().to_string();
                 let security_id = h.get(&row, "Security ID").unwrap_or("").trim().to_string();
-                let underlying = h.get(&row, "Underlying").unwrap_or("").trim().to_string();
-                let listing_exch = h.get(&row, "Listing Exch").unwrap_or("").trim().to_string();
-                let multiplier = h.get(&row, "Multiplier").unwrap_or("").trim().to_string();
                 let itype = h.get(&row, "Type").unwrap_or("").trim().to_string();
 
                 if symbol.is_empty() && conid.is_empty() && security_id.is_empty() {
@@ -173,64 +172,110 @@ impl IbkrCsvParser {
                 }
 
                 let instrument_id =
-                    build_instrument_id(&conid, &security_id, &asset_category, &symbol);
-
-                let mult_f = parse_f64_opt(&multiplier);
+                    build_instrument_id(&conid, &security_id, &asset_category, &primary_symbol(&symbol));
 
                 let inst = json!({
                     "instrument_id": instrument_id,
                     "source": "IBKR",
                     "asset_category": null_if_empty(&asset_category),
-                    "symbol": null_if_empty(&symbol),
                     "description": null_if_empty(&description),
-                    "conid": null_if_empty(&conid),
                     "security_id": null_if_empty(&security_id),
-                    "listing_exchange": null_if_empty(&listing_exch),
-                    "type": null_if_empty(&itype),
-                    "underlying": null_if_empty(&underlying),
-                    "multiplier": mult_f
+                    "type": null_if_empty(&itype)
                 });
 
-                let key = format!("{}|{}", asset_category, symbol);
+                let aliases = split_symbol_aliases(&symbol);
 
-                // Check if a placeholder already exists for this symbol
-                if let Some(existing_id) = instrument_key_to_id.get(&key).cloned() {
-                    // Find and update the placeholder instrument with the new ISIN-based ID
-                    if let Some(placeholder) = instruments.iter_mut().find(|i| {
+                // Resolve existing instrument by any known alias key
+                let mut existing_id: Option<String> = None;
+                for alias in &aliases {
+                    let key = format!("{}|{}", asset_category, alias);
+                    if let Some(id) = instrument_key_to_id.get(&key) {
+                        existing_id = Some(resolve_instrument_id(id, &instrument_id_remap));
+                        break;
+                    }
+                }
+
+                if existing_id.is_none() {
+                    let full_symbol_key = format!("{}|{}", asset_category, symbol);
+                    if let Some(id) = instrument_key_to_id.get(&full_symbol_key) {
+                        existing_id = Some(resolve_instrument_id(id, &instrument_id_remap));
+                    }
+                }
+
+                let final_instrument_id = if let Some(existing_id) = existing_id {
+                    if let Some(idx) = instruments.iter().position(|i| {
                         i.get("instrument_id")
                             .and_then(|v| v.as_str())
-                            .map(|id| id == &existing_id)
+                            .map(|id| id == existing_id)
                             .unwrap_or(false)
                     }) {
-                        // Recalculate instrument_id with actual security_id (ISIN)
-                        let new_instrument_id =
-                            build_instrument_id(&conid, &security_id, &asset_category, &symbol);
-                        *placeholder = json!({
-                            "instrument_id": new_instrument_id,
-                            "source": "IBKR",
-                            "asset_category": null_if_empty(&asset_category),
-                            "symbol": null_if_empty(&symbol),
-                            "description": null_if_empty(&description),
-                            "conid": null_if_empty(&conid),
-                            "security_id": null_if_empty(&security_id),
-                            "listing_exchange": null_if_empty(&listing_exch),
-                            "type": null_if_empty(&itype),
-                            "underlying": null_if_empty(&underlying),
-                            "multiplier": mult_f
-                        });
-                        // Update the key map with the new ID
-                        instrument_key_to_id.insert(key.clone(), new_instrument_id);
+                        let merged = merge_instrument_entries(&instruments[idx], &inst);
+                        let merged_asset_category = merged
+                            .get("asset_category")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("");
+                        let merged_symbol = merged.get("symbol").and_then(|v| v.as_str()).unwrap_or("");
+                        let merged_conid = merged.get("conid").and_then(|v| v.as_str()).unwrap_or("");
+                        let merged_security_id = merged
+                            .get("security_id")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("");
+
+                        let new_instrument_id = build_instrument_id(
+                            merged_conid,
+                            merged_security_id,
+                            merged_asset_category,
+                            &primary_symbol(merged_symbol),
+                        );
+
+                        let mut merged_with_id = merged;
+                        if let Some(id_field) = merged_with_id.get_mut("instrument_id") {
+                            *id_field = Value::String(new_instrument_id.clone());
+                        }
+
+                        instruments[idx] = merged_with_id;
+
+                        if new_instrument_id != existing_id {
+                            instrument_id_remap.insert(existing_id.clone(), new_instrument_id.clone());
+                        }
+
+                        new_instrument_id
+                    } else {
+                        let id = inst
+                            .get("instrument_id")
+                            .and_then(|v| v.as_str())
+                            .unwrap()
+                            .to_string();
+                        instruments.push(inst);
+                        id
                     }
+                } else if let Some(idx) = instruments.iter().position(|i| {
+                    i.get("instrument_id")
+                        .and_then(|v| v.as_str())
+                        .map(|id| id == instrument_id)
+                        .unwrap_or(false)
+                }) {
+                    instruments[idx] = merge_instrument_entries(&instruments[idx], &inst);
+                    instrument_id.clone()
                 } else {
-                    // No placeholder exists, add as new
-                    let inst_id = inst
+                    let id = inst
                         .get("instrument_id")
                         .and_then(|v| v.as_str())
                         .unwrap()
                         .to_string();
-                    instrument_key_to_id.insert(key, inst_id);
                     instruments.push(inst);
+                    id
+                };
+
+                // Index all aliases to the final instrument id
+                for alias in &aliases {
+                    let key = format!("{}|{}", asset_category, alias);
+                    instrument_key_to_id.insert(key, final_instrument_id.clone());
                 }
+
+                let full_symbol_key = format!("{}|{}", asset_category, symbol);
+                instrument_key_to_id.insert(full_symbol_key, final_instrument_id);
+
                 continue;
             }
 
@@ -267,14 +312,9 @@ impl IbkrCsvParser {
                         "instrument_id": fallback_id,
                         "source": "IBKR",
                         "asset_category": null_if_empty(&asset_category),
-                        "symbol": null_if_empty(&symbol),
                         "description": null,
-                        "conid": null,
                         "security_id": null,
-                        "listing_exchange": null,
-                        "type": null,
-                        "underlying": null,
-                        "multiplier": null
+                        "type": null
                     });
                     instruments.push(placeholder);
                     instrument_key_to_id.insert(inst_key, fallback_id.clone());
@@ -628,39 +668,23 @@ impl IbkrCsvParser {
         }
 
         // After all sections are processed, update positions with corrected instrument IDs
-        // (in case placeholders were created first and later updated with ISIN-based IDs)
+        // (in case placeholders were created first and later updated with ISIN/conid-based IDs)
         for pos in positions.iter_mut() {
             if let Some(old_inst_id) = pos.get("instrument_id").and_then(|v| v.as_str()) {
-                // Try to find if this instrument was updated in the key map
-                // by searching for the key that matches this instrument
-                if let Some(inst) = instruments.iter().find(|i| {
-                    i.get("instrument_id")
-                        .and_then(|v| v.as_str())
-                        .map(|id| id == old_inst_id)
-                        .unwrap_or(false)
-                }) {
-                    // Get the asset_category and symbol to look up the correct ID
-                    let ac = inst
-                        .get("asset_category")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("");
-                    let sym = inst.get("symbol").and_then(|v| v.as_str()).unwrap_or("");
-                    let key = format!("{}|{}", ac, sym);
-
-                    if let Some(correct_id) = instrument_key_to_id.get(&key) {
-                        if let Some(inst_id_field) = pos.get_mut("instrument_id") {
-                            *inst_id_field = Value::String(correct_id.clone());
-                        }
-                        // Also update position_id since it includes the instrument_id
-                        if let Some(as_of) = pos.get("as_of_date").and_then(|v| v.as_str()) {
-                            let new_position_id = make_hash_id(&format!(
-                                "{}|{}|{}",
-                                self.account_id_savings, as_of, correct_id
-                            ));
-                            if let Some(pos_id_field) = pos.get_mut("position_id") {
-                                *pos_id_field =
-                                    Value::String(format!("IBKRPOS-{}", &new_position_id[..12]));
-                            }
+                let correct_id = resolve_instrument_id(old_inst_id, &instrument_id_remap);
+                if correct_id != old_inst_id {
+                    if let Some(inst_id_field) = pos.get_mut("instrument_id") {
+                        *inst_id_field = Value::String(correct_id.clone());
+                    }
+                    // Also update position_id since it includes the instrument_id
+                    if let Some(as_of) = pos.get("as_of_date").and_then(|v| v.as_str()) {
+                        let new_position_id = make_hash_id(&format!(
+                            "{}|{}|{}",
+                            self.account_id_savings, as_of, correct_id
+                        ));
+                        if let Some(pos_id_field) = pos.get_mut("position_id") {
+                            *pos_id_field =
+                                Value::String(format!("IBKRPOS-{}", &new_position_id[..12]));
                         }
                     }
                 }
@@ -778,6 +802,57 @@ fn build_instrument_id(
     let ac = asset_category.trim().replace(' ', "_");
     let sym = symbol.trim().replace(' ', "_");
     format!("IBKR_{}_{}", ac, sym)
+}
+
+fn split_symbol_aliases(symbol: &str) -> Vec<String> {
+    let mut aliases: Vec<String> = Vec::new();
+    for part in symbol.split(',') {
+        let alias = part.trim();
+        if !alias.is_empty() && !aliases.iter().any(|a| a == alias) {
+            aliases.push(alias.to_string());
+        }
+    }
+    aliases
+}
+
+fn primary_symbol(symbol: &str) -> String {
+    split_symbol_aliases(symbol)
+        .into_iter()
+        .next()
+        .unwrap_or_else(|| symbol.trim().to_string())
+}
+
+fn resolve_instrument_id(id: &str, remap: &HashMap<String, String>) -> String {
+    let mut current = id.to_string();
+    while let Some(next) = remap.get(&current) {
+        if *next == current {
+            break;
+        }
+        current = next.clone();
+    }
+    current
+}
+
+fn merge_instrument_entries(existing: &Value, incoming: &Value) -> Value {
+    let existing_score = instrument_completeness_score(existing);
+    let incoming_score = instrument_completeness_score(incoming);
+    if incoming_score >= existing_score {
+        incoming.clone()
+    } else {
+        existing.clone()
+    }
+}
+
+fn instrument_completeness_score(inst: &Value) -> usize {
+    ["description", "security_id", "type"]
+    .iter()
+    .filter(|field| match inst.get(**field) {
+        Some(Value::Null) | None => false,
+        Some(Value::String(s)) => !s.trim().is_empty(),
+        Some(Value::Number(_)) => true,
+        _ => true,
+    })
+    .count()
 }
 
 fn looks_like_isin(s: &str) -> bool {
