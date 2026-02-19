@@ -796,45 +796,9 @@ fn intesa_force_expense(desc: &str) -> bool {
 // ------------------------
 
 pub fn merge_instruments_with_deduplication(
-    mut template: Value,
+    template: Value,
     new_instruments: Vec<Value>,
 ) -> Result<(Value, utils::MergeStats)> {
-    use std::collections::HashSet;
-
-    let arr = template
-        .get_mut("instruments")
-        .and_then(|v| v.as_array_mut())
-        .ok_or_else(|| anyhow!("database.json missing 'instruments' array"))?;
-
-    let existing: HashSet<String> = arr
-        .iter()
-        .filter_map(|v| {
-            v.get("instrument_id")
-                .and_then(|x| x.as_str())
-                .map(|s| s.to_string())
-        })
-        .collect();
-
-    let mut stats = utils::MergeStats {
-        added: 0,
-        skipped: 0,
-        total: new_instruments.len(),
-    };
-
-    for inst in new_instruments {
-        let id = inst
-            .get("instrument_id")
-            .and_then(|x| x.as_str())
-            .ok_or_else(|| anyhow!("Instrument missing instrument_id"))?;
-
-        if existing.contains(id) {
-            stats.skipped += 1;
-        } else {
-            arr.push(inst);
-            stats.added += 1;
-        }
-    }
-
-    Ok((template, stats))
+    utils::merge_instruments_with_deduplication(template, new_instruments)
 }
 
