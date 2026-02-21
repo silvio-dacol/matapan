@@ -3,6 +3,7 @@ use calamine::{open_workbook, Reader, Xlsx};
 use chrono::{Datelike, Local, NaiveDate};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
+use std::collections::HashMap;
 use std::path::Path;
 use utils::{build_position, PositionInput};
 
@@ -494,6 +495,7 @@ impl IntesaSanpaoloParser {
         let mut prezzo_mercato_col = None;
         let mut controvalore_col = None;
         let mut valore_carico_col = None;
+        let mut as_of_col = None;
 
         for row_idx in 0..height.min(20) {
             for col_idx in 0..width {
@@ -523,6 +525,9 @@ impl IntesaSanpaoloParser {
                     }
                     if text.contains("valore carico") && valore_carico_col.is_none() {
                         valore_carico_col = Some(col_idx);
+                    }
+                    if is_portfolio_date_header(&text) && as_of_col.is_none() {
+                        as_of_col = Some(col_idx);
                     }
                 }
             }
@@ -586,6 +591,12 @@ impl IntesaSanpaoloParser {
                 continue;
             }
 
+            let position_as_of_date = as_of_col
+                .and_then(|col| range.get((row_idx, col)))
+                .and_then(|c| parse_date_or_serial(&c.to_string()).ok())
+                .or_else(|| extract_row_date_from_column_g(range, row_idx))
+                .unwrap_or(as_of_date);
+
             // Create instrument
             let instrument_id = format!("ISIN_{}", isin);
             let instrument = json!({
@@ -608,7 +619,7 @@ impl IntesaSanpaoloParser {
             let position_id = make_hash(&format!(
                 "{}|{}|{}",
                 self.account_id_trading,
-                as_of_date.format("%Y-%m-%d"),
+                position_as_of_date.format("%Y-%m-%d"),
                 instrument_id
             ));
 
@@ -622,7 +633,7 @@ impl IntesaSanpaoloParser {
                 &PositionInput {
                     position_id: format!("INTESAPOS-{}", &position_id[..12]),
                     source: "Intesa Sanpaolo".to_string(),
-                    as_of_date: as_of_date.format("%Y-%m-%d").to_string(),
+                    as_of_date: position_as_of_date.format("%Y-%m-%d").to_string(),
                     account_id: self.account_id_trading.clone(),
                     instrument_id: instrument_id.clone(),
                     quantity,
@@ -728,6 +739,10 @@ fn parse_amount(s: &str) -> Result<f64> {
 }
 
 fn extract_portfolio_date(range: &calamine::Range<calamine::Data>) -> Option<NaiveDate> {
+    if let Some(date) = extract_portfolio_date_from_column_g(range) {
+        return Some(date);
+    }
+
     // Look for dates in the first few rows
     let (height, width) = range.get_size();
     for row_idx in 0..height.min(10) {
@@ -745,6 +760,46 @@ fn extract_portfolio_date(range: &calamine::Range<calamine::Data>) -> Option<Nai
         }
     }
     None
+}
+
+fn extract_portfolio_date_from_column_g(range: &calamine::Range<calamine::Data>) -> Option<NaiveDate> {
+    let (height, width) = range.get_size();
+    if width <= 6 {
+        return None;
+    }
+
+    let mut counts: HashMap<NaiveDate, usize> = HashMap::new();
+    for row_idx in 0..height {
+        if let Some(cell) = range.get((row_idx, 6)) {
+            if let Ok(date) = parse_date_or_serial(&cell.to_string()) {
+                if (2020..=2035).contains(&date.year()) {
+                    *counts.entry(date).or_insert(0) += 1;
+                }
+            }
+        }
+    }
+
+    counts
+        .into_iter()
+        .max_by_key(|(date, count)| (*count, *date))
+        .map(|(date, _)| date)
+}
+
+fn extract_row_date_from_column_g(
+    range: &calamine::Range<calamine::Data>,
+    row_idx: usize,
+) -> Option<NaiveDate> {
+    range
+        .get((row_idx, 6))
+        .and_then(|c| parse_date_or_serial(&c.to_string()).ok())
+}
+
+fn is_portfolio_date_header(text: &str) -> bool {
+    let t = text.trim();
+    t == "data"
+        || t.contains("data valoriz")
+        || t.contains("data riferimento")
+        || t.contains("as of")
 }
 
 fn extract_file_statement_date(path: &Path) -> Option<NaiveDate> {

@@ -92,8 +92,9 @@ impl IbkrCsvParser {
     /// - instruments (from Financial Instrument Information)
     /// - positions (from Open Positions, as_of_date = statement end)
     pub fn parse_file<P: AsRef<Path>>(&self, path: P) -> Result<ParsedIbkr> {
-        let fallback_statement_date =
-            extract_file_statement_date(path.as_ref()).unwrap_or_else(|| Local::now().naive_local().date());
+        let fallback_statement_date = extract_statement_end_from_filename(path.as_ref())
+            .or_else(|| extract_file_statement_date(path.as_ref()))
+            .unwrap_or_else(|| Local::now().naive_local().date());
         let mut file = std::fs::File::open(path.as_ref())
             .with_context(|| format!("Cannot open {}", path.as_ref().display()))?;
         self.parse_reader_with_fallback_date(&mut file, Some(fallback_statement_date))
@@ -157,11 +158,15 @@ impl IbkrCsvParser {
             }
 
             // Statement end date
-            if section == "Statement" {
+            if section.eq_ignore_ascii_case("Statement") {
                 // columns: Field Name, Field Value
-                let field_name = row.get(0).map(|s| s.trim()).unwrap_or("");
-                if field_name == "Period" {
-                    let field_val = row.get(1).map(|s| s.trim()).unwrap_or("");
+                let field_name = row.get(0).map(|s| s.trim()).unwrap_or("").to_lowercase();
+                let field_val = row.get(1).map(|s| s.trim()).unwrap_or("");
+
+                if field_name.contains("whengenerated") {
+                    statement_end = parse_statement_generated(field_val).ok().or(statement_end);
+                }
+                if field_name.contains("period") {
                     statement_end = parse_statement_end(field_val).ok();
                 }
                 continue;
@@ -749,13 +754,22 @@ fn null_if_empty(s: &str) -> Value {
 }
 
 fn parse_statement_end(period: &str) -> Result<NaiveDate> {
-    // "January 1, 2025 - November 28, 2025"
-    let parts: Vec<&str> = period.split('-').collect();
-    if parts.len() != 2 {
-        return Err(anyhow!("Unsupported period format: {}", period));
+    // e.g. "December 1, 2025 - January 30, 2026"
+    let normalized = period
+        .trim()
+        .trim_matches('"')
+        .replace('–', "-")
+        .replace('—', "-");
+
+    if let Some((_, end)) = normalized.split_once('-') {
+        return parse_flexible_date(end.trim());
     }
-    let end = parts[1].trim();
-    Ok(NaiveDate::parse_from_str(end, "%B %d, %Y")?)
+
+    parse_flexible_date(&normalized)
+}
+
+fn parse_statement_generated(value: &str) -> Result<NaiveDate> {
+    parse_ibkr_datetime_date(value)
 }
 
 fn extract_file_statement_date(path: &Path) -> Option<NaiveDate> {
@@ -768,8 +782,38 @@ fn extract_file_statement_date(path: &Path) -> Option<NaiveDate> {
     Some(local_timestamp.naive_local().date())
 }
 
+fn extract_statement_end_from_filename(path: &Path) -> Option<NaiveDate> {
+    let stem = path.file_stem()?.to_string_lossy();
+    let last_token = stem.split('_').next_back()?;
+
+    if last_token.len() != 8 || !last_token.chars().all(|c| c.is_ascii_digit()) {
+        return None;
+    }
+
+    NaiveDate::parse_from_str(last_token, "%Y%m%d").ok()
+}
+
 fn parse_yyyy_mm_dd(s: &str) -> Result<NaiveDate> {
     Ok(NaiveDate::parse_from_str(s.trim(), "%Y-%m-%d")?)
+}
+
+fn parse_flexible_date(s: &str) -> Result<NaiveDate> {
+    let text = s.trim().trim_matches('"');
+
+    if let Ok(date) = NaiveDate::parse_from_str(text, "%B %d, %Y") {
+        return Ok(date);
+    }
+    if let Ok(date) = NaiveDate::parse_from_str(text, "%b %d, %Y") {
+        return Ok(date);
+    }
+    if let Ok(date) = NaiveDate::parse_from_str(text, "%Y-%m-%d") {
+        return Ok(date);
+    }
+    if let Ok(date) = NaiveDate::parse_from_str(text, "%m/%d/%Y") {
+        return Ok(date);
+    }
+
+    Err(anyhow!("Unsupported date format: {}", s))
 }
 
 fn parse_ibkr_datetime_date(s: &str) -> Result<NaiveDate> {
