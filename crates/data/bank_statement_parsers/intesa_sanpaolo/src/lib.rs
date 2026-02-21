@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Context, Result};
 use calamine::{open_workbook, Reader, Xlsx};
-use chrono::{Datelike, NaiveDate};
+use chrono::{Datelike, Local, NaiveDate};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::path::Path;
@@ -152,6 +152,9 @@ impl IntesaSanpaoloParser {
         path: P,
         file_type: FileType,
     ) -> Result<ParsedIntesa> {
+        let fallback_statement_date =
+            extract_file_statement_date(path.as_ref()).unwrap_or_else(|| Local::now().naive_local().date());
+
         let mut workbook: Xlsx<_> = open_workbook(&path)
             .with_context(|| format!("Failed to open workbook: {}", path.as_ref().display()))?;
 
@@ -166,7 +169,8 @@ impl IntesaSanpaoloParser {
                 })
             }
             FileType::Portfolio => {
-                let (instruments, positions) = self.parse_portfolio(&mut workbook)?;
+                let (instruments, positions) =
+                    self.parse_portfolio(&mut workbook, fallback_statement_date)?;
                 Ok(ParsedIntesa {
                     transactions: Vec::new(),
                     positions,
@@ -452,6 +456,7 @@ impl IntesaSanpaoloParser {
     fn parse_portfolio<R: std::io::Read + std::io::Seek>(
         &self,
         workbook: &mut Xlsx<R>,
+        fallback_statement_date: NaiveDate,
     ) -> Result<(Vec<Value>, Vec<Value>)> {
         let mut instruments = Vec::new();
         let mut positions = Vec::new();
@@ -459,7 +464,7 @@ impl IntesaSanpaoloParser {
         let sheet_names = workbook.sheet_names().to_vec();
         for sheet_name in sheet_names {
             if let Ok(range) = workbook.worksheet_range(&sheet_name) {
-                let (inst, pos) = self.parse_portfolio_sheet(&range)?;
+                let (inst, pos) = self.parse_portfolio_sheet(&range, fallback_statement_date)?;
                 instruments.extend(inst);
                 positions.extend(pos);
             }
@@ -471,14 +476,14 @@ impl IntesaSanpaoloParser {
     fn parse_portfolio_sheet(
         &self,
         range: &calamine::Range<calamine::Data>,
+        fallback_statement_date: NaiveDate,
     ) -> Result<(Vec<Value>, Vec<Value>)> {
         let mut instruments = Vec::new();
         let mut positions = Vec::new();
         let (height, width) = range.get_size();
 
         // Find the as_of_date from the sheet (usually in top rows)
-        let as_of_date = extract_portfolio_date(range)
-            .unwrap_or_else(|| chrono::Local::now().naive_local().date());
+        let as_of_date = extract_portfolio_date(range).unwrap_or(fallback_statement_date);
 
         // Find header row with ISIN, Quantità, etc.
         let mut header_row = None;
@@ -740,6 +745,16 @@ fn extract_portfolio_date(range: &calamine::Range<calamine::Data>) -> Option<Nai
         }
     }
     None
+}
+
+fn extract_file_statement_date(path: &Path) -> Option<NaiveDate> {
+    let metadata = std::fs::metadata(path).ok()?;
+    let timestamp = metadata
+        .modified()
+        .or_else(|_| metadata.created())
+        .ok()?;
+    let local_timestamp: chrono::DateTime<Local> = timestamp.into();
+    Some(local_timestamp.naive_local().date())
 }
 
 fn determine_transaction_type(account_id: &str, amount: f64) -> (String, String, String) {

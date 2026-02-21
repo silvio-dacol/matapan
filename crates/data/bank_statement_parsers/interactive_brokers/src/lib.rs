@@ -1,9 +1,10 @@
 use anyhow::{anyhow, Context, Result};
-use chrono::NaiveDate;
+use chrono::{Local, NaiveDate};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::io::Read;
+use std::path::Path;
 use utils::{build_position, PositionInput};
 
 pub const PARSER_NAME: &str = "ibkr";
@@ -90,7 +91,23 @@ impl IbkrCsvParser {
     /// - transactions (cash only, OPTION 1)
     /// - instruments (from Financial Instrument Information)
     /// - positions (from Open Positions, as_of_date = statement end)
-    pub fn parse_reader<R: Read>(&self, mut reader: R) -> Result<ParsedIbkr> {
+    pub fn parse_file<P: AsRef<Path>>(&self, path: P) -> Result<ParsedIbkr> {
+        let fallback_statement_date =
+            extract_file_statement_date(path.as_ref()).unwrap_or_else(|| Local::now().naive_local().date());
+        let mut file = std::fs::File::open(path.as_ref())
+            .with_context(|| format!("Cannot open {}", path.as_ref().display()))?;
+        self.parse_reader_with_fallback_date(&mut file, Some(fallback_statement_date))
+    }
+
+    pub fn parse_reader<R: Read>(&self, reader: R) -> Result<ParsedIbkr> {
+        self.parse_reader_with_fallback_date(reader, None)
+    }
+
+    fn parse_reader_with_fallback_date<R: Read>(
+        &self,
+        mut reader: R,
+        fallback_statement_date: Option<NaiveDate>,
+    ) -> Result<ParsedIbkr> {
         let mut buf = String::new();
         reader.read_to_string(&mut buf)?;
 
@@ -298,8 +315,9 @@ impl IbkrCsvParser {
                     continue;
                 }
 
-                let as_of =
-                    statement_end.unwrap_or_else(|| NaiveDate::from_ymd_opt(1970, 1, 1).unwrap());
+                let as_of = statement_end
+                    .or(fallback_statement_date)
+                    .unwrap_or_else(|| NaiveDate::from_ymd_opt(1970, 1, 1).unwrap());
 
                 // Link to instrument if possible, otherwise create a placeholder instrument
                 let inst_key = format!("{}|{}", asset_category, symbol);
@@ -738,6 +756,16 @@ fn parse_statement_end(period: &str) -> Result<NaiveDate> {
     }
     let end = parts[1].trim();
     Ok(NaiveDate::parse_from_str(end, "%B %d, %Y")?)
+}
+
+fn extract_file_statement_date(path: &Path) -> Option<NaiveDate> {
+    let metadata = std::fs::metadata(path).ok()?;
+    let timestamp = metadata
+        .modified()
+        .or_else(|_| metadata.created())
+        .ok()?;
+    let local_timestamp: chrono::DateTime<Local> = timestamp.into();
+    Some(local_timestamp.naive_local().date())
 }
 
 fn parse_yyyy_mm_dd(s: &str) -> Result<NaiveDate> {

@@ -1,5 +1,5 @@
-use anyhow::{Context, Result};
-use std::{env, fs, fs::File, io::Read, path::PathBuf};
+use anyhow::Result;
+use std::{env, fs, path::PathBuf};
 
 use ibkr_parser::{merge_instruments_with_deduplication, IbkrCsvParser};
 
@@ -44,14 +44,10 @@ fn main() -> Result<()> {
 
     println!("📖 Parsing IBKR statement: {}", csv_path);
 
-    let mut f = File::open(csv_path).with_context(|| format!("Cannot open {}", csv_path))?;
-    let mut buf = Vec::new();
-    f.read_to_end(&mut buf)?;
-
     let parser = IbkrCsvParser::new();
     let accounts = parser.create_accounts();
 
-    let parsed = parser.parse_reader(buf.as_slice())?;
+    let parsed = parser.parse_file(csv_path)?;
 
     if parsed.transactions.is_empty()
         && parsed.positions.is_empty()
