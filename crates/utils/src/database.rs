@@ -6,7 +6,7 @@ use std::{
 };
 
 /// Ensures that database.json exists at the specified path.
-/// If it doesn't exist or is invalid JSON, initializes it from template.json
+/// If it doesn't exist or is invalid JSON, initializes it from .database.template.json
 /// in the same directory.
 ///
 /// # Arguments
@@ -18,13 +18,13 @@ use std::{
 /// # Example
 /// ```no_run
 /// use utils::ensure_database_exists;
-/// 
+///
 /// let db_path = ensure_database_exists("../../database").unwrap();
 /// println!("Database ready at: {:?}", db_path);
 /// ```
 pub fn ensure_database_exists<P: AsRef<Path>>(database_path: P) -> Result<PathBuf> {
     let path = database_path.as_ref();
-    
+
     // Resolve to database.json if a directory was provided
     let db_path = if path.is_dir() || (!path.exists() && !path.to_string_lossy().ends_with(".json")) {
         path.join("database.json")
@@ -53,24 +53,24 @@ pub fn ensure_database_exists<P: AsRef<Path>>(database_path: P) -> Result<PathBu
     Ok(db_path)
 }
 
-/// Initializes database.json from template.json
+/// Initializes database.json from .database.template.json.
 fn initialize_from_template(db_path: &Path) -> Result<()> {
-    let template_path = db_path
+    let parent = db_path
         .parent()
-        .ok_or_else(|| anyhow::anyhow!("Cannot determine parent directory of {:?}", db_path))?
-        .join("template.json");
+        .ok_or_else(|| anyhow::anyhow!("Cannot determine parent directory of {:?}", db_path))?;
 
-    // Read template.json to get user_profile and engine_version
-    let mut template_file = File::open(&template_path).with_context(|| {
-        format!("Cannot open template file at {:?}", template_path)
-    })?;
-    
+    let template_path = parent.join(".database.template.json");
+
+    // Read template to get user_profile and engine_version
+    let mut template_file = File::open(&template_path)
+        .with_context(|| format!("Cannot open template file at {:?}", template_path))?;
+
     let mut template_contents = String::new();
     template_file.read_to_string(&mut template_contents)?;
-    
+
     // Validate it's valid JSON
     let template_value: serde_json::Value = serde_json::from_str(&template_contents)
-        .with_context(|| format!("template.json at {:?} is not valid JSON", template_path))?;
+        .with_context(|| format!("template file at {:?} is not valid JSON", template_path))?;
 
     // Create minimal database structure with empty arrays
     let minimal_db = serde_json::json!({
@@ -93,12 +93,12 @@ fn initialize_from_template(db_path: &Path) -> Result<()> {
     // Write to database.json
     let mut db_file = File::create(db_path)
         .with_context(|| format!("Cannot create database file at {:?}", db_path))?;
-    
+
     let formatted = serde_json::to_string_pretty(&minimal_db)?;
     db_file.write_all(formatted.as_bytes())?;
 
     println!("✓ Initialized database.json with empty structure at {:?}", db_path);
-    
+
     Ok(())
 }
 
@@ -106,13 +106,13 @@ fn initialize_from_template(db_path: &Path) -> Result<()> {
 /// Ensures the database exists before reading.
 pub fn read_database<P: AsRef<Path>>(database_path: P) -> Result<serde_json::Value> {
     let db_path = ensure_database_exists(database_path)?;
-    
+
     let mut file = File::open(&db_path)
         .with_context(|| format!("Cannot open database at {:?}", db_path))?;
-    
+
     let mut contents = String::new();
     file.read_to_string(&mut contents)?;
-    
+
     serde_json::from_str(&contents)
         .with_context(|| format!("Database at {:?} is not valid JSON", db_path))
 }
@@ -123,7 +123,7 @@ pub fn write_database<P: AsRef<Path>>(
     value: &serde_json::Value,
 ) -> Result<PathBuf> {
     let path = database_path.as_ref();
-    
+
     // Resolve to database.json if a directory was provided
     let db_path = if path.is_dir() || (!path.exists() && !path.to_string_lossy().ends_with(".json")) {
         path.join("database.json")
@@ -138,7 +138,7 @@ pub fn write_database<P: AsRef<Path>>(
 
     let mut file = File::create(&db_path)
         .with_context(|| format!("Cannot create database file at {:?}", db_path))?;
-    
+
     let formatted = serde_json::to_string_pretty(value)?;
     file.write_all(formatted.as_bytes())?;
 

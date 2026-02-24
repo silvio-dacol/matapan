@@ -1,11 +1,8 @@
 pub mod parser;
+pub mod database;
 
 pub mod accounts {
     pub use crate::parser::accounts::*;
-}
-
-pub mod database {
-    pub use crate::parser::database::*;
 }
 
 pub mod instruments {
