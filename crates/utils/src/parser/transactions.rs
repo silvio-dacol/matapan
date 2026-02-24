@@ -189,6 +189,36 @@ pub fn dedup_transactions_by_signature(database: &mut Value) -> Result<usize> {
     Ok(removed)
 }
 
+/// Deduplicate transactions in-place by `date` + `amount` only.
+/// Keeps the first occurrence and removes subsequent ones, preserving order.
+///
+/// Returns the count of removed transactions.
+pub fn dedup_transactions_by_date_and_amount(database: &mut Value) -> Result<usize> {
+    let arr = database
+        .get_mut("transactions")
+        .and_then(|v| v.as_array_mut())
+        .ok_or_else(|| anyhow!("database.json missing 'transactions' array"))?;
+
+    let mut seen: HashSet<String> = HashSet::new();
+    let mut deduped: Vec<Value> = Vec::with_capacity(arr.len());
+    let mut removed = 0usize;
+
+    for txn in arr.drain(..) {
+        if let Some(sig) = build_date_amount_signature(&txn) {
+            if seen.insert(sig) {
+                deduped.push(txn);
+            } else {
+                removed += 1;
+            }
+        } else {
+            deduped.push(txn);
+        }
+    }
+
+    *arr = deduped;
+    Ok(removed)
+}
+
 fn build_signature(txn: &Value) -> Option<String> {
     let obj = txn.as_object()?;
     let date = obj.get("date")?.as_str()?;
@@ -201,6 +231,13 @@ fn build_signature(txn: &Value) -> Option<String> {
         "{}|{}|{}|{}|{}|{}",
         date, amount, currency, from, to, typ
     ))
+}
+
+fn build_date_amount_signature(txn: &Value) -> Option<String> {
+    let obj = txn.as_object()?;
+    let date = obj.get("date")?.as_str()?;
+    let amount = obj.get("amount")?.as_f64()?;
+    Some(format!("{}|{:.8}", date, amount))
 }
 
 /// Mark duplicates in-place based on the same strict signature used by
@@ -550,5 +587,39 @@ mod tests {
             arr[1].get("duplicate_of_txn_id").unwrap().as_str().unwrap(),
             "X1"
         );
+    }
+
+    #[test]
+    fn test_dedup_transactions_by_date_and_amount() {
+        let mut database = json!({
+            "transactions": [
+                {
+                    "date": "2025-02-01",
+                    "amount": 100.0,
+                    "currency": "SEK",
+                    "txn_id": "A1"
+                },
+                {
+                    "date": "2025-02-01",
+                    "amount": 100.0,
+                    "currency": "EUR",
+                    "txn_id": "A2"
+                },
+                {
+                    "date": "2025-02-02",
+                    "amount": 100.0,
+                    "currency": "SEK",
+                    "txn_id": "A3"
+                }
+            ]
+        });
+
+        let removed = dedup_transactions_by_date_and_amount(&mut database).unwrap();
+        assert_eq!(removed, 1);
+
+        let arr = database.get("transactions").unwrap().as_array().unwrap();
+        assert_eq!(arr.len(), 2);
+        assert_eq!(arr[0].get("txn_id").unwrap().as_str().unwrap(), "A1");
+        assert_eq!(arr[1].get("txn_id").unwrap().as_str().unwrap(), "A3");
     }
 }

@@ -35,7 +35,7 @@ pub use crate::positions::{
     normalize_positions_pnl_fields, split_unrealized_pnl, PositionInput,
 };
 pub use crate::transactions::{
-    build_transaction, dedup_transactions_by_signature, find_duplicate_txn_ids,
-    mark_duplicates_by_signature, merge_transactions_with_deduplication, sort_transactions_by_date,
-    MergeStats, TransactionInput,
+    build_transaction, dedup_transactions_by_date_and_amount, dedup_transactions_by_signature,
+    find_duplicate_txn_ids, mark_duplicates_by_signature, merge_transactions_with_deduplication,
+    sort_transactions_by_date, MergeStats, TransactionInput,
 };

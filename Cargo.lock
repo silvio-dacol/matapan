@@ -1231,6 +1231,7 @@ dependencies = [
 name = "revolut"
 version = "0.1.0"
 dependencies = [
+ "ai_client",
  "anyhow",
  "chrono",
  "csv",
