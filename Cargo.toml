@@ -10,6 +10,7 @@ members = [
     "crates/data/bank_statement_parsers/skandinaviska_enskilda_banken",
     "crates/data/bank_statement_parsers/wechat",
     "crates/data/bank_statement_parsers/carpay",
+    "crates/data/bank_statement_parsers/template",
     "crates/utils", "crates/rules", "crates/ai_client",
 ]
 
