@@ -1,9 +1,11 @@
-use anyhow::{anyhow, Context, Result};
-use chrono::{NaiveDate, NaiveDateTime};
-use encoding_rs::GB18030;
+use anyhow::Result;
 use serde_json::{json, Value};
-use sha2::{Digest, Sha256};
 use std::io::Read;
+
+mod accounts;
+mod instruments;
+mod positions;
+mod transactions;
 
 pub const PARSER_NAME: &str = "alipay";
 
@@ -33,25 +35,8 @@ impl AlipayCsvParser {
     }
 
     /// Creates account entries for the Alipay accounts used by this parser.
-    ///
-    /// Note: Some fields cannot be determined from the CSV and are left as null.
     pub fn create_accounts(&self) -> Vec<Value> {
-        vec![json!({
-            "account_id": self.account_id,
-            "structural_type": "bank",
-            "institution": "Alipay",
-            "country": "CN",
-            "iban": null,
-            "bic": null,
-            "account_number": null,
-            "owner": "self",
-            "is_liability": false,
-            "supports_positions": false,
-            "opened_date": null,
-            "closed_date": null,
-            "is_active": true,
-            "notes": "Alipay wallet account - fields may need manual completion"
-        })]
+        accounts::create_accounts(self)
     }
 
     #[allow(dead_code)]
@@ -62,255 +47,9 @@ impl AlipayCsvParser {
             .unwrap_or_else(|| json!({}))
     }
 
-    pub fn parse_reader<R: Read>(&self, mut reader: R) -> Result<Vec<Value>> {
-        let mut buf = Vec::new();
-        reader.read_to_end(&mut buf)?;
-
-        let decoded = decode_text_lossy(&buf);
-
-        // Strip export preamble and keep the actual CSV table
-        let csv_text = slice_to_csv_table(&decoded)
-            .context("Could not find Alipay CSV header row starting with '交易时间,'")?;
-
-        let mut csv_reader = csv::ReaderBuilder::new()
-            .flexible(true)
-            .trim(csv::Trim::All)
-            .from_reader(csv_text.as_bytes());
-
-        let headers = csv_reader.headers().context("Missing CSV headers")?.clone();
-
-        let idx_time = find_col(&headers, "交易时间")?;
-        let idx_category = find_col(&headers, "交易分类")?;
-        let idx_counterparty = find_col(&headers, "交易对方")?;
-        let idx_item = find_col(&headers, "商品说明")?;
-        let idx_inout = find_col(&headers, "收/支")?;
-        let idx_amount = find_col(&headers, "金额")?;
-        let idx_status = find_col(&headers, "交易状态")?;
-        let idx_order = find_col(&headers, "交易订单号")?;
-        let idx_note = find_optional_col(&headers, "备注");
-
-        let mut out = Vec::new();
-
-        for (row_idx, rec) in csv_reader.records().enumerate() {
-            let rec = rec.with_context(|| format!("CSV read error at row {}", row_idx + 2))?;
-
-            let status = rec.get(idx_status).unwrap_or("").trim();
-            if self.only_successful && !(status == "交易成功" || status == "退款成功") {
-                continue;
-            }
-
-            let raw_dt = rec.get(idx_time).unwrap_or("").trim();
-            let date = parse_alipay_datetime(raw_dt)
-                .with_context(|| format!("Invalid datetime '{}' at row {}", raw_dt, row_idx + 2))?;
-
-            let amount_raw = rec.get(idx_amount).unwrap_or("");
-            let amount = parse_amount(amount_raw).with_context(|| {
-                format!("Invalid amount '{}' at row {}", amount_raw, row_idx + 2)
-            })?;
-
-            let inout = rec.get(idx_inout).unwrap_or("").trim();
-
-            // Raw text fields (used for semantic classification)
-            let item_raw = rec.get(idx_item).unwrap_or("").trim();
-            let counterparty_raw = rec.get(idx_counterparty).unwrap_or("").trim();
-            let cat_raw = rec.get(idx_category).unwrap_or("").trim();
-
-            // Default type from Alipay's "收/支" column
-            let mut txn_type = match inout {
-                "支出" => "expense",
-                "收入" => "income",
-                // Alipay often uses "不计收支" for refunds/top-ups/withdrawals.
-                // For cashflow correctness we treat it by sign (and then refine semantically below).
-                "不计收支" => {
-                    if amount < 0.0 { "expense" } else { "income" }
-                }
-                _ => {
-                    if amount < 0.0 { "expense" } else { "income" }
-                }
-            };
-
-            // Semantic overrides (strict):
-            // - Refunds must be treated as income back into the wallet
-            // - Top-ups (充值) are income into the wallet from an external funding source
-            // - Withdrawals (提现) are expense out of the wallet to an external destination
-            // - Receipts (收款 / 收钱码收款) are income into the wallet
-            let semantic_blob = format!("{} {} {}", item_raw, counterparty_raw, cat_raw);
-
-            let mut semantic_tag: Option<&str> = None;
-
-            if status == "退款成功" || semantic_blob.contains("退款") {
-                txn_type = "income";
-                semantic_tag = Some("退款");
-            } else if semantic_blob.contains("充值") {
-                txn_type = "income";
-                semantic_tag = Some("充值");
-            } else if semantic_blob.contains("提现") {
-                txn_type = "expense";
-                semantic_tag = Some("提现");
-            } else if semantic_blob.contains("收钱码收款") || semantic_blob.contains("收款") {
-                txn_type = "income";
-                semantic_tag = Some("收款");
-            }
-
-            let mut desc = item_raw.to_string();
-            if desc.is_empty() {
-                desc = counterparty_raw.to_string();
-            }
-
-            desc = html_escape::decode_html_entities(&desc).to_string();
-            desc = desc.replace('\u{00A0}', " ");
-            desc = desc.split_whitespace().collect::<Vec<_>>().join(" ");
-
-            if !cat_raw.is_empty() {
-                desc = format!("{} [{}]", desc, cat_raw);
-            }
-
-            if let Some(tag) = semantic_tag {
-                // Extra breadcrumb to make audits/reconciliation easier
-                desc = format!("{} [{}]", desc, tag);
-            }
-
-            if let Some(i) = idx_note {
-                let note = rec.get(i).unwrap_or("").trim();
-                if !note.is_empty() {
-                    desc = format!("{} ({})", desc, note);
-                }
-            }
-
-            let order_no = rec
-                .get(idx_order)
-                .unwrap_or("")
-                .trim()
-                .trim_end_matches('\t');
-
-            let (from_account_id, to_account_id) = match txn_type {
-                "expense" => (self.account_id.clone(), "EXTERNAL_PAYEE".to_string()),
-                "income" => ("EXTERNAL_PAYER".to_string(), self.account_id.clone()),
-                _ => {
-                    if amount < 0.0 {
-                        (self.account_id.clone(), "EXTERNAL_PAYEE".to_string())
-                    } else {
-                        ("EXTERNAL_PAYER".to_string(), self.account_id.clone())
-                    }
-                }
-            };
-
-
-            // Final invariant: never allow wallet->wallet transactions in the output.
-            // If we cannot prove it's a true internal transfer, we model it by sign so cashflow stays correct.
-            let (from_account_id, to_account_id, txn_type) =
-                if from_account_id == to_account_id || txn_type == "internal_transfer" {
-                    if amount < 0.0 {
-                        (self.account_id.clone(), "EXTERNAL_PAYEE".to_string(), "expense")
-                    } else {
-                        ("EXTERNAL_PAYER".to_string(), self.account_id.clone(), "income")
-                    }
-                } else {
-                    (from_account_id, to_account_id, txn_type)
-                };
-
-            let txn_id = make_alipay_txn_id(
-                &self.account_id,
-                date,
-                amount,
-                &self.currency,
-                &desc,
-                order_no,
-                row_idx + 1,
-            );
-
-            out.push(json!({
-                "date": date.format("%Y-%m-%d").to_string(),
-                "from_account_id": from_account_id,
-                "to_account_id": to_account_id,
-                "type": txn_type,
-                "category": "uncategorized",
-                "amount": amount,
-                "currency": self.currency.clone(),
-                "description": desc,
-                "txn_id": txn_id
-            }));
-        }
-
-        Ok(out)
+    pub fn parse_reader<R: Read>(&self, reader: R) -> Result<Vec<Value>> {
+        transactions::parse_transactions(self, reader)
     }
-}
-
-/// Decode Alipay export bytes into text.
-///
-/// Alipay CSV exports are commonly GBK/GB18030, but sometimes can be UTF-8.
-fn decode_text_lossy(bytes: &[u8]) -> String {
-    // UTF-8 BOM
-    let bytes = bytes.strip_prefix(&[0xEF, 0xBB, 0xBF]).unwrap_or(bytes);
-
-    if let Ok(s) = std::str::from_utf8(bytes) {
-        // Heuristic: if we can already see the Chinese header, accept UTF-8.
-        if s.contains("交易时间") {
-            return s.to_string();
-        }
-    }
-
-    let (decoded, _, _) = GB18030.decode(bytes);
-    decoded.into_owned()
-}
-
-fn slice_to_csv_table(decoded: &str) -> Result<String> {
-    let needle = "交易时间,";
-    let start = decoded
-        .find(needle)
-        .ok_or_else(|| anyhow!("Missing Alipay header row (expected to find '交易时间,')"))?;
-    Ok(decoded[start..].to_string())
-}
-
-fn find_col(headers: &csv::StringRecord, name: &str) -> Result<usize> {
-    headers
-        .iter()
-        .position(|h| h.trim() == name)
-        .ok_or_else(|| anyhow!("Missing required column '{}'", name))
-}
-
-fn find_optional_col(headers: &csv::StringRecord, name: &str) -> Option<usize> {
-    headers.iter().position(|h| h.trim() == name)
-}
-
-fn parse_alipay_datetime(raw: &str) -> Result<NaiveDate> {
-    let dt = NaiveDateTime::parse_from_str(raw, "%Y-%m-%d %H:%M:%S")?;
-    Ok(dt.date())
-}
-
-fn parse_amount(raw: &str) -> Result<f64> {
-    let s = raw.trim().replace(",", "");
-    if s.is_empty() {
-        return Err(anyhow!("empty amount"));
-    }
-    Ok(s.parse::<f64>()?)
-}
-
-fn make_alipay_txn_id(
-    account_id: &str,
-    date: NaiveDate,
-    amount: f64,
-    currency: &str,
-    description: &str,
-    order_no: &str,
-    row_index: usize,
-) -> String {
-    let s = format!(
-        "{}|{}|{:.8}|{}|{}|{}|{}",
-        account_id,
-        date.format("%Y-%m-%d"),
-        amount,
-        currency,
-        description.trim(),
-        order_no.trim(),
-        row_index
-    );
-
-    let mut hasher = Sha256::new();
-    hasher.update(s.as_bytes());
-    let hash = hasher.finalize();
-
-    format!("ALIPAY-{}", hex::encode(&hash[..12]))
 }
 
 /// Merges Alipay transactions into an existing database.json Value.
