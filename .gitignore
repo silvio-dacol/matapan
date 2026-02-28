@@ -4,5 +4,6 @@
 *.xls
 *.csv
 *txt
-!template.json
+!.database.template.json
+!.rules.template.json
 minpension.png

@@ -1,0 +1,12 @@
+{
+  "rules": [
+    {
+      "when": { "field": "description", "contains": "salary" },
+      "set": { "category": "Income:Salary" }
+    },
+    {
+      "when": { "field": "description", "contains": "amazon" },
+      "set": { "category": "Shopping" }
+    }
+  ]
+}
