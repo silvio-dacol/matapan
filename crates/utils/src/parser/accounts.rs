@@ -5,37 +5,21 @@ use std::collections::HashSet;
 #[derive(Debug, Clone)]
 pub struct AccountInput {
     pub account_id: String,
-    pub structural_type: String,
     pub institution: String,
     pub country: Option<String>,
     pub iban: Option<String>,
     pub bic: Option<String>,
-    pub account_number: Option<String>,
-    pub owner: String,
-    pub is_liability: bool,
-    pub supports_positions: bool,
-    pub opened_date: Option<String>,
-    pub closed_date: Option<String>,
     pub is_active: bool,
-    pub notes: Option<String>,
 }
 
 pub fn build_account(input: &AccountInput) -> Value {
     json!({
         "account_id": input.account_id,
-        "structural_type": input.structural_type,
         "institution": input.institution,
         "country": input.country,
         "iban": input.iban,
         "bic": input.bic,
-        "account_number": input.account_number,
-        "owner": input.owner,
-        "is_liability": input.is_liability,
-        "supports_positions": input.supports_positions,
-        "opened_date": input.opened_date,
-        "closed_date": input.closed_date,
-        "is_active": input.is_active,
-        "notes": input.notes
+        "is_active": input.is_active
     })
 }
 
@@ -158,35 +142,19 @@ pub fn create_system_accounts() -> Vec<Value> {
     vec![
         build_account(&AccountInput {
             account_id: "EXTERNAL_PAYER".to_string(),
-            structural_type: "external".to_string(),
             institution: "External".to_string(),
             country: None,
             iban: None,
             bic: None,
-            account_number: None,
-            owner: "external".to_string(),
-            is_liability: false,
-            supports_positions: false,
-            opened_date: None,
-            closed_date: None,
             is_active: true,
-            notes: Some("System account representing external income sources".to_string()),
         }),
         build_account(&AccountInput {
             account_id: "EXTERNAL_PAYEE".to_string(),
-            structural_type: "external".to_string(),
             institution: "External".to_string(),
             country: None,
             iban: None,
             bic: None,
-            account_number: None,
-            owner: "external".to_string(),
-            is_liability: false,
-            supports_positions: false,
-            opened_date: None,
-            closed_date: None,
             is_active: true,
-            notes: Some("System account representing external expense destinations".to_string()),
         })
     ]
 }
