@@ -1,5 +1,7 @@
 #![allow(dead_code)]
 
+//! Placeholder mapping hooks for future Revolut investment positions.
+
 use serde_json::Value;
 use utils::{build_position, PositionInput};
 

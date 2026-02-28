@@ -2,6 +2,18 @@
 
 Shared utilities for reading/writing the database and transaction operations.
 
+## Source Modules (very short)
+
+- `src/accounts.rs`: account builders + account merge/dedup helpers.
+- `src/contract.rs`: parser trait contract shared by parser crates.
+- `src/instruments.rs`: instrument builders + instrument merge/dedup helpers.
+- `src/positions.rs`: position builders + unrealized PnL normalization + merge.
+- `src/transactions.rs`: transaction builders + sorting + merge/dedup helpers.
+- `src/database.rs`: read/write/create helpers for `database.json`.
+- `src/pipeline.rs`: shared parser pipeline orchestration and CLI runner.
+- `src/description_enrichment.rs`: enriches `description-en` fields.
+- `src/rules.rs`: loads/applies rule-based post-processing.
+
 ## Parser Contract
 
 External parser crates should implement `utils::ParserContract`:

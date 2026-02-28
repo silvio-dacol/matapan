@@ -2,7 +2,10 @@ use anyhow::Result;
 use serde_json::Value;
 use std::io::Read;
 
-mod parser;
+mod accounts;
+mod instruments;
+mod positions;
+mod transactions;
 
 pub const PARSER_NAME: &str = "revolut";
 
@@ -34,15 +37,15 @@ impl RevolutCsvParser {
     }
 
     pub fn create_accounts(&self) -> Vec<Value> {
-        parser::accounts::create_all_accounts(self)
+        accounts::create_all_accounts(self)
     }
 
     pub fn parse_reader<R: Read>(&self, reader: R) -> Result<(Vec<Value>, Vec<String>)> {
-        parser::transactions::parse_transactions(self, reader)
+        transactions::parse_transactions(self, reader)
     }
 
     pub fn create_used_accounts(&self, used_account_ids: &[String]) -> Vec<Value> {
-        parser::accounts::create_used_accounts(self, used_account_ids)
+        accounts::create_used_accounts(self, used_account_ids)
     }
 }
 

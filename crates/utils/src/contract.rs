@@ -1,3 +1,5 @@
+//! Defines the parser interface used by all statement parser crates.
+
 use crate::{InputFormat, ParsedEntities, PipelineProfile};
 use anyhow::Result;
 

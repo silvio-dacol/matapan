@@ -1,3 +1,5 @@
+//! Builds, merges, sorts, and deduplicates normalized transaction entities.
+
 use anyhow::{anyhow, Result};
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};

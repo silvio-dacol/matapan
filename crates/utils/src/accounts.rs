@@ -1,3 +1,5 @@
+//! Builds and merges normalized account entities in database.json.
+
 use anyhow::{anyhow, Result};
 use serde_json::{json, Value};
 use std::collections::HashSet;

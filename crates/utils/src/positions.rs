@@ -1,3 +1,5 @@
+//! Builds positions and normalizes unrealized PnL fields across schemas.
+
 use anyhow::{anyhow, Result};
 use serde_json::Value;
 use std::collections::HashSet;

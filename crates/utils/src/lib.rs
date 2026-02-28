@@ -1,24 +1,12 @@
-pub mod parser;
+pub mod accounts;
+pub mod contract;
+pub mod instruments;
+pub mod positions;
+pub mod transactions;
 pub mod database;
 pub mod pipeline;
 pub mod description_enrichment;
 pub mod rules;
-
-pub mod accounts {
-    pub use crate::parser::accounts::*;
-}
-
-pub mod instruments {
-    pub use crate::parser::instruments::*;
-}
-
-pub mod positions {
-    pub use crate::parser::positions::*;
-}
-
-pub mod transactions {
-    pub use crate::parser::transactions::*;
-}
 
 pub mod pipelines {
     pub use crate::pipeline::*;
@@ -37,7 +25,7 @@ pub use crate::accounts::{
     build_account, create_system_accounts, find_duplicate_account_ids,
     merge_accounts_with_deduplication, AccountInput,
 };
-pub use crate::parser::contract::ParserContract;
+pub use crate::contract::ParserContract;
 pub use crate::database::{ensure_database_exists, read_database, write_database};
 pub use crate::description_enrichment::{
     contains_non_latin_script, enrich_descriptions_to_english,

@@ -451,7 +451,7 @@ pub fn run_parser_contract_cli<P>(
     default_database_path: &str,
 ) -> Result<()>
 where
-    P: crate::parser::contract::ParserContract,
+    P: crate::contract::ParserContract,
 {
     let input_files = discover_input_files_in_current_dir(contract.supported_input_formats())?;
 

@@ -1,3 +1,5 @@
+//! Parses Revolut CSV rows into normalized transactions and used-account metadata.
+
 use anyhow::{anyhow, Context, Result};
 use chrono::{NaiveDate, NaiveDateTime};
 use serde::Deserialize;

@@ -1,3 +1,5 @@
+//! Maps Revolut account variants (current/savings) into normalized account records.
+
 use serde_json::Value;
 use utils::{build_account, AccountInput};
 
