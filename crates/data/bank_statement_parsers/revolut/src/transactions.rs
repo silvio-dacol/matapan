@@ -239,7 +239,11 @@ fn infer_type(amount: f64, revolut_type: Option<&str>, description: &str) -> Str
             "income".to_string()
         }
     } else if rt.contains("exchange") {
-        "internal_transfer".to_string()
+        if amount < 0.0 {
+            "expense".to_string()
+        } else {
+            "income".to_string()
+        }
     } else if amount < 0.0 {
         "expense".to_string()
     } else {
@@ -255,12 +259,12 @@ fn determine_accounts(
     current_account: &str,
     savings_account: &str,
 ) -> (String, String) {
+    if description.to_lowercase().contains("exchanged") {
+        return (account_id.to_string(), account_id.to_string());
+    }
+
     match txn_type {
         "internal_transfer" => {
-            if description.to_lowercase().contains("exchanged") {
-                return (account_id.to_string(), account_id.to_string());
-            }
-
             if description.contains("To pocket") {
                 if amount > 0.0 {
                     if account_id == savings_account {
@@ -307,5 +311,50 @@ fn determine_accounts(
                 ("EXTERNAL_PAYER".to_string(), account_id.to_string())
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::RevolutCsvParser;
+
+    #[test]
+    fn parse_exchange_rows_as_directional_flows() {
+        let csv = "Type,Product,Started Date,Completed Date,Description,Amount,Fee,Currency,State,Balance\n\
+Exchange,Savings,2026-01-04 14:57:50,2026-01-04 14:57:50,Exchanged to EUR,-2510.31,25.10,SEK,COMPLETED,7414.49\n\
+Exchange,Current,2026-01-04 14:57:50,2026-01-04 14:57:50,Exchanged to EUR,231.50,0.00,EUR,COMPLETED,251.81\n";
+
+        let parser = RevolutCsvParser::new("REVOLUT");
+        let (txns, _used_accounts) = parse_transactions(&parser, csv.as_bytes()).unwrap();
+
+        assert_eq!(txns.len(), 3);
+
+        let exchanged_out = &txns[0];
+        assert_eq!(exchanged_out.get("type").and_then(|v| v.as_str()), Some("expense"));
+        assert_eq!(
+            exchanged_out.get("from_account_id").and_then(|v| v.as_str()),
+            Some("REVOLUT_SAVINGS")
+        );
+        assert_eq!(
+            exchanged_out.get("to_account_id").and_then(|v| v.as_str()),
+            Some("REVOLUT_SAVINGS")
+        );
+        assert_eq!(
+            exchanged_out.get("amount").and_then(|v| v.as_f64()),
+            Some(2510.31)
+        );
+
+        let exchanged_in = &txns[2];
+        assert_eq!(exchanged_in.get("type").and_then(|v| v.as_str()), Some("income"));
+        assert_eq!(
+            exchanged_in.get("from_account_id").and_then(|v| v.as_str()),
+            Some("REVOLUT_CURRENT")
+        );
+        assert_eq!(
+            exchanged_in.get("to_account_id").and_then(|v| v.as_str()),
+            Some("REVOLUT_CURRENT")
+        );
+        assert_eq!(exchanged_in.get("amount").and_then(|v| v.as_f64()), Some(231.5));
     }
 }
