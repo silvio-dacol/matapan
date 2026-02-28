@@ -17,12 +17,21 @@ pub struct Rule {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct Condition {
-    pub field: String,
-    #[serde(default)]
-    pub contains: Option<String>,
-    #[serde(default)]
-    pub equals: Option<Value>,
+#[serde(untagged)]
+pub enum Condition {
+    All {
+        and: Vec<Condition>,
+    },
+    Any {
+        or: Vec<Condition>,
+    },
+    Predicate {
+        field: String,
+        #[serde(default)]
+        contains: Option<String>,
+        #[serde(default)]
+        equals: Option<Value>,
+    },
 }
 
 pub fn apply_rules_from_database_path(database: &mut Value, database_path: &str) -> Result<usize> {
@@ -96,21 +105,45 @@ pub fn load_rules_from_database_path(database_path: &str) -> Result<Option<RuleS
 }
 
 fn matches_condition(obj: &Map<String, Value>, cond: &Condition) -> bool {
-    let Some(val) = obj.get(&cond.field) else {
-        return false;
-    };
+    match cond {
+        Condition::All { and } => {
+            if and.is_empty() {
+                return false;
+            }
 
-    if let Some(eq) = &cond.equals {
-        if val == eq {
-            return true;
+            and.iter().all(|c| matches_condition(obj, c))
+        }
+        Condition::Any { or } => {
+            if or.is_empty() {
+                return false;
+            }
+
+            or.iter().any(|c| matches_condition(obj, c))
+        }
+        Condition::Predicate {
+            field,
+            contains,
+            equals,
+        } => {
+            let Some(val) = obj.get(field) else {
+                return false;
+            };
+
+            if let Some(eq) = equals {
+                if val == eq {
+                    return true;
+                }
+            }
+
+            if let Some(sub) = contains.as_ref() {
+                if let Some(s) = val.as_str() {
+                    return s
+                        .to_ascii_lowercase()
+                        .contains(&sub.to_ascii_lowercase());
+                }
+            }
+
+            false
         }
     }
-
-    if let Some(sub) = cond.contains.as_ref() {
-        if let Some(s) = val.as_str() {
-            return s.to_ascii_lowercase().contains(&sub.to_ascii_lowercase());
-        }
-    }
-
-    false
 }

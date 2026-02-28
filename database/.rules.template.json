@@ -5,6 +5,24 @@
       "set": { "category": "Income:Salary" }
     },
     {
+      "when": {
+        "and": [
+          { "field": "description", "contains": "amazon" },
+          { "field": "currency", "equals": "USD" }
+        ]
+      },
+      "set": { "category": "Shopping:AmazonUSD" }
+    },
+    {
+      "when": {
+        "or": [
+          { "field": "description", "contains": "amazon" },
+          { "field": "description", "contains": "ebay" }
+        ]
+      },
+      "set": { "category": "Shopping:Marketplace" }
+    },
+    {
       "when": { "field": "description", "contains": "amazon" },
       "set": { "category": "Shopping" }
     }
