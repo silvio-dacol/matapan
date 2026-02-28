@@ -39,7 +39,7 @@ pub use crate::description_enrichment::{
 };
 pub use crate::pipeline::{
     apply_rules_from_database_path, discover_input_files, discover_input_files_in_current_dir,
-    for_each_input_file, print_pipeline_summary, run_parser_pipeline,
+    for_each_input_file, print_pipeline_summary, run_parser_contract_cli, run_parser_pipeline,
     run_parser_pipeline_with_policy, DedupStrategy, InputDiscovery, InputFormat, ParsedEntities,
     PipelineOptions, PipelinePolicy, PipelineProfile, PipelineSummary, PolicyEffects,
 };

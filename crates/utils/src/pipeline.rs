@@ -553,3 +553,85 @@ pub fn run_parser_pipeline_with_policy(
 
     Ok((summary, effects))
 }
+
+pub fn run_parser_contract_cli<P>(
+    contract: &mut P,
+    args: &[String],
+    default_database_path: &str,
+) -> Result<()>
+where
+    P: crate::parser::contract::ParserContract,
+{
+    let input_files = discover_input_files_in_current_dir(contract.supported_input_formats())?;
+
+    if input_files.is_empty() {
+        eprintln!("❌ No input files found for supported parser formats!");
+        return Ok(());
+    }
+
+    println!("📂 Input files:");
+    for file in &input_files {
+        println!("  ✓ Found: {}", file);
+    }
+
+    let database_path = args
+        .get(1)
+        .map(|s| s.as_str())
+        .unwrap_or(default_database_path);
+    let output_path = args.get(2).map(|s| s.as_str());
+
+    let mut parsed_entities = ParsedEntities::default();
+
+    for_each_input_file(&input_files, |input_file_path| {
+        println!("\n📖 Parsing {} ({})", input_file_path, contract.parser_name());
+
+        match contract.parse_file(input_file_path) {
+            Ok(file_entities) => {
+                println!("  ✓ Found {} transactions", file_entities.transactions.len());
+                parsed_entities.append(file_entities);
+            }
+            Err(e) => {
+                eprintln!("  ⚠ Warning: Could not parse file: {}", e);
+                eprintln!("    Continuing with next file...");
+            }
+        }
+
+        Ok(())
+    })?;
+
+    let parsed_entities = contract.finalize_entities(parsed_entities)?;
+
+    if parsed_entities.is_empty() {
+        eprintln!("❌ No parsable entities found in any input file!");
+        return Ok(());
+    }
+
+    println!("\n📖 Reading database from: {}", database_path);
+
+    let policy = contract.pipeline_profile().policy();
+    let (summary, effects) = run_parser_pipeline_with_policy(
+        database_path,
+        output_path,
+        parsed_entities,
+        &policy,
+    )?;
+
+    let dedup_label = match policy.dedup_strategy {
+        DedupStrategy::None => "Dedup removed",
+        DedupStrategy::DateAndAmount => "Date+amount dedup removed",
+        DedupStrategy::StrictSignature => "Strict-signature dedup removed",
+    };
+
+    let extra_lines = vec![
+        format!(
+            "✓ description-en updated: {} transaction(s)",
+            effects.description_en_updated
+        ),
+        format!("✓ Rules changed: {} transaction(s)", effects.rules_changed),
+        format!("✓ {}: {} transaction(s)", dedup_label, effects.dedup_removed),
+    ];
+
+    print_pipeline_summary(&summary, &extra_lines);
+
+    Ok(())
+}
