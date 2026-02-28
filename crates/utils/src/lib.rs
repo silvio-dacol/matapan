@@ -32,14 +32,16 @@ pub use crate::accounts::{
     build_account, create_system_accounts, find_duplicate_account_ids,
     merge_accounts_with_deduplication, AccountInput,
 };
+pub use crate::parser::contract::ParserContract;
 pub use crate::database::{ensure_database_exists, read_database, write_database};
 pub use crate::description_enrichment::{
     contains_non_latin_script, enrich_descriptions_to_english,
 };
 pub use crate::pipeline::{
     apply_rules_from_database_path, discover_input_files, discover_input_files_in_current_dir,
-    for_each_input_file, print_pipeline_summary, run_parser_pipeline, InputDiscovery,
-    InputFormat, ParsedEntities, PipelineOptions, PipelineSummary,
+    for_each_input_file, print_pipeline_summary, run_parser_pipeline,
+    run_parser_pipeline_with_policy, DedupStrategy, InputDiscovery, InputFormat, ParsedEntities,
+    PipelineOptions, PipelinePolicy, PipelineProfile, PipelineSummary, PolicyEffects,
 };
 pub use crate::instruments::{
     build_instrument, find_duplicate_instrument_ids, merge_instruments_with_deduplication,

@@ -2,6 +2,42 @@
 
 Shared utilities for reading/writing the database and transaction operations.
 
+## Parser Contract
+
+External parser crates should implement `utils::ParserContract`:
+
+- `parser_name()`
+- `supported_input_formats()`
+- `parse_file(input_file_path)`
+- Optional: `finalize_entities(...)`
+- Optional: `pipeline_profile()`
+
+The contract keeps parser crates focused on normalization, while the pipeline remains centralized.
+
+## Pipeline Profiles
+
+Use `run_parser_pipeline_with_policy(...)` with a profile-driven policy.
+
+Available profiles:
+
+- `PipelineProfile::RetailBankDefault`
+  - Includes system accounts
+  - Sorts by date
+  - Applies `rules.json`
+  - Enriches `description-en`
+  - Deduplicates by date+amount
+- `PipelineProfile::BrokerDefault`
+  - Includes system accounts
+  - Sorts by date
+  - Applies `rules.json`
+  - No description enrichment
+  - No extra dedup pass (beyond `txn_id` merge dedup)
+- `PipelineProfile::MinimalImport`
+  - Includes system accounts only
+  - No sorting/rules/description enrichment/extra dedup
+
+Use profiles as defaults; parser CLIs can expose flags later to override policy fields.
+
 ## Description Enrichment
 
 Use `enrich_descriptions_to_english(&mut db)` to classify/translate transaction descriptions into `description-en`.

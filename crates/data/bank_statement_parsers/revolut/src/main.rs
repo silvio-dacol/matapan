@@ -1,12 +1,62 @@
 use anyhow::{Context, Result};
-use serde_json::Value;
 use std::{
+    collections::HashSet,
     env,
     fs::File,
     io::Read,
 };
+use utils::ParserContract;
 
 use revolut::RevolutCsvParser;
+
+struct RevolutImportContract {
+    parser: RevolutCsvParser,
+    used_account_ids: HashSet<String>,
+}
+
+impl RevolutImportContract {
+    fn new() -> Self {
+        Self {
+            parser: RevolutCsvParser::new("REVOLUT"),
+            used_account_ids: HashSet::new(),
+        }
+    }
+}
+
+impl utils::ParserContract for RevolutImportContract {
+    fn parser_name(&self) -> &'static str {
+        revolut::PARSER_NAME
+    }
+
+    fn supported_input_formats(&self) -> &'static [utils::InputFormat] {
+        &[utils::InputFormat::Csv]
+    }
+
+    fn parse_file(&mut self, input_file_path: &str) -> Result<utils::ParsedEntities> {
+        let mut csv_file = File::open(input_file_path)
+            .with_context(|| format!("Cannot open {}", input_file_path))?;
+        let mut csv_buf = Vec::new();
+        csv_file.read_to_end(&mut csv_buf)?;
+
+        let (txns, used_accounts) = self.parser.parse_reader(csv_buf.as_slice())?;
+        self.used_account_ids.extend(used_accounts);
+
+        Ok(utils::ParsedEntities {
+            transactions: txns,
+            ..Default::default()
+        })
+    }
+
+    fn finalize_entities(&mut self, mut entities: utils::ParsedEntities) -> Result<utils::ParsedEntities> {
+        let used_account_ids: Vec<String> = self.used_account_ids.iter().cloned().collect();
+        entities.accounts = self.parser.create_used_accounts(&used_account_ids);
+        Ok(entities)
+    }
+
+    fn pipeline_profile(&self) -> utils::PipelineProfile {
+        utils::PipelineProfile::RetailBankDefault
+    }
+}
 
 fn main() -> Result<()> {
     // Usage:
@@ -20,15 +70,16 @@ fn main() -> Result<()> {
     //   output = same as database_path
 
     let args: Vec<String> = env::args().collect();
-    let csv_files = utils::discover_input_files_in_current_dir(&[utils::InputFormat::Csv])?;
+    let mut contract = RevolutImportContract::new();
+    let input_files = utils::discover_input_files_in_current_dir(contract.supported_input_formats())?;
 
-    if csv_files.is_empty() {
+    if input_files.is_empty() {
         eprintln!("❌ No .csv files found!");
         return Ok(());
     }
 
     println!("📂 Input files:");
-    for file in &csv_files {
+    for file in &input_files {
         println!("  ✓ Found: {}", file);
     }
 
@@ -37,25 +88,18 @@ fn main() -> Result<()> {
     let output_path = args.get(2).map(|s| s.as_str());
 
     // Parse all discovered .csv files
-    let mut all_txns = Vec::new();
-    let mut all_used_account_ids = std::collections::HashSet::new();
+    let mut parsed_entities = utils::ParsedEntities::default();
 
-    utils::for_each_input_file(&csv_files, |csv_file_path| {
-        println!("\n📖 Parsing {} (account base: REVOLUT)", csv_file_path);
+    utils::for_each_input_file(&input_files, |input_file_path| {
+        println!("\n📖 Parsing {} ({})", input_file_path, contract.parser_name());
 
-        // Read CSV
-        let mut csv_file = File::open(csv_file_path)
-            .with_context(|| format!("Cannot open {}", csv_file_path))?;
-        let mut csv_buf = Vec::new();
-        csv_file.read_to_end(&mut csv_buf)?;
-
-        // Parse
-        let parser = RevolutCsvParser::new("REVOLUT");
-        match parser.parse_reader(csv_buf.as_slice()) {
-            Ok((txns, used_accounts)) => {
-                println!("  ✓ Found {} transactions", txns.len());
-                all_txns.extend(txns);
-                all_used_account_ids.extend(used_accounts);
+        match contract.parse_file(input_file_path) {
+            Ok(file_entities) => {
+                println!(
+                    "  ✓ Found {} transactions",
+                    file_entities.transactions.len()
+                );
+                parsed_entities.append(file_entities);
             }
             Err(e) => {
                 eprintln!("  ⚠ Warning: Could not parse file: {}", e);
@@ -66,16 +110,7 @@ fn main() -> Result<()> {
         Ok(())
     })?;
 
-    // Create only the accounts that were actually used
-    let parser = RevolutCsvParser::new("REVOLUT"); // Base name doesn't matter here
-    let used_account_ids: Vec<String> = all_used_account_ids.into_iter().collect();
-    let all_accounts = parser.create_used_accounts(&used_account_ids);
-
-    let parsed_entities = utils::ParsedEntities {
-        accounts: all_accounts,
-        transactions: all_txns,
-        ..Default::default()
-    };
+    let parsed_entities = contract.finalize_entities(parsed_entities)?;
 
     if parsed_entities.is_empty() {
         eprintln!("❌ No parsable entities found in any input file!");
@@ -84,33 +119,24 @@ fn main() -> Result<()> {
 
     println!("\n📖 Reading database from: {}", database_path);
 
-    let mut translated_count = 0usize;
-    let mut rules_changed = 0usize;
-    let mut removed_by_date_amount = 0usize;
-
-    let summary = utils::run_parser_pipeline(
+    let policy = contract.pipeline_profile().policy();
+    let (summary, effects) = utils::run_parser_pipeline_with_policy(
         database_path,
         output_path,
         parsed_entities,
-        utils::PipelineOptions {
-            include_system_accounts: true,
-            sort_transactions_by_date: true,
-        },
-        Some(|db: &mut Value| {
-            translated_count = utils::enrich_descriptions_to_english(db)?;
-            rules_changed = utils::apply_rules_from_database_path(db, database_path)?;
-            removed_by_date_amount = utils::dedup_transactions_by_date_and_amount(db)?;
-            Ok(())
-        }),
+        &policy,
     )?;
 
+    let dedup_label = match policy.dedup_strategy {
+        utils::DedupStrategy::None => "Dedup removed",
+        utils::DedupStrategy::DateAndAmount => "Date+amount dedup removed",
+        utils::DedupStrategy::StrictSignature => "Strict-signature dedup removed",
+    };
+
     let extra_lines = vec![
-        format!("✓ description-en updated: {} transaction(s)", translated_count),
-        format!("✓ Rules changed: {} transaction(s)", rules_changed),
-        format!(
-            "✓ Date+amount dedup removed: {} transaction(s)",
-            removed_by_date_amount
-        ),
+        format!("✓ description-en updated: {} transaction(s)", effects.description_en_updated),
+        format!("✓ Rules changed: {} transaction(s)", effects.rules_changed),
+        format!("✓ {}: {} transaction(s)", dedup_label, effects.dedup_removed),
     ];
 
     utils::print_pipeline_summary(&summary, &extra_lines);

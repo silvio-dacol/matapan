@@ -45,6 +45,13 @@ impl ParsedEntities {
             && self.positions.is_empty()
             && self.transactions.is_empty()
     }
+
+    pub fn append(&mut self, other: ParsedEntities) {
+        self.accounts.extend(other.accounts);
+        self.instruments.extend(other.instruments);
+        self.positions.extend(other.positions);
+        self.transactions.extend(other.transactions);
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -390,4 +397,159 @@ where
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn profile_retail_bank_default_is_expected() {
+        let policy = PipelineProfile::RetailBankDefault.policy();
+        assert!(policy.include_system_accounts);
+        assert!(policy.sort_transactions_by_date);
+        assert!(policy.apply_rules);
+        assert!(policy.enrich_description_en);
+        assert_eq!(policy.dedup_strategy, DedupStrategy::DateAndAmount);
+    }
+
+    #[test]
+    fn profile_broker_default_is_expected() {
+        let policy = PipelineProfile::BrokerDefault.policy();
+        assert!(policy.include_system_accounts);
+        assert!(policy.sort_transactions_by_date);
+        assert!(policy.apply_rules);
+        assert!(!policy.enrich_description_en);
+        assert_eq!(policy.dedup_strategy, DedupStrategy::None);
+    }
+
+    #[test]
+    fn profile_minimal_import_is_expected() {
+        let policy = PipelineProfile::MinimalImport.policy();
+        assert!(policy.include_system_accounts);
+        assert!(!policy.sort_transactions_by_date);
+        assert!(!policy.apply_rules);
+        assert!(!policy.enrich_description_en);
+        assert_eq!(policy.dedup_strategy, DedupStrategy::None);
+    }
+
+    #[test]
+    fn parsed_entities_append_merges_all_collections() {
+        let mut left = ParsedEntities {
+            accounts: vec![serde_json::json!({"account_id": "A"})],
+            instruments: vec![serde_json::json!({"instrument_id": "I1"})],
+            positions: vec![],
+            transactions: vec![serde_json::json!({"txn_id": "T1"})],
+        };
+
+        let right = ParsedEntities {
+            accounts: vec![serde_json::json!({"account_id": "B"})],
+            instruments: vec![],
+            positions: vec![serde_json::json!({"position_id": "P1"})],
+            transactions: vec![serde_json::json!({"txn_id": "T2"})],
+        };
+
+        left.append(right);
+
+        assert_eq!(left.accounts.len(), 2);
+        assert_eq!(left.instruments.len(), 1);
+        assert_eq!(left.positions.len(), 1);
+        assert_eq!(left.transactions.len(), 2);
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DedupStrategy {
+    None,
+    DateAndAmount,
+    StrictSignature,
+}
+
+#[derive(Debug, Clone)]
+pub struct PipelinePolicy {
+    pub include_system_accounts: bool,
+    pub sort_transactions_by_date: bool,
+    pub apply_rules: bool,
+    pub enrich_description_en: bool,
+    pub dedup_strategy: DedupStrategy,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PipelineProfile {
+    RetailBankDefault,
+    BrokerDefault,
+    MinimalImport,
+}
+
+impl PipelineProfile {
+    pub fn policy(self) -> PipelinePolicy {
+        match self {
+            PipelineProfile::RetailBankDefault => PipelinePolicy {
+                include_system_accounts: true,
+                sort_transactions_by_date: true,
+                apply_rules: true,
+                enrich_description_en: true,
+                dedup_strategy: DedupStrategy::DateAndAmount,
+            },
+            PipelineProfile::BrokerDefault => PipelinePolicy {
+                include_system_accounts: true,
+                sort_transactions_by_date: true,
+                apply_rules: true,
+                enrich_description_en: false,
+                dedup_strategy: DedupStrategy::None,
+            },
+            PipelineProfile::MinimalImport => PipelinePolicy {
+                include_system_accounts: true,
+                sort_transactions_by_date: false,
+                apply_rules: false,
+                enrich_description_en: false,
+                dedup_strategy: DedupStrategy::None,
+            },
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct PolicyEffects {
+    pub description_en_updated: usize,
+    pub rules_changed: usize,
+    pub dedup_removed: usize,
+}
+
+pub fn run_parser_pipeline_with_policy(
+    database_path: &str,
+    output_path: Option<&str>,
+    entities: ParsedEntities,
+    policy: &PipelinePolicy,
+) -> Result<(PipelineSummary, PolicyEffects)> {
+    let mut effects = PolicyEffects::default();
+
+    let summary = run_parser_pipeline(
+        database_path,
+        output_path,
+        entities,
+        PipelineOptions {
+            include_system_accounts: policy.include_system_accounts,
+            sort_transactions_by_date: policy.sort_transactions_by_date,
+        },
+        Some(|db: &mut Value| {
+            if policy.enrich_description_en {
+                effects.description_en_updated = crate::enrich_descriptions_to_english(db)?;
+            }
+
+            if policy.apply_rules {
+                effects.rules_changed = crate::apply_rules_from_database_path(db, database_path)?;
+            }
+
+            effects.dedup_removed = match policy.dedup_strategy {
+                DedupStrategy::None => 0,
+                DedupStrategy::DateAndAmount => crate::dedup_transactions_by_date_and_amount(db)?,
+                DedupStrategy::StrictSignature => crate::dedup_transactions_by_signature(db)?,
+            };
+
+            Ok(())
+        }),
+    )?;
+
+    Ok((summary, effects))
 }
