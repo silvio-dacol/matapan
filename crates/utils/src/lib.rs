@@ -2,6 +2,7 @@ pub mod parser;
 pub mod database;
 pub mod pipeline;
 pub mod description_enrichment;
+pub mod rules;
 
 pub mod accounts {
     pub use crate::parser::accounts::*;
@@ -27,6 +28,10 @@ pub mod descriptions {
     pub use crate::description_enrichment::*;
 }
 
+pub mod rule_sets {
+    pub use crate::rules::*;
+}
+
 // Re-export commonly used items
 pub use crate::accounts::{
     build_account, create_system_accounts, find_duplicate_account_ids,
@@ -38,10 +43,14 @@ pub use crate::description_enrichment::{
     contains_non_latin_script, enrich_descriptions_to_english,
 };
 pub use crate::pipeline::{
-    apply_rules_from_database_path, discover_input_files, discover_input_files_in_current_dir,
-    for_each_input_file, print_pipeline_summary, run_parser_contract_cli, run_parser_pipeline,
+    discover_input_files, discover_input_files_in_current_dir, for_each_input_file,
+    print_pipeline_summary, run_parser_contract_cli, run_parser_pipeline,
     run_parser_pipeline_with_policy, DedupStrategy, InputDiscovery, InputFormat, ParsedEntities,
     PipelineOptions, PipelinePolicy, PipelineProfile, PipelineSummary, PolicyEffects,
+};
+pub use crate::rules::{
+    apply_rules, apply_rules_from_database_path, load_rules_from_database_path, Condition, Rule,
+    RuleSet,
 };
 pub use crate::instruments::{
     build_instrument, find_duplicate_instrument_ids, merge_instruments_with_deduplication,

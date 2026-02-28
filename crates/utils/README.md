@@ -70,6 +70,27 @@ Environment variables:
 Description enrichment and transaction sorting are now consumed as library functions
 from parser pipelines (not as standalone `utils` binaries).
 
+## Rules Module
+
+Rules are now exposed as library functions (similar to description enrichment), not as a standalone `utils` binary.
+
+- Apply rules from `rules.json` located near the provided database path:
+
+```rust
+use utils::apply_rules_from_database_path;
+
+let changed = apply_rules_from_database_path(&mut db, "./database")?;
+```
+
+- Reuse already-loaded rules directly:
+
+```rust
+use utils::{apply_rules, RuleSet};
+
+let rules: RuleSet = serde_json::from_str(r#"{ "rules": [] }"#)?;
+let changed = apply_rules(&mut db, &rules)?;
+```
+
 ## Duplicate Handling
 
 Two approaches are provided, both using a strict signature of core fields:
