@@ -34,4 +34,4 @@ Note: If you see changes in the statement format, please open an issue or a pull
 - `src/transactions.rs`: parses CSV rows into normalized transactions.
 
 - This parser currently focuses on wallet cashflows (`accounts` + `transactions`).
-- Pipeline behavior is profile-driven via `utils::PipelineProfile::RetailBankDefault` in the CLI entrypoint.
+- Pipeline behavior is profile-driven via `utils::PipelineProfile::Default` in the CLI entrypoint.

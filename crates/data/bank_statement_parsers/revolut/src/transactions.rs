@@ -75,10 +75,14 @@ pub fn parse_transactions<R: Read>(
         let (from_account_id, to_account_id) =
             field_accounts(parser, &account_id, &txn_type, amount, &description);
 
-        if from_account_id == parser.account_id_current || to_account_id == parser.account_id_current {
+        if from_account_id == parser.account_id_current
+            || to_account_id == parser.account_id_current
+        {
             used_accounts.insert(parser.account_id_current.clone());
         }
-        if from_account_id == parser.account_id_savings || to_account_id == parser.account_id_savings {
+        if from_account_id == parser.account_id_savings
+            || to_account_id == parser.account_id_savings
+        {
             used_accounts.insert(parser.account_id_savings.clone());
         }
 
@@ -100,8 +104,14 @@ pub fn parse_transactions<R: Read>(
         if let Some(fee) = field_fee(&row) {
             if fee != 0.0 {
                 let fee_description = format!("Fees: {}", description);
-                let fee_txn_id =
-                    field_txn_id(&account_id, date, fee, &currency, &format!("FEE|{}", description), idx + 1);
+                let fee_txn_id = field_txn_id(
+                    &account_id,
+                    date,
+                    fee,
+                    &currency,
+                    &format!("FEE|{}", description),
+                    idx + 1,
+                );
 
                 out.push(build_transaction(&TransactionInput {
                     date: date.format("%Y-%m-%d").to_string(),
@@ -331,9 +341,14 @@ Exchange,Current,2026-01-04 14:57:50,2026-01-04 14:57:50,Exchanged to EUR,231.50
         assert_eq!(txns.len(), 3);
 
         let exchanged_out = &txns[0];
-        assert_eq!(exchanged_out.get("type").and_then(|v| v.as_str()), Some("expense"));
         assert_eq!(
-            exchanged_out.get("from_account_id").and_then(|v| v.as_str()),
+            exchanged_out.get("type").and_then(|v| v.as_str()),
+            Some("expense")
+        );
+        assert_eq!(
+            exchanged_out
+                .get("from_account_id")
+                .and_then(|v| v.as_str()),
             Some("REVOLUT_SAVINGS")
         );
         assert_eq!(
@@ -346,7 +361,10 @@ Exchange,Current,2026-01-04 14:57:50,2026-01-04 14:57:50,Exchanged to EUR,231.50
         );
 
         let exchanged_in = &txns[2];
-        assert_eq!(exchanged_in.get("type").and_then(|v| v.as_str()), Some("income"));
+        assert_eq!(
+            exchanged_in.get("type").and_then(|v| v.as_str()),
+            Some("income")
+        );
         assert_eq!(
             exchanged_in.get("from_account_id").and_then(|v| v.as_str()),
             Some("REVOLUT_CURRENT")
@@ -355,6 +373,9 @@ Exchange,Current,2026-01-04 14:57:50,2026-01-04 14:57:50,Exchanged to EUR,231.50
             exchanged_in.get("to_account_id").and_then(|v| v.as_str()),
             Some("REVOLUT_CURRENT")
         );
-        assert_eq!(exchanged_in.get("amount").and_then(|v| v.as_f64()), Some(231.5));
+        assert_eq!(
+            exchanged_in.get("amount").and_then(|v| v.as_f64()),
+            Some(231.5)
+        );
     }
 }

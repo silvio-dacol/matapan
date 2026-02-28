@@ -1,8 +1,7 @@
 use anyhow::{anyhow, Context, Result};
 use serde_json::Value;
 use std::{
-    env,
-    fs,
+    env, fs,
     path::{Path, PathBuf},
 };
 
@@ -91,7 +90,9 @@ impl PipelineSummary {
 
 pub fn discover_input_files(args: &[String], formats: &[InputFormat]) -> Result<InputDiscovery> {
     if formats.is_empty() {
-        return Err(anyhow!("discover_input_files requires at least one input format"));
+        return Err(anyhow!(
+            "discover_input_files requires at least one input format"
+        ));
     }
 
     let mut input_files: Vec<String> = Vec::new();
@@ -231,7 +232,10 @@ pub fn print_pipeline_summary(summary: &PipelineSummary, extra_lines: &[String])
     }
 
     println!("✓ Total accounts in database: {}", summary.total_accounts);
-    println!("✓ Total transactions in database: {}", summary.total_transactions);
+    println!(
+        "✓ Total transactions in database: {}",
+        summary.total_transactions
+    );
     println!("─────────────────────────────────────────");
     println!("✅ Database written to: {}", summary.written_path.display());
 }
@@ -254,7 +258,9 @@ fn has_supported_extension(path_or_name: &str, formats: &[InputFormat]) -> bool 
 
 pub fn discover_input_files_in_current_dir(formats: &[InputFormat]) -> Result<Vec<String>> {
     if formats.is_empty() {
-        return Err(anyhow!("discover_input_files_in_current_dir requires at least one input format"));
+        return Err(anyhow!(
+            "discover_input_files_in_current_dir requires at least one input format"
+        ));
     }
 
     let mut input_files: Vec<String> = Vec::new();
@@ -295,8 +301,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn profile_retail_bank_default_is_expected() {
-        let policy = PipelineProfile::RetailBankDefault.policy();
+    fn profile_default_is_expected() {
+        let policy = PipelineProfile::Default.policy();
         assert!(policy.include_system_accounts);
         assert!(policy.sort_transactions_by_date);
         assert!(policy.apply_rules);
@@ -305,13 +311,13 @@ mod tests {
     }
 
     #[test]
-    fn profile_broker_default_is_expected() {
-        let policy = PipelineProfile::BrokerDefault.policy();
+    fn profile_stricter_for_dedup_is_expected() {
+        let policy = PipelineProfile::StricterForDedup.policy();
         assert!(policy.include_system_accounts);
         assert!(policy.sort_transactions_by_date);
         assert!(policy.apply_rules);
-        assert!(!policy.enrich_description_en);
-        assert_eq!(policy.dedup_strategy, DedupStrategy::None);
+        assert!(policy.enrich_description_en);
+        assert_eq!(policy.dedup_strategy, DedupStrategy::DateAmountReference);
     }
 
     #[test]
@@ -353,6 +359,7 @@ mod tests {
 pub enum DedupStrategy {
     None,
     DateAndAmount,
+    DateAmountReference,
     StrictSignature,
 }
 
@@ -367,27 +374,27 @@ pub struct PipelinePolicy {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PipelineProfile {
-    RetailBankDefault,
-    BrokerDefault,
+    Default,
+    StricterForDedup,
     MinimalImport,
 }
 
 impl PipelineProfile {
     pub fn policy(self) -> PipelinePolicy {
         match self {
-            PipelineProfile::RetailBankDefault => PipelinePolicy {
+            PipelineProfile::Default => PipelinePolicy {
                 include_system_accounts: true,
                 sort_transactions_by_date: true,
                 apply_rules: true,
                 enrich_description_en: true,
                 dedup_strategy: DedupStrategy::DateAndAmount,
             },
-            PipelineProfile::BrokerDefault => PipelinePolicy {
+            PipelineProfile::StricterForDedup => PipelinePolicy {
                 include_system_accounts: true,
                 sort_transactions_by_date: true,
                 apply_rules: true,
-                enrich_description_en: false,
-                dedup_strategy: DedupStrategy::None,
+                enrich_description_en: true,
+                dedup_strategy: DedupStrategy::DateAmountReference,
             },
             PipelineProfile::MinimalImport => PipelinePolicy {
                 include_system_accounts: true,
@@ -435,6 +442,9 @@ pub fn run_parser_pipeline_with_policy(
             effects.dedup_removed = match policy.dedup_strategy {
                 DedupStrategy::None => 0,
                 DedupStrategy::DateAndAmount => crate::dedup_transactions_by_date_and_amount(db)?,
+                DedupStrategy::DateAmountReference => {
+                    crate::dedup_transactions_by_date_amount_reference(db)?
+                }
                 DedupStrategy::StrictSignature => crate::dedup_transactions_by_signature(db)?,
             };
 
@@ -474,11 +484,18 @@ where
     let mut parsed_entities = ParsedEntities::default();
 
     for_each_input_file(&input_files, |input_file_path| {
-        println!("\n📖 Parsing {} ({})", input_file_path, contract.parser_name());
+        println!(
+            "\n📖 Parsing {} ({})",
+            input_file_path,
+            contract.parser_name()
+        );
 
         match contract.parse_file(input_file_path) {
             Ok(file_entities) => {
-                println!("  ✓ Found {} transactions", file_entities.transactions.len());
+                println!(
+                    "  ✓ Found {} transactions",
+                    file_entities.transactions.len()
+                );
                 parsed_entities.append(file_entities);
             }
             Err(e) => {
@@ -500,16 +517,13 @@ where
     println!("\n📖 Reading database from: {}", database_path);
 
     let policy = contract.pipeline_profile().policy();
-    let (summary, effects) = run_parser_pipeline_with_policy(
-        database_path,
-        output_path,
-        parsed_entities,
-        &policy,
-    )?;
+    let (summary, effects) =
+        run_parser_pipeline_with_policy(database_path, output_path, parsed_entities, &policy)?;
 
     let dedup_label = match policy.dedup_strategy {
         DedupStrategy::None => "Dedup removed",
         DedupStrategy::DateAndAmount => "Date+amount dedup removed",
+        DedupStrategy::DateAmountReference => "Date+amount+reference dedup removed",
         DedupStrategy::StrictSignature => "Strict-signature dedup removed",
     };
 
@@ -519,7 +533,10 @@ where
             effects.description_en_updated
         ),
         format!("✓ Rules changed: {} transaction(s)", effects.rules_changed),
-        format!("✓ {}: {} transaction(s)", dedup_label, effects.dedup_removed),
+        format!(
+            "✓ {}: {} transaction(s)",
+            dedup_label, effects.dedup_removed
+        ),
     ];
 
     print_pipeline_summary(&summary, &extra_lines);

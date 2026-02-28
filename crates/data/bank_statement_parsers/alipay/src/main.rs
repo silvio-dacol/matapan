@@ -47,7 +47,7 @@ impl utils::ParserContract for AlipayImportContract {
     }
 
     fn pipeline_profile(&self) -> utils::PipelineProfile {
-        utils::PipelineProfile::RetailBankDefault
+        utils::PipelineProfile::Default
     }
 }
 

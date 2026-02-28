@@ -247,11 +247,23 @@ mod tests {
             .and_then(|v| v.first())
             .unwrap();
 
-        assert_eq!(inst.get("instrument_id").and_then(|v| v.as_str()), Some("IBKR_IE00B5BMR087"));
+        assert_eq!(
+            inst.get("instrument_id").and_then(|v| v.as_str()),
+            Some("IBKR_IE00B5BMR087")
+        );
         assert_eq!(inst.get("source").and_then(|v| v.as_str()), Some("IBKR"));
-        assert_eq!(inst.get("asset_category").and_then(|v| v.as_str()), Some("Stocks"));
-        assert_eq!(inst.get("description").and_then(|v| v.as_str()), Some("ISHARES CORE S&P 500"));
-        assert_eq!(inst.get("security_id").and_then(|v| v.as_str()), Some("IE00B5BMR087"));
+        assert_eq!(
+            inst.get("asset_category").and_then(|v| v.as_str()),
+            Some("Stocks")
+        );
+        assert_eq!(
+            inst.get("description").and_then(|v| v.as_str()),
+            Some("ISHARES CORE S&P 500")
+        );
+        assert_eq!(
+            inst.get("security_id").and_then(|v| v.as_str()),
+            Some("IE00B5BMR087")
+        );
         assert_eq!(inst.get("type").and_then(|v| v.as_str()), Some("ETF"));
         assert!(inst.get("symbol").is_none());
         assert!(inst.get("conid").is_none());

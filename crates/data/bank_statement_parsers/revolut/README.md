@@ -26,4 +26,4 @@ Note: If you see changes in the statement format, please open an issue or a pull
 
 - This parser currently focuses on bank-account style flows (`accounts` + `transactions`).
 - The `instruments` and `positions` parser modules are intentionally present as extension points for users that also use Revolut for investments.
-- Pipeline behavior is profile-driven via `utils::PipelineProfile::RetailBankDefault` in the CLI entrypoint.
+- Pipeline behavior is profile-driven via `utils::PipelineProfile::Default` in the CLI entrypoint.

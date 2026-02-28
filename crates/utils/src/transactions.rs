@@ -33,9 +33,15 @@ pub fn build_transaction(input: &TransactionInput) -> Value {
         "type".to_string(),
         Value::String(input.transaction_type.clone()),
     );
-    obj.insert("category".to_string(), Value::String(input.category.clone()));
+    obj.insert(
+        "category".to_string(),
+        Value::String(input.category.clone()),
+    );
     obj.insert("amount".to_string(), Value::from(input.amount));
-    obj.insert("currency".to_string(), Value::String(input.currency.clone()));
+    obj.insert(
+        "currency".to_string(),
+        Value::String(input.currency.clone()),
+    );
     obj.insert(
         "description".to_string(),
         Value::String(input.description.clone()),
@@ -221,6 +227,42 @@ pub fn dedup_transactions_by_date_and_amount(database: &mut Value) -> Result<usi
     Ok(removed)
 }
 
+/// Deduplicate transactions in-place by `date` + `amount` + optional `reference`.
+///
+/// If a reference is present, it becomes part of the dedup signature.
+/// If no reference is present, falls back to `date` + `amount` behavior.
+///
+/// Reference lookup priority:
+/// 1) `reference_number`
+/// 2) `reference`
+/// 3) `referens`
+/// 4) token like `ref=...` inside `description`
+pub fn dedup_transactions_by_date_amount_reference(database: &mut Value) -> Result<usize> {
+    let arr = database
+        .get_mut("transactions")
+        .and_then(|v| v.as_array_mut())
+        .ok_or_else(|| anyhow!("database.json missing 'transactions' array"))?;
+
+    let mut seen: HashSet<String> = HashSet::new();
+    let mut deduped: Vec<Value> = Vec::with_capacity(arr.len());
+    let mut removed = 0usize;
+
+    for txn in arr.drain(..) {
+        if let Some(sig) = build_date_amount_reference_signature(&txn) {
+            if seen.insert(sig) {
+                deduped.push(txn);
+            } else {
+                removed += 1;
+            }
+        } else {
+            deduped.push(txn);
+        }
+    }
+
+    *arr = deduped;
+    Ok(removed)
+}
+
 fn build_signature(txn: &Value) -> Option<String> {
     let obj = txn.as_object()?;
     let date = obj.get("date")?.as_str()?;
@@ -240,6 +282,47 @@ fn build_date_amount_signature(txn: &Value) -> Option<String> {
     let date = obj.get("date")?.as_str()?;
     let amount = obj.get("amount")?.as_f64()?;
     Some(format!("{}|{:.8}", date, amount))
+}
+
+fn build_date_amount_reference_signature(txn: &Value) -> Option<String> {
+    let obj = txn.as_object()?;
+    let date = obj.get("date")?.as_str()?;
+    let amount = obj.get("amount")?.as_f64()?;
+
+    let reference = extract_reference_for_dedup(obj);
+
+    if let Some(reference) = reference {
+        Some(format!("{}|{:.8}|{}", date, amount, reference))
+    } else {
+        Some(format!("{}|{:.8}", date, amount))
+    }
+}
+
+fn extract_reference_for_dedup(obj: &serde_json::Map<String, Value>) -> Option<String> {
+    for key in ["reference_number", "reference", "referens"] {
+        if let Some(reference) = obj.get(key).and_then(|v| v.as_str()) {
+            let reference = reference.trim();
+            if !reference.is_empty() {
+                return Some(reference.to_string());
+            }
+        }
+    }
+
+    let description = obj
+        .get("description")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    for token in description.split_whitespace() {
+        if let Some(reference) = token.strip_prefix("ref=") {
+            let reference = reference.trim();
+            if !reference.is_empty() {
+                return Some(reference.to_string());
+            }
+        }
+    }
+
+    None
 }
 
 /// Mark duplicates in-place based on the same strict signature used by
@@ -623,5 +706,39 @@ mod tests {
         assert_eq!(arr.len(), 2);
         assert_eq!(arr[0].get("txn_id").unwrap().as_str().unwrap(), "A1");
         assert_eq!(arr[1].get("txn_id").unwrap().as_str().unwrap(), "A3");
+    }
+
+    #[test]
+    fn test_dedup_transactions_by_date_amount_reference_keeps_different_references() {
+        let mut database = json!({
+            "transactions": [
+                {
+                    "date": "2025-02-01",
+                    "amount": 100.0,
+                    "description": "Payment [Sheet] ref=R1",
+                    "txn_id": "A1"
+                },
+                {
+                    "date": "2025-02-01",
+                    "amount": 100.0,
+                    "description": "Payment [Sheet] ref=R2",
+                    "txn_id": "A2"
+                },
+                {
+                    "date": "2025-02-01",
+                    "amount": 100.0,
+                    "description": "Payment [Sheet] ref=R1",
+                    "txn_id": "A3"
+                }
+            ]
+        });
+
+        let removed = dedup_transactions_by_date_amount_reference(&mut database).unwrap();
+        assert_eq!(removed, 1);
+
+        let arr = database.get("transactions").unwrap().as_array().unwrap();
+        assert_eq!(arr.len(), 2);
+        assert_eq!(arr[0].get("txn_id").unwrap().as_str().unwrap(), "A1");
+        assert_eq!(arr[1].get("txn_id").unwrap().as_str().unwrap(), "A2");
     }
 }

@@ -128,7 +128,10 @@ fn set_description_en_preserving_order(obj: &mut Map<String, Value>, translated:
         new_obj.insert(k.clone(), v.clone());
 
         if k == "description" {
-            new_obj.insert("description-en".to_string(), Value::String(translated.clone()));
+            new_obj.insert(
+                "description-en".to_string(),
+                Value::String(translated.clone()),
+            );
             inserted = true;
         }
     }

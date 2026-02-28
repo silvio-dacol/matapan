@@ -1,10 +1,5 @@
 use anyhow::{Context, Result};
-use std::{
-    collections::HashSet,
-    env,
-    fs::File,
-    io::Read,
-};
+use std::{collections::HashSet, env, fs::File, io::Read};
 
 use template::TemplateCsvParser;
 
@@ -50,14 +45,17 @@ impl utils::ParserContract for TemplateImportContract {
         })
     }
 
-    fn finalize_entities(&mut self, mut entities: utils::ParsedEntities) -> Result<utils::ParsedEntities> {
+    fn finalize_entities(
+        &mut self,
+        mut entities: utils::ParsedEntities,
+    ) -> Result<utils::ParsedEntities> {
         let used_account_ids: Vec<String> = self.used_account_ids.iter().cloned().collect();
         entities.accounts = self.parser.create_used_accounts(&used_account_ids);
         Ok(entities)
     }
 
     fn pipeline_profile(&self) -> utils::PipelineProfile {
-        utils::PipelineProfile::RetailBankDefault
+        utils::PipelineProfile::Default
     }
 }
 

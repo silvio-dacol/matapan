@@ -6,10 +6,7 @@ use utils::{build_account, AccountInput};
 use crate::RevolutCsvParser;
 
 pub fn create_all_accounts(parser: &RevolutCsvParser) -> Vec<Value> {
-    vec![
-        build_current_account(parser),
-        build_savings_account(parser),
-    ]
+    vec![build_current_account(parser), build_savings_account(parser)]
 }
 
 pub fn create_used_accounts(parser: &RevolutCsvParser, used_account_ids: &[String]) -> Vec<Value> {

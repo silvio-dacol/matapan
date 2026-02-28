@@ -26,7 +26,8 @@ pub fn ensure_database_exists<P: AsRef<Path>>(database_path: P) -> Result<PathBu
     let path = database_path.as_ref();
 
     // Resolve to database.json if a directory was provided
-    let db_path = if path.is_dir() || (!path.exists() && !path.to_string_lossy().ends_with(".json")) {
+    let db_path = if path.is_dir() || (!path.exists() && !path.to_string_lossy().ends_with(".json"))
+    {
         path.join("database.json")
     } else {
         path.to_path_buf()
@@ -97,7 +98,10 @@ fn initialize_from_template(db_path: &Path) -> Result<()> {
     let formatted = serde_json::to_string_pretty(&minimal_db)?;
     db_file.write_all(formatted.as_bytes())?;
 
-    println!("✓ Initialized database.json with empty structure at {:?}", db_path);
+    println!(
+        "✓ Initialized database.json with empty structure at {:?}",
+        db_path
+    );
 
     Ok(())
 }
@@ -107,8 +111,8 @@ fn initialize_from_template(db_path: &Path) -> Result<()> {
 pub fn read_database<P: AsRef<Path>>(database_path: P) -> Result<serde_json::Value> {
     let db_path = ensure_database_exists(database_path)?;
 
-    let mut file = File::open(&db_path)
-        .with_context(|| format!("Cannot open database at {:?}", db_path))?;
+    let mut file =
+        File::open(&db_path).with_context(|| format!("Cannot open database at {:?}", db_path))?;
 
     let mut contents = String::new();
     file.read_to_string(&mut contents)?;
@@ -125,7 +129,8 @@ pub fn write_database<P: AsRef<Path>>(
     let path = database_path.as_ref();
 
     // Resolve to database.json if a directory was provided
-    let db_path = if path.is_dir() || (!path.exists() && !path.to_string_lossy().ends_with(".json")) {
+    let db_path = if path.is_dir() || (!path.exists() && !path.to_string_lossy().ends_with(".json"))
+    {
         path.join("database.json")
     } else {
         path.to_path_buf()

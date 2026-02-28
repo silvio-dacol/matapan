@@ -204,8 +204,14 @@ mod tests {
         let changed = normalize_position_pnl_fields(&mut pos);
         assert!(changed);
         assert!(pos.get("unrealized_pnl").is_none());
-        assert_eq!(pos.get("unrealized_profit").and_then(|v| v.as_f64()), Some(0.0));
-        assert_eq!(pos.get("unrealized_loss").and_then(|v| v.as_f64()), Some(47.47));
+        assert_eq!(
+            pos.get("unrealized_profit").and_then(|v| v.as_f64()),
+            Some(0.0)
+        );
+        assert_eq!(
+            pos.get("unrealized_loss").and_then(|v| v.as_f64()),
+            Some(47.47)
+        );
     }
 
     #[test]
@@ -218,8 +224,14 @@ mod tests {
 
         let changed = normalize_position_pnl_fields(&mut pos);
         assert!(changed);
-        assert_eq!(pos.get("unrealized_profit").and_then(|v| v.as_f64()), Some(5.0));
-        assert_eq!(pos.get("unrealized_loss").and_then(|v| v.as_f64()), Some(3.0));
+        assert_eq!(
+            pos.get("unrealized_profit").and_then(|v| v.as_f64()),
+            Some(5.0)
+        );
+        assert_eq!(
+            pos.get("unrealized_loss").and_then(|v| v.as_f64()),
+            Some(3.0)
+        );
     }
 
     #[test]

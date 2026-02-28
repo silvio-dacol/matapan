@@ -26,4 +26,4 @@ Note: If you see changes in the statement format, please open an issue or a pull
 - `src/positions.rs`: placeholder hooks for future investment position parsing.
 
 - This parser currently focuses on card cashflows (`accounts` + `transactions`).
-- Pipeline behavior is profile-driven via `utils::PipelineProfile::RetailBankDefault` in the CLI entrypoint.
+- Pipeline behavior is profile-driven via `utils::PipelineProfile::StricterForDedup` in the CLI entrypoint.

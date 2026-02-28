@@ -32,18 +32,18 @@ Use `run_parser_pipeline_with_policy(...)` with a profile-driven policy.
 
 Available profiles:
 
-- `PipelineProfile::RetailBankDefault`
+- `PipelineProfile::Default`
   - Includes system accounts
   - Sorts by date
   - Applies `rules.json`
   - Enriches `description-en`
   - Deduplicates by date+amount
-- `PipelineProfile::BrokerDefault`
+- `PipelineProfile::StricterForDedup`
   - Includes system accounts
   - Sorts by date
   - Applies `rules.json`
-  - No description enrichment
-  - No extra dedup pass (beyond `txn_id` merge dedup)
+  - Enriches `description-en`
+  - Deduplicates by date+amount+reference (if present)
 - `PipelineProfile::MinimalImport`
   - Includes system accounts only
   - No sorting/rules/description enrichment/extra dedup

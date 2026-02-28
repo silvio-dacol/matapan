@@ -157,7 +157,7 @@ pub fn create_system_accounts() -> Vec<Value> {
             iban: None,
             bic: None,
             is_active: true,
-        })
+        }),
     ]
 }
 

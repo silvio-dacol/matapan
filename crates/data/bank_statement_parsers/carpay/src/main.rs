@@ -45,7 +45,7 @@ impl utils::ParserContract for CarPayImportContract {
     }
 
     fn pipeline_profile(&self) -> utils::PipelineProfile {
-        utils::PipelineProfile::RetailBankDefault
+        utils::PipelineProfile::StricterForDedup
     }
 }
 
