@@ -78,8 +78,11 @@ fn main() -> Result<()> {
     let (db3, inst_stats) = merge_instruments_with_deduplication(db2, parsed.instruments)?;
     let (db4, pos_stats) = utils::merge_positions_with_deduplication(db3, parsed.positions)?;
 
-    let (merged, txn_stats) =
+    let (mut merged, txn_stats) =
         utils::merge_transactions_with_deduplication(db4, parsed.transactions)?;
+
+    let description_en_updated = utils::enrich_descriptions_to_english(&mut merged)?;
+    let rules_changed = utils::apply_rules_from_database_path(&mut merged, database_path)?;
 
     let final_output_path = output_path.unwrap_or(database_path);
     let written = utils::write_database(final_output_path, &merged)?;
@@ -105,6 +108,11 @@ fn main() -> Result<()> {
         "✓ Transactions processed: {} added, {} skipped",
         txn_stats.added, txn_stats.skipped
     );
+    println!(
+        "✓ description-en updated: {} transaction(s)",
+        description_en_updated
+    );
+    println!("✓ Rules changed: {} transaction(s)", rules_changed);
     println!("✅ Database written to: {}", written.display());
 
     Ok(())
