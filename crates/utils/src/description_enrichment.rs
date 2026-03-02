@@ -34,7 +34,7 @@ pub fn enrich_descriptions_to_english(database: &mut Value) -> Result<usize> {
             .unwrap_or("")
             .trim();
 
-        if !current_en.is_empty() {
+        if !should_translate(description, current_en) {
             continue;
         }
 
@@ -46,8 +46,10 @@ pub fn enrich_descriptions_to_english(database: &mut Value) -> Result<usize> {
             translated
         };
 
-        set_description_en_preserving_order(obj, description_en);
-        updated += 1;
+        if description_en != current_en {
+            set_description_en_preserving_order(obj, description_en);
+            updated += 1;
+        }
     }
 
     Ok(updated)
@@ -58,10 +60,6 @@ pub fn contains_non_latin_script(text: &str) -> bool {
 }
 
 fn translate_or_copy_description(description: &str, client: Option<&OllamaClient>) -> String {
-    if !contains_non_latin_script(description) {
-        return description.to_string();
-    }
-
     if let Some(c) = client {
         if let Ok(translated) = c.translate_text(description, "English") {
             let cleaned = translated.trim();
@@ -114,6 +112,14 @@ fn is_non_latin_script_char(ch: char) -> bool {
     }
 
     false
+}
+
+fn should_translate(description: &str, current_en: &str) -> bool {
+    if description.trim().is_empty() {
+        return false;
+    }
+
+    current_en.trim().is_empty() || current_en.trim() == description.trim()
 }
 
 fn set_description_en_preserving_order(obj: &mut Map<String, Value>, translated: String) {
