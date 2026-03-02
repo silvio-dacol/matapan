@@ -143,7 +143,10 @@ fn main() -> Result<()> {
         )
     };
 
-    let (merged, txn_stats) = utils::merge_transactions_with_deduplication(db4, all_txns)?;
+    let (mut merged, txn_stats) = utils::merge_transactions_with_deduplication(db4, all_txns)?;
+
+    let description_en_updated = utils::enrich_descriptions_to_english(&mut merged)?;
+    let rules_changed = utils::apply_rules_from_database_path(&mut merged, database_path)?;
 
     let final_output_path = output_path.unwrap_or(database_path);
     let written = utils::write_database(final_output_path, &merged)?;
@@ -174,6 +177,11 @@ fn main() -> Result<()> {
         "✓ Transactions: {} added, {} skipped (duplicates)",
         txn_stats.added, txn_stats.skipped
     );
+    println!(
+        "✓ description-en updated: {} transaction(s)",
+        description_en_updated
+    );
+    println!("✓ Rules changed: {} transaction(s)", rules_changed);
     println!(
         "✓ Total accounts in database: {}",
         merged

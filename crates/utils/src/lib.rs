@@ -3,6 +3,7 @@ pub mod contract;
 pub mod database;
 pub mod description_enrichment;
 pub mod instruments;
+pub mod round_digits;
 pub mod pipeline;
 pub mod positions;
 pub mod rules;
@@ -34,6 +35,7 @@ pub use crate::instruments::{
     build_instrument, find_duplicate_instrument_ids, merge_instruments_with_deduplication,
     InstrumentInput,
 };
+pub use crate::round_digits::{round_money, round_money_option};
 pub use crate::pipeline::{
     discover_input_files, discover_input_files_in_current_dir, for_each_input_file,
     print_pipeline_summary, run_parser_contract_cli, run_parser_pipeline,

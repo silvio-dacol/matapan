@@ -4,6 +4,8 @@ use anyhow::{anyhow, Result};
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 
+use crate::round_digits::round_money;
+
 #[derive(Debug, Clone)]
 pub struct TransactionInput {
     pub date: String,
@@ -19,6 +21,8 @@ pub struct TransactionInput {
 }
 
 pub fn build_transaction(input: &TransactionInput) -> Value {
+    let rounded_amount = round_money(input.amount);
+
     let mut obj = serde_json::Map::new();
     obj.insert("date".to_string(), Value::String(input.date.clone()));
     obj.insert(
@@ -37,7 +41,7 @@ pub fn build_transaction(input: &TransactionInput) -> Value {
         "category".to_string(),
         Value::String(input.category.clone()),
     );
-    obj.insert("amount".to_string(), Value::from(input.amount));
+    obj.insert("amount".to_string(), Value::from(rounded_amount));
     obj.insert(
         "currency".to_string(),
         Value::String(input.currency.clone()),
@@ -266,7 +270,7 @@ pub fn dedup_transactions_by_date_amount_reference(database: &mut Value) -> Resu
 fn build_signature(txn: &Value) -> Option<String> {
     let obj = txn.as_object()?;
     let date = obj.get("date")?.as_str()?;
-    let amount = obj.get("amount")?.to_string();
+    let amount = round_money(obj.get("amount")?.as_f64()?).to_string();
     let currency = obj.get("currency")?.as_str()?;
     let from = obj.get("from_account_id")?.as_str()?;
     let to = obj.get("to_account_id")?.as_str()?;
@@ -280,14 +284,14 @@ fn build_signature(txn: &Value) -> Option<String> {
 fn build_date_amount_signature(txn: &Value) -> Option<String> {
     let obj = txn.as_object()?;
     let date = obj.get("date")?.as_str()?;
-    let amount = obj.get("amount")?.as_f64()?;
+    let amount = round_money(obj.get("amount")?.as_f64()?);
     Some(format!("{}|{:.8}", date, amount))
 }
 
 fn build_date_amount_reference_signature(txn: &Value) -> Option<String> {
     let obj = txn.as_object()?;
     let date = obj.get("date")?.as_str()?;
-    let amount = obj.get("amount")?.as_f64()?;
+    let amount = round_money(obj.get("amount")?.as_f64()?);
 
     let reference = extract_reference_for_dedup(obj);
 
@@ -370,6 +374,10 @@ fn ensure_description_en_position(txn: &mut Value) {
     let Some(obj) = txn.as_object_mut() else {
         return;
     };
+
+    if let Some(amount) = obj.get("amount").and_then(|v| v.as_f64()) {
+        obj.insert("amount".to_string(), Value::from(round_money(amount)));
+    }
 
     // Determine the value for description-en (preserve existing if present), default ""
     let desc_en_value = obj
@@ -740,5 +748,46 @@ mod tests {
         assert_eq!(arr.len(), 2);
         assert_eq!(arr[0].get("txn_id").unwrap().as_str().unwrap(), "A1");
         assert_eq!(arr[1].get("txn_id").unwrap().as_str().unwrap(), "A2");
+    }
+
+    #[test]
+    fn test_build_transaction_rounds_amount_half_down_to_2_decimals() {
+        let txn = build_transaction(&TransactionInput {
+            date: "2026-01-01".to_string(),
+            from_account_id: "A".to_string(),
+            to_account_id: "B".to_string(),
+            transaction_type: "expense".to_string(),
+            category: "uncategorized".to_string(),
+            amount: 10.345,
+            currency: "EUR".to_string(),
+            description: "Test".to_string(),
+            description_en: None,
+            txn_id: "T-1".to_string(),
+        });
+
+        assert_eq!(txn.get("amount").and_then(|v| v.as_f64()), Some(10.34));
+    }
+
+    #[test]
+    fn test_merge_normalizes_existing_amount_to_2_decimals() {
+        let database = json!({
+            "transactions": [
+                {
+                    "date": "2026-01-01",
+                    "from_account_id": "A",
+                    "to_account_id": "B",
+                    "type": "expense",
+                    "category": "uncategorized",
+                    "amount": 12.345,
+                    "currency": "EUR",
+                    "description": "Test",
+                    "txn_id": "X1"
+                }
+            ]
+        });
+
+        let (merged, _stats) = merge_transactions_with_deduplication(database, vec![]).unwrap();
+        let arr = merged.get("transactions").unwrap().as_array().unwrap();
+        assert_eq!(arr[0].get("amount").and_then(|v| v.as_f64()), Some(12.34));
     }
 }

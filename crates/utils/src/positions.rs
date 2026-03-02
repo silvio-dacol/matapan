@@ -4,6 +4,8 @@ use anyhow::{anyhow, Result};
 use serde_json::Value;
 use std::collections::HashSet;
 
+use crate::round_digits::{round_money, round_money_option};
+
 #[derive(Debug, Clone)]
 pub struct PositionInput {
     pub position_id: String,
@@ -20,13 +22,13 @@ pub struct PositionInput {
 }
 
 pub fn split_unrealized_pnl(unrealized_pnl: Option<f64>) -> (Option<f64>, Option<f64>) {
-    if let Some(pnl) = unrealized_pnl {
+    if let Some(pnl) = round_money_option(unrealized_pnl) {
         if pnl > 0.0 {
-            (Some(pnl), Some(0.0))
+            (Some(pnl), Some(round_money(0.0)))
         } else if pnl < 0.0 {
-            (Some(0.0), Some(-pnl))
+            (Some(round_money(0.0)), Some(round_money(-pnl)))
         } else {
-            (Some(0.0), Some(0.0))
+            (Some(round_money(0.0)), Some(round_money(0.0)))
         }
     } else {
         (None, None)
@@ -44,10 +46,10 @@ pub fn build_position(input: &PositionInput, unrealized_pnl: Option<f64>) -> Val
         "instrument_id": input.instrument_id,
         "quantity": input.quantity,
         "currency": input.currency,
-        "cost_price": input.cost_price,
-        "cost_basis": input.cost_basis,
-        "close_price": input.close_price,
-        "market_value": input.market_value,
+        "cost_price": round_money_option(input.cost_price),
+        "cost_basis": round_money_option(input.cost_basis),
+        "close_price": round_money_option(input.close_price),
+        "market_value": round_money_option(input.market_value),
         "unrealized_profit": unrealized_profit,
         "unrealized_loss": unrealized_loss
     })
@@ -66,11 +68,12 @@ pub fn normalize_position_pnl_fields(position: &mut Value) -> bool {
         split_unrealized_pnl(legacy_pnl)
     } else if current_profit.is_some() || current_loss.is_some() {
         (
-            Some(current_profit.unwrap_or(0.0).abs()),
-            Some(current_loss.unwrap_or(0.0).abs()),
+            Some(round_money(current_profit.unwrap_or(0.0).abs())),
+            Some(round_money(current_loss.unwrap_or(0.0).abs())),
         )
     } else {
-        return false;
+        let rounded_any = round_position_monetary_fields(obj);
+        return rounded_any;
     };
 
     obj.insert(
@@ -86,6 +89,35 @@ pub fn normalize_position_pnl_fields(position: &mut Value) -> bool {
         || legacy_pnl.is_some()
         || current_profit.is_some()
         || current_loss.is_some()
+        || round_position_monetary_fields(obj)
+}
+
+fn round_position_monetary_fields(obj: &mut serde_json::Map<String, Value>) -> bool {
+    let mut changed = false;
+
+    for key in [
+        "cost_price",
+        "cost_basis",
+        "close_price",
+        "market_value",
+        "unrealized_profit",
+        "unrealized_loss",
+        "unrealized_pnl",
+    ] {
+        if let Some(value) = obj.get_mut(key) {
+            let Some(raw) = value.as_f64() else {
+                continue;
+            };
+
+            let rounded = round_money(raw);
+            if rounded != raw {
+                *value = Value::from(rounded);
+                changed = true;
+            }
+        }
+    }
+
+    changed
 }
 
 pub fn normalize_positions_pnl_fields(database: &mut Value) -> Result<usize> {
@@ -191,6 +223,54 @@ mod tests {
         assert_eq!(
             pos.get("unrealized_loss").and_then(|v| v.as_f64()),
             Some(0.0)
+        );
+    }
+
+    #[test]
+    fn test_build_position_rounds_monetary_fields_half_down() {
+        let pos = build_position(
+            &PositionInput {
+                position_id: "P1".to_string(),
+                source: "TEST".to_string(),
+                as_of_date: "2026-02-17".to_string(),
+                account_id: "ACC".to_string(),
+                instrument_id: "INST".to_string(),
+                quantity: Some(2.0),
+                currency: Some("EUR".to_string()),
+                cost_price: Some(10.345),
+                cost_basis: Some(20.345),
+                close_price: Some(12.346),
+                market_value: Some(24.345),
+            },
+            Some(4.345),
+        );
+
+        assert_eq!(pos.get("cost_price").and_then(|v| v.as_f64()), Some(10.34));
+        assert_eq!(pos.get("cost_basis").and_then(|v| v.as_f64()), Some(20.34));
+        assert_eq!(pos.get("close_price").and_then(|v| v.as_f64()), Some(12.35));
+        assert_eq!(pos.get("market_value").and_then(|v| v.as_f64()), Some(24.34));
+        assert_eq!(
+            pos.get("unrealized_profit").and_then(|v| v.as_f64()),
+            Some(4.34)
+        );
+    }
+
+    #[test]
+    fn test_normalize_position_rounds_existing_monetary_fields() {
+        let mut pos = json!({
+            "position_id": "P3",
+            "cost_price": 1.235,
+            "market_value": 2.236,
+            "unrealized_profit": 0.555
+        });
+
+        let changed = normalize_position_pnl_fields(&mut pos);
+        assert!(changed);
+        assert_eq!(pos.get("cost_price").and_then(|v| v.as_f64()), Some(1.23));
+        assert_eq!(pos.get("market_value").and_then(|v| v.as_f64()), Some(2.24));
+        assert_eq!(
+            pos.get("unrealized_profit").and_then(|v| v.as_f64()),
+            Some(0.56)
         );
     }
 
