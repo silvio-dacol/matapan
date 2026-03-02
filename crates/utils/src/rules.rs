@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Context, Result};
+use logger::log_rule_applied;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::fs::File;
@@ -59,9 +60,14 @@ pub fn apply_rules(database: &mut Value, rules: &RuleSet) -> Result<usize> {
 
         for rule in &rules.rules {
             if matches_condition(obj, &rule.when) {
+                let before_rule = Value::Object(obj.clone());
                 for (k, v) in &rule.set {
                     obj.insert(k.clone(), v.clone());
                 }
+
+                let rule_value = serde_json::to_value(rule).unwrap_or(Value::Null);
+                let after_rule = Value::Object(obj.clone());
+                log_rule_applied(&rule_value, &before_rule, &after_rule);
             }
         }
 

@@ -103,6 +103,22 @@ let rules: RuleSet = serde_json::from_str(r#"{ "rules": [] }"#)?;
 let changed = apply_rules(&mut db, &rules)?;
 ```
 
+## Event Logging
+
+Parser pipelines now emit structured event logs for:
+
+- each account added,
+- each instrument added,
+- each position added,
+- each transaction added,
+- each rule application (with before/after snapshots),
+- each transaction removed by dedup.
+
+Events are appended to daily .log files:
+
+- default: `logs/YYYY-MM-DD.log` at the Matapan workspace root
+- override: `MATAPAN_LOG_PATH`
+
 ## Duplicate Handling
 
 Two approaches are provided, both using a strict signature of core fields:

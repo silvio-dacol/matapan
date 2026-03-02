@@ -1,6 +1,7 @@
 //! Builds and deduplicates normalized instrument entities.
 
 use anyhow::{anyhow, Result};
+use logger::log_instrument_added;
 use serde_json::Value;
 use std::collections::HashSet;
 
@@ -74,6 +75,7 @@ pub fn merge_instruments_with_deduplication(
         if existing_ids.contains(&instrument_id) {
             stats.skipped += 1;
         } else {
+            log_instrument_added(&normalized_instrument);
             arr.push(normalized_instrument);
             existing_ids.insert(instrument_id);
             stats.added += 1;

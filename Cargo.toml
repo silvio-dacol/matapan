@@ -2,6 +2,7 @@
 
 [workspace]
 members = [
+    "crates/logger",
     "crates/data/bank_statement_parsers/revolut",
     "crates/data/bank_statement_parsers/intesa_sanpaolo",
     "crates/data/bank_statement_parsers/interactive_brokers",
@@ -11,7 +12,8 @@ members = [
     "crates/data/bank_statement_parsers/wechat",
     "crates/data/bank_statement_parsers/carpay",
     "crates/data/bank_statement_parsers/template",
-    "crates/utils", "crates/ai_client",
+    "crates/utils", 
+    "crates/ai_client",
 ]
 
 resolver = "3"

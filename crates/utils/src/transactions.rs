@@ -1,6 +1,7 @@
 //! Builds, merges, sorts, and deduplicates normalized transaction entities.
 
 use anyhow::{anyhow, Result};
+use logger::{log_transaction_added, log_transaction_removed};
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 
@@ -145,6 +146,7 @@ pub fn merge_transactions_with_deduplication(
         } else {
             // Add standard fields and ordering before storing
             ensure_description_en_position(&mut txn);
+            log_transaction_added(&txn);
             arr.push(txn);
             stats.added += 1;
         }
@@ -189,6 +191,7 @@ pub fn dedup_transactions_by_signature(database: &mut Value) -> Result<usize> {
             if seen.insert(sig) {
                 deduped.push(txn);
             } else {
+                log_transaction_removed("dedup_strict_signature", &txn);
                 removed += 1;
             }
         } else {
@@ -220,6 +223,7 @@ pub fn dedup_transactions_by_date_and_amount(database: &mut Value) -> Result<usi
             if seen.insert(sig) {
                 deduped.push(txn);
             } else {
+                log_transaction_removed("dedup_date_and_amount", &txn);
                 removed += 1;
             }
         } else {
@@ -256,6 +260,7 @@ pub fn dedup_transactions_by_date_amount_reference(database: &mut Value) -> Resu
             if seen.insert(sig) {
                 deduped.push(txn);
             } else {
+                log_transaction_removed("dedup_date_amount_reference", &txn);
                 removed += 1;
             }
         } else {

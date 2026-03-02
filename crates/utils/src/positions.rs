@@ -1,6 +1,7 @@
 //! Builds positions and normalizes unrealized PnL fields across schemas.
 
 use anyhow::{anyhow, Result};
+use logger::log_position_added;
 use serde_json::Value;
 use std::collections::HashSet;
 
@@ -176,6 +177,7 @@ pub fn merge_positions_with_deduplication(
         if existing.contains(id) {
             stats.skipped += 1;
         } else {
+            log_position_added(&pos);
             arr.push(pos);
             stats.added += 1;
         }

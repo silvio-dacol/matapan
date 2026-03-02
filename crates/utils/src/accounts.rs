@@ -1,6 +1,7 @@
 //! Builds and merges normalized account entities in database.json.
 
 use anyhow::{anyhow, Result};
+use logger::log_account_added;
 use serde_json::{json, Value};
 use std::collections::HashSet;
 
@@ -80,6 +81,7 @@ pub fn merge_accounts_with_deduplication(
         if existing_ids.contains(account_id) {
             stats.skipped += 1;
         } else {
+            log_account_added(&account);
             arr.push(account);
             stats.added += 1;
         }
