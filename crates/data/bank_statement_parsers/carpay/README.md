@@ -27,3 +27,5 @@ Note: If you see changes in the statement format, please open an issue or a pull
 
 - This parser currently focuses on card cashflows (`accounts` + `transactions`).
 - Pipeline behavior is profile-driven via `utils::PipelineProfile::StricterForDedup` in the CLI entrypoint.
+
+- Carpay is a credit card and the statements do not specify when a bank transfer repays it.

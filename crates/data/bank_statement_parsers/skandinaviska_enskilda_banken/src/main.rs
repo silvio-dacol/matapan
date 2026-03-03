@@ -14,8 +14,7 @@ impl SebImportContract {
         let checking_id = "SEB_CHECKING".to_string();
         let savings_id = "SEB_SAVINGS".to_string();
 
-        let parser = SebXlsxParser::new(checking_id.clone(), savings_id.clone())
-            .with_account_numbers(Some("50200105205".to_string()), Some("50371807786".to_string()));
+        let parser = SebXlsxParser::new(checking_id.clone(), savings_id.clone());
 
         Self {
             parser,

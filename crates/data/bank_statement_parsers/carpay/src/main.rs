@@ -10,7 +10,7 @@ struct CarPayImportContract {
 impl CarPayImportContract {
     fn new() -> Self {
         Self {
-            parser: CarPayXlsxParser::new("CARPAY_CARD").with_currency("SEK"),
+            parser: CarPayXlsxParser::new("CARPAY_CREDIT_CARD").with_currency("SEK"),
         }
     }
 }
