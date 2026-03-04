@@ -3,7 +3,7 @@
 use anyhow::{anyhow, Result};
 use logger::{log_transaction_added, log_transaction_removed};
 use serde_json::Value;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use crate::round_digits::round_money;
 
@@ -169,72 +169,6 @@ impl MergeStats {
     }
 }
 
-/// Deduplicate transactions in-place based on a strict signature of key fields.
-/// Keeps the first occurrence and removes subsequent ones, preserving order.
-///
-/// Signature includes: `date`, `amount`, `currency`, `from_account_id`, `to_account_id`, `type`.
-/// This is conservative and avoids collapsing distinct records that differ in `type`.
-///
-/// Returns the count of removed transactions.
-pub fn dedup_transactions_by_signature(database: &mut Value) -> Result<usize> {
-    let arr = database
-        .get_mut("transactions")
-        .and_then(|v| v.as_array_mut())
-        .ok_or_else(|| anyhow!("database.json missing 'transactions' array"))?;
-
-    let mut seen: HashSet<String> = HashSet::new();
-    let mut deduped: Vec<Value> = Vec::with_capacity(arr.len());
-    let mut removed = 0usize;
-
-    for txn in arr.drain(..) {
-        if let Some(sig) = build_signature(&txn) {
-            if seen.insert(sig) {
-                deduped.push(txn);
-            } else {
-                log_transaction_removed("dedup_strict_signature", &txn);
-                removed += 1;
-            }
-        } else {
-            // If signature cannot be built, keep the transaction (no risky removal)
-            deduped.push(txn);
-        }
-    }
-
-    *arr = deduped;
-    Ok(removed)
-}
-
-/// Deduplicate transactions in-place by `date` + `amount` only.
-/// Keeps the first occurrence and removes subsequent ones, preserving order.
-///
-/// Returns the count of removed transactions.
-pub fn dedup_transactions_by_date_and_amount(database: &mut Value) -> Result<usize> {
-    let arr = database
-        .get_mut("transactions")
-        .and_then(|v| v.as_array_mut())
-        .ok_or_else(|| anyhow!("database.json missing 'transactions' array"))?;
-
-    let mut seen: HashSet<String> = HashSet::new();
-    let mut deduped: Vec<Value> = Vec::with_capacity(arr.len());
-    let mut removed = 0usize;
-
-    for txn in arr.drain(..) {
-        if let Some(sig) = build_date_amount_signature(&txn) {
-            if seen.insert(sig) {
-                deduped.push(txn);
-            } else {
-                log_transaction_removed("dedup_date_and_amount", &txn);
-                removed += 1;
-            }
-        } else {
-            deduped.push(txn);
-        }
-    }
-
-    *arr = deduped;
-    Ok(removed)
-}
-
 /// Deduplicate transactions in-place by `date` + `amount` + optional `reference`.
 ///
 /// If a reference is present, it becomes part of the dedup signature.
@@ -270,27 +204,6 @@ pub fn dedup_transactions_by_date_amount_reference(database: &mut Value) -> Resu
 
     *arr = deduped;
     Ok(removed)
-}
-
-fn build_signature(txn: &Value) -> Option<String> {
-    let obj = txn.as_object()?;
-    let date = obj.get("date")?.as_str()?;
-    let amount = round_money(obj.get("amount")?.as_f64()?).to_string();
-    let currency = obj.get("currency")?.as_str()?;
-    let from = obj.get("from_account_id")?.as_str()?;
-    let to = obj.get("to_account_id")?.as_str()?;
-    let typ = obj.get("type")?.as_str()?;
-    Some(format!(
-        "{}|{}|{}|{}|{}|{}",
-        date, amount, currency, from, to, typ
-    ))
-}
-
-fn build_date_amount_signature(txn: &Value) -> Option<String> {
-    let obj = txn.as_object()?;
-    let date = obj.get("date")?.as_str()?;
-    let amount = round_money(obj.get("amount")?.as_f64()?);
-    Some(format!("{}|{:.8}", date, amount))
 }
 
 fn build_date_amount_reference_signature(txn: &Value) -> Option<String> {
@@ -332,46 +245,6 @@ fn extract_reference_for_dedup(obj: &serde_json::Map<String, Value>) -> Option<S
     }
 
     None
-}
-
-/// Mark duplicates in-place based on the same strict signature used by
-/// `dedup_transactions_by_signature()`. Keeps all transactions, but annotates
-/// later duplicates with `{"duplicate": true, "duplicate_of_txn_id": "..."}` when possible.
-/// Returns the count of marked duplicates.
-pub fn mark_duplicates_by_signature(database: &mut Value) -> Result<usize> {
-    let arr = database
-        .get_mut("transactions")
-        .and_then(|v| v.as_array_mut())
-        .ok_or_else(|| anyhow!("database.json missing 'transactions' array"))?;
-
-    let mut first_seen: HashMap<String, Option<String>> = HashMap::new();
-    let mut marked = 0usize;
-
-    for txn in arr.iter_mut() {
-        let Some(sig) = build_signature(txn) else {
-            continue;
-        };
-
-        if !first_seen.contains_key(&sig) {
-            // Record first occurrence and its txn_id (if present)
-            let first_id = txn
-                .get("txn_id")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string());
-            first_seen.insert(sig, first_id);
-        } else {
-            // Subsequent occurrence: mark as duplicate
-            if let Some(obj) = txn.as_object_mut() {
-                obj.insert("duplicate".to_string(), Value::Bool(true));
-                if let Some(Some(id)) = first_seen.get(&sig) {
-                    obj.insert("duplicate_of_txn_id".to_string(), Value::String(id.clone()));
-                }
-                marked += 1;
-            }
-        }
-    }
-
-    Ok(marked)
 }
 
 /// Ensure a transaction contains "description-en" and place it right after "description".
@@ -594,131 +467,6 @@ mod tests {
             .collect();
 
         assert_eq!(ids, vec!["B", "A", "C", "D"]);
-    }
-
-    #[test]
-    fn test_dedup_transactions_by_signature() {
-        let mut database = json!({
-            "transactions": [
-                {
-                    "date": "2025-01-01",
-                    "from_account_id": "A",
-                    "to_account_id": "B",
-                    "type": "internal_transfer",
-                    "category": "uncategorized",
-                    "amount": 100.0,
-                    "currency": "SEK",
-                    "description": "A->B",
-                    "txn_id": "X1"
-                },
-                {
-                    "date": "2025-01-01",
-                    "from_account_id": "A",
-                    "to_account_id": "B",
-                    "type": "internal_transfer",
-                    "category": "uncategorized",
-                    "amount": 100.0,
-                    "currency": "SEK",
-                    "description": "Duplicate",
-                    "txn_id": "X2"
-                },
-                {
-                    "date": "2025-01-01",
-                    "from_account_id": "A",
-                    "to_account_id": "B",
-                    "type": "income",
-                    "category": "uncategorized",
-                    "amount": 100.0,
-                    "currency": "SEK",
-                    "description": "Same movement but different type",
-                    "txn_id": "X3"
-                }
-            ]
-        });
-
-        let removed = dedup_transactions_by_signature(&mut database).unwrap();
-        assert_eq!(removed, 1);
-
-        let arr = database.get("transactions").unwrap().as_array().unwrap();
-        assert_eq!(arr.len(), 2);
-        // Ensure first occurrence kept and different type retained
-        assert_eq!(arr[0].get("txn_id").unwrap().as_str().unwrap(), "X1");
-        assert_eq!(arr[1].get("txn_id").unwrap().as_str().unwrap(), "X3");
-    }
-
-    #[test]
-    fn test_mark_duplicates_by_signature() {
-        let mut database = json!({
-            "transactions": [
-                {
-                    "date": "2025-01-01",
-                    "from_account_id": "A",
-                    "to_account_id": "B",
-                    "type": "internal_transfer",
-                    "category": "uncategorized",
-                    "amount": 100.0,
-                    "currency": "SEK",
-                    "description": "A->B",
-                    "txn_id": "X1"
-                },
-                {
-                    "date": "2025-01-01",
-                    "from_account_id": "A",
-                    "to_account_id": "B",
-                    "type": "internal_transfer",
-                    "category": "uncategorized",
-                    "amount": 100.0,
-                    "currency": "SEK",
-                    "description": "Duplicate",
-                    "txn_id": "X2"
-                }
-            ]
-        });
-
-        let marked = mark_duplicates_by_signature(&mut database).unwrap();
-        assert_eq!(marked, 1);
-
-        let arr = database.get("transactions").unwrap().as_array().unwrap();
-        assert_eq!(arr.len(), 2);
-        assert_eq!(arr[1].get("duplicate").unwrap().as_bool().unwrap(), true);
-        assert_eq!(
-            arr[1].get("duplicate_of_txn_id").unwrap().as_str().unwrap(),
-            "X1"
-        );
-    }
-
-    #[test]
-    fn test_dedup_transactions_by_date_and_amount() {
-        let mut database = json!({
-            "transactions": [
-                {
-                    "date": "2025-02-01",
-                    "amount": 100.0,
-                    "currency": "SEK",
-                    "txn_id": "A1"
-                },
-                {
-                    "date": "2025-02-01",
-                    "amount": 100.0,
-                    "currency": "EUR",
-                    "txn_id": "A2"
-                },
-                {
-                    "date": "2025-02-02",
-                    "amount": 100.0,
-                    "currency": "SEK",
-                    "txn_id": "A3"
-                }
-            ]
-        });
-
-        let removed = dedup_transactions_by_date_and_amount(&mut database).unwrap();
-        assert_eq!(removed, 1);
-
-        let arr = database.get("transactions").unwrap().as_array().unwrap();
-        assert_eq!(arr.len(), 2);
-        assert_eq!(arr[0].get("txn_id").unwrap().as_str().unwrap(), "A1");
-        assert_eq!(arr[1].get("txn_id").unwrap().as_str().unwrap(), "A3");
     }
 
     #[test]

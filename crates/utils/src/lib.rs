@@ -51,8 +51,7 @@ pub use crate::rules::{
     RuleSet,
 };
 pub use crate::transactions::{
-    build_transaction, dedup_transactions_by_date_amount_reference,
-    dedup_transactions_by_date_and_amount, dedup_transactions_by_signature, find_duplicate_txn_ids,
-    mark_duplicates_by_signature, merge_transactions_with_deduplication, sort_transactions_by_date,
-    MergeStats, TransactionInput,
+    build_transaction, dedup_transactions_by_date_amount_reference, find_duplicate_txn_ids,
+    merge_transactions_with_deduplication, sort_transactions_by_date, MergeStats,
+    TransactionInput,
 };

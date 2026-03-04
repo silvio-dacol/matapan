@@ -441,11 +441,11 @@ pub fn run_parser_pipeline_with_policy(
 
             effects.dedup_removed = match policy.dedup_strategy {
                 DedupStrategy::None => 0,
-                DedupStrategy::DateAndAmount => crate::dedup_transactions_by_date_and_amount(db)?,
+                DedupStrategy::DateAndAmount => 0,
                 DedupStrategy::DateAmountReference => {
                     crate::dedup_transactions_by_date_amount_reference(db)?
                 }
-                DedupStrategy::StrictSignature => crate::dedup_transactions_by_signature(db)?,
+                DedupStrategy::StrictSignature => 0,
             };
 
             Ok(())

@@ -121,63 +121,18 @@ Events are appended to daily .log files:
 
 ## Duplicate Handling
 
-Two approaches are provided, both using a strict signature of core fields:
+Current parser profiles use two duplicate layers:
 
-Signature: `(date, amount, currency, from_account_id, to_account_id, type)`
+- Merge-time dedup by `txn_id`:
+  - `merge_transactions_with_deduplication(template, new_txns)`
+  - Incoming rows with an already existing `txn_id` are skipped.
 
-- Remove duplicates:
-  - `dedup_transactions_by_signature(&mut db) -> Result<usize>`
-  - Keeps the first occurrence and removes subsequent duplicates, preserving original order.
-  - Returns the number of removed transactions.
-
-- Mark duplicates:
-  - `mark_duplicates_by_signature(&mut db) -> Result<usize>`
-  - Keeps all transactions but annotates later duplicates with:
-    - `duplicate: true`
-    - `duplicate_of_txn_id: <first txn_id>` when available
-  - Returns the number of marked transactions.
-
-## Example
-
-```rust
-use anyhow::Result;
-use serde_json::json;
-use utils::{dedup_transactions_by_signature, mark_duplicates_by_signature};
-
-fn main() -> Result<()> {
-    let mut db = json!({
-        "transactions": [
-            {
-                "date": "2025-01-01",
-                "from_account_id": "A",
-                "to_account_id": "B",
-                "type": "internal_transfer",
-                "amount": 100.0,
-                "currency": "SEK",
-                "txn_id": "X1"
-            },
-            {
-                "date": "2025-01-01",
-                "from_account_id": "A",
-                "to_account_id": "B",
-                "type": "internal_transfer",
-                "amount": 100.0,
-                "currency": "SEK",
-                "txn_id": "X2"
-            }
-        ]
-    });
-
-    // Remove exact duplicates
-    let removed = dedup_transactions_by_signature(&mut db)?;
-
-    // Or mark duplicates instead
-    let marked = mark_duplicates_by_signature(&mut db)?;
-    Ok(())
-}
-```
-
-## Notes
-
-- These operations are conservative: differing `type` values (e.g., `income` vs `expense`) are not considered duplicates.
-- For cross-source collapse (e.g., bank outflow + wallet inflow representing the same transfer), consider adding a separate normalization step with date tolerance and description normalization.
+- Optional post-merge dedup by `date + amount + reference`:
+  - `dedup_transactions_by_date_amount_reference(&mut db) -> Result<usize>`
+  - Used by the `StricterForDedup` profile.
+  - Reference lookup priority:
+    1. `reference_number`
+    2. `reference`
+    3. `referens`
+    4. token like `ref=...` in `description`
+  - If no reference is found, fallback key is `date + amount`.
