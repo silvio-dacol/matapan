@@ -37,7 +37,7 @@ Available profiles:
   - Sorts by date
   - Applies `rules.json`
   - Enriches `description-en`
-  - Deduplicates by date+amount
+  - No extra dedup (keeps parsed duplicates unless they were already skipped during merge)
 - `PipelineProfile::StricterForDedup`
   - Includes system accounts
   - Sorts by date

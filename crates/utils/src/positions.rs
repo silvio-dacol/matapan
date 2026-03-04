@@ -86,11 +86,13 @@ pub fn normalize_position_pnl_fields(position: &mut Value) -> bool {
         loss.map_or(Value::Null, Value::from),
     );
 
-    obj.remove("unrealized_pnl").is_some()
+    let shape_changed = obj.remove("unrealized_pnl").is_some()
         || legacy_pnl.is_some()
         || current_profit.is_some()
-        || current_loss.is_some()
-        || round_position_monetary_fields(obj)
+        || current_loss.is_some();
+    let rounded_any = round_position_monetary_fields(obj);
+
+    shape_changed || rounded_any
 }
 
 fn round_position_monetary_fields(obj: &mut serde_json::Map<String, Value>) -> bool {
@@ -272,7 +274,7 @@ mod tests {
         assert_eq!(pos.get("market_value").and_then(|v| v.as_f64()), Some(2.24));
         assert_eq!(
             pos.get("unrealized_profit").and_then(|v| v.as_f64()),
-            Some(0.56)
+            Some(0.55)
         );
     }
 

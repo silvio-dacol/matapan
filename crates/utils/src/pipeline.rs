@@ -307,7 +307,7 @@ mod tests {
         assert!(policy.sort_transactions_by_date);
         assert!(policy.apply_rules);
         assert!(policy.enrich_description_en);
-        assert_eq!(policy.dedup_strategy, DedupStrategy::DateAndAmount);
+        assert_eq!(policy.dedup_strategy, DedupStrategy::None);
     }
 
     #[test]
@@ -387,7 +387,7 @@ impl PipelineProfile {
                 sort_transactions_by_date: true,
                 apply_rules: true,
                 enrich_description_en: true,
-                dedup_strategy: DedupStrategy::DateAndAmount,
+                dedup_strategy: DedupStrategy::None,
             },
             PipelineProfile::StricterForDedup => PipelinePolicy {
                 include_system_accounts: true,
