@@ -353,8 +353,14 @@ fn find_optional_col(headers: &csv::StringRecord, name: &str) -> Option<usize> {
 }
 
 fn parse_alipay_datetime(raw: &str) -> Result<NaiveDate> {
-    let dt = NaiveDateTime::parse_from_str(raw, "%Y-%m-%d %H:%M:%S")?;
-    Ok(dt.date())
+    // Alipay exports can include either minute precision or second precision.
+    for fmt in ["%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M"] {
+        if let Ok(dt) = NaiveDateTime::parse_from_str(raw, fmt) {
+            return Ok(dt.date());
+        }
+    }
+
+    Err(anyhow!("unsupported datetime format: {}", raw))
 }
 
 fn parse_amount(raw: &str) -> Result<f64> {
