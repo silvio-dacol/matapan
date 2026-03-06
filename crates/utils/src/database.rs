@@ -33,22 +33,23 @@ pub fn ensure_database_exists<P: AsRef<Path>>(database_path: P) -> Result<PathBu
         path.to_path_buf()
     };
 
-    // Check if database.json exists and is valid
-    let needs_initialization = match File::open(&db_path) {
-        Ok(mut file) => {
-            let mut contents = String::new();
-            file.read_to_string(&mut contents)?;
-            // Try to parse - if it fails, we need to reinitialize
-            serde_json::from_str::<serde_json::Value>(&contents).is_err()
-        }
-        Err(_) => {
-            // File doesn't exist, needs initialization
-            true
-        }
-    };
-
-    if needs_initialization {
+    // Initialize only when the file does not exist.
+    if !db_path.exists() {
         initialize_from_template(&db_path)?;
+    } else {
+        // If the file exists, validate JSON and fail loudly instead of silently resetting.
+        let mut file = File::open(&db_path)
+            .with_context(|| format!("Cannot open existing database at {:?}", db_path))?;
+        let mut contents = String::new();
+        file.read_to_string(&mut contents)
+            .with_context(|| format!("Cannot read existing database at {:?}", db_path))?;
+
+        serde_json::from_str::<serde_json::Value>(&contents).with_context(|| {
+            format!(
+                "Existing database at {:?} is invalid JSON; refusing to auto-reset it",
+                db_path
+            )
+        })?;
     }
 
     Ok(db_path)

@@ -452,6 +452,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "general_parser"
+version = "0.1.0"
+dependencies = [
+ "ai_client",
+ "anyhow",
+ "calamine 0.33.0",
+ "csv",
+ "encoding_rs",
+ "hex",
+ "serde",
+ "serde_json",
+ "sha2",
+ "utils",
+]
+
+[[package]]
 name = "generic-array"
 version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
