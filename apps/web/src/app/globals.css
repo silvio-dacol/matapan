@@ -1,0 +1,62 @@
+@import "tailwindcss";
+
+:root {
+  --bg-0: #f6f3ec;
+  --bg-1: #e8f0ed;
+  --bg-2: #cbd8e7;
+  --surface: #ffffff;
+  --ink-1: #1b1f24;
+  --ink-2: #4d5761;
+  --brand: #114b5f;
+  --brand-soft: #d5edf1;
+  --line: #d7dde4;
+}
+
+@theme inline {
+  --color-background: var(--bg-0);
+  --color-foreground: var(--ink-1);
+  --font-sans: var(--font-space-grotesk);
+  --font-mono: var(--font-ibm-plex-mono);
+}
+
+body {
+  min-height: 100vh;
+  color: var(--ink-1);
+  background:
+    radial-gradient(circle at 10% 5%, color-mix(in srgb, var(--bg-2) 40%, transparent), transparent 48%),
+    radial-gradient(circle at 90% 0%, color-mix(in srgb, var(--bg-1) 65%, transparent), transparent 50%),
+    linear-gradient(165deg, var(--bg-0), #f4f1ea 42%, #eef4f6);
+  font-family: var(--font-space-grotesk), "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+a {
+  color: inherit;
+}
+
+.matapan-shell {
+  margin: 1.5rem auto;
+  width: min(1120px, 95vw);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  box-shadow: 0 16px 36px rgba(17, 45, 59, 0.1);
+}
+
+.matapan-section {
+  padding: 1.25rem;
+}
+
+.matapan-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+@media (min-width: 720px) {
+  .matapan-section {
+    padding: 1.75rem;
+  }
+}

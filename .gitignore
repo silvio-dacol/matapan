@@ -1,7 +1,8 @@
 /target
 /logs
-*.json
 *.xlsx
+rules.json
+database.json
 *.xls
 *.csv
 *txt
