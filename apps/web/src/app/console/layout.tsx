@@ -11,12 +11,12 @@ export default function ConsoleLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <main className="matapan-shell matapan-section">
-      <header className="border-b border-[var(--line)] pb-5">
-        <p className="text-xs tracking-[0.2em] text-[var(--ink-2)] uppercase">
+      <header className="border-b border-(--line) pb-5">
+        <p className="text-xs tracking-[0.2em] text-(--ink-2) uppercase">
           Data Console
         </p>
         <h1 className="mt-2 text-3xl font-semibold">Operator controls</h1>
-        <p className="mt-2 text-sm text-[var(--ink-2)]">
+        <p className="mt-2 text-sm text-(--ink-2)">
           Safe write workflows with explicit visibility and review steps.
         </p>
       </header>
@@ -26,7 +26,7 @@ export default function ConsoleLayout({
           <Link
             key={link.href}
             href={link.href}
-            className="rounded-full border border-[var(--line)] bg-[var(--surface)] px-4 py-2 text-sm transition hover:bg-[var(--brand-soft)]"
+            className="rounded-full border border-(--line) bg-(--surface) px-4 py-2 text-sm transition hover:bg-(--brand-soft)"
           >
             {link.label}
           </Link>
