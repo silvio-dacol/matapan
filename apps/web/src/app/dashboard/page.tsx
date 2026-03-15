@@ -1,14 +1,16 @@
-import { getAccountBalances, getNetWorthSeries, getParserRuns } from "@/lib/api";
+import { getAccountBalances, getNetWorthSeries, getTransactions } from "@/lib/api";
 
 export default async function DashboardPage() {
-  const [netWorth, accounts, runs] = await Promise.all([
+  const [netWorth, accounts, transactions] = await Promise.all([
     getNetWorthSeries(),
     getAccountBalances(),
-    getParserRuns(),
+    getTransactions(),
   ]);
 
   const latestPoint = netWorth.points.at(-1);
-  const noData = netWorth.points.length === 0 && accounts.length === 0;
+  const noData =
+    netWorth.points.length === 0 && accounts.length === 0 && transactions.length === 0;
+  const recentTransactions = transactions.slice(0, 8);
 
   if (noData) {
     return (
@@ -68,21 +70,15 @@ export default async function DashboardPage() {
             Accounts tracked
           </p>
           <p className="mt-2 font-mono text-2xl">{accounts.length}</p>
-          <p className="mt-1 text-xs text-(--ink-2)">multi-institution sample data</p>
+          <p className="mt-1 text-xs text-(--ink-2)">loaded from database.json</p>
         </article>
 
         <article className="rounded-xl border border-(--line) bg-(--surface) p-4">
           <p className="text-xs text-(--ink-2) uppercase tracking-[0.14em]">
-            Latest parser run
+            Transactions loaded
           </p>
-          {runs[0] ? (
-            <>
-              <p className="mt-2 font-mono text-base">{runs[0].source}</p>
-              <p className="mt-1 text-xs text-(--ink-2)">status: {runs[0].status}</p>
-            </>
-          ) : (
-            <p className="mt-2 text-sm text-(--ink-2)">No parser runs yet</p>
-          )}
+          <p className="mt-2 font-mono text-2xl">{transactions.length}</p>
+          <p className="mt-1 text-xs text-(--ink-2)">all currencies</p>
         </article>
       </section>
 
@@ -112,17 +108,20 @@ export default async function DashboardPage() {
         </article>
 
         <article className="rounded-xl border border-(--line) bg-(--surface) p-4">
-          <h2 className="text-lg font-semibold">Recent parser runs</h2>
-          {runs.length === 0 ? (
-            <p className="mt-3 text-sm text-(--ink-2)">No parser runs yet</p>
+          <h2 className="text-lg font-semibold">Recent transactions</h2>
+          {recentTransactions.length === 0 ? (
+            <p className="mt-3 text-sm text-(--ink-2)">No transactions yet</p>
           ) : (
             <ul className="mt-3 space-y-2 text-sm">
-              {runs.map((run) => (
-                <li key={run.runId} className="rounded-lg border border-(--line) p-3">
-                  <p className="font-mono text-xs">{run.runId}</p>
-                  <p className="mt-1">{run.source}</p>
+              {recentTransactions.map((tx) => (
+                <li key={tx.id} className="rounded-lg border border-(--line) p-3">
+                  <p className="font-mono text-xs">{tx.bookingDate}</p>
+                  <p className="mt-1">{tx.description}</p>
                   <p className="text-xs text-(--ink-2)">
-                    {run.status} / rows imported: {run.importedRows}
+                    {tx.amount.toLocaleString(undefined, {
+                      style: "currency",
+                      currency: tx.currency,
+                    })}
                   </p>
                 </li>
               ))}

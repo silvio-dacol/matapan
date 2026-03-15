@@ -53,13 +53,61 @@ function prettyAccountName(accountId: string): string {
     .join(" ");
 }
 
+function isPortfolioAccount(account: DatabaseSnapshot["accounts"][number]): boolean {
+  return account.institution.toLowerCase() !== "external" && !account.account_id.startsWith("EXTERNAL_");
+}
+
+function sortByDateAsc<T extends { date: string }>(items: T[]): T[] {
+  return [...items].sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function sortByDateDesc<T extends { bookingDate: string }>(items: T[]): T[] {
+  return [...items].sort((a, b) => b.bookingDate.localeCompare(a.bookingDate));
+}
+
 export async function getNetWorthSeries(): Promise<NetWorthSeries> {
   const snapshot = await loadDatabaseSnapshot();
   const baseCurrency = snapshot?.user_profile.base_currency ?? "EUR";
 
+  if (!snapshot) {
+    return {
+      baseCurrency,
+      points: [],
+    };
+  }
+
+  const ownAccountIds = new Set(
+    snapshot.accounts.filter(isPortfolioAccount).map((account) => account.account_id),
+  );
+
+  let runningTotal = 0;
+  const dailyTotals = new Map<string, number>();
+
+  for (const transaction of sortByDateAsc(snapshot.transactions)) {
+    if (transaction.currency !== baseCurrency) {
+      continue;
+    }
+
+    let delta = 0;
+
+    if (ownAccountIds.has(transaction.to_account_id)) {
+      delta += transaction.amount;
+    }
+
+    if (ownAccountIds.has(transaction.from_account_id)) {
+      delta -= transaction.amount;
+    }
+
+    runningTotal += delta;
+    dailyTotals.set(transaction.date, runningTotal);
+  }
+
   return {
     baseCurrency,
-    points: [],
+    points: [...dailyTotals.entries()].map(([date, amountBaseCcy]) => ({
+      date,
+      amountBaseCcy,
+    })),
   };
 }
 
@@ -69,12 +117,37 @@ export async function getAccountBalances(): Promise<AccountBalance[]> {
     return [];
   }
 
-  return snapshot.accounts.map((account) => ({
+  const baseCurrency = snapshot.user_profile.base_currency;
+  const ownAccounts = snapshot.accounts.filter(isPortfolioAccount);
+  const ownAccountIds = new Set(ownAccounts.map((account) => account.account_id));
+  const balances = new Map<string, number>(ownAccounts.map((account) => [account.account_id, 0]));
+
+  for (const transaction of snapshot.transactions) {
+    if (transaction.currency !== baseCurrency) {
+      continue;
+    }
+
+    if (ownAccountIds.has(transaction.to_account_id)) {
+      balances.set(
+        transaction.to_account_id,
+        (balances.get(transaction.to_account_id) ?? 0) + transaction.amount,
+      );
+    }
+
+    if (ownAccountIds.has(transaction.from_account_id)) {
+      balances.set(
+        transaction.from_account_id,
+        (balances.get(transaction.from_account_id) ?? 0) - transaction.amount,
+      );
+    }
+  }
+
+  return ownAccounts.map((account) => ({
     accountId: account.account_id,
     accountName: prettyAccountName(account.account_id),
     institution: account.institution,
-    currency: snapshot.user_profile.base_currency,
-    balance: 0,
+    currency: baseCurrency,
+    balance: balances.get(account.account_id) ?? 0,
   }));
 }
 
@@ -84,7 +157,7 @@ export async function getTransactions(): Promise<Transaction[]> {
     return [];
   }
 
-  return snapshot.transactions.map((transaction) => {
+  const transactions = snapshot.transactions.map((transaction) => {
     const sign = transaction.type === "expense" || transaction.type === "fees" ? -1 : 1;
 
     return {
@@ -98,6 +171,8 @@ export async function getTransactions(): Promise<Transaction[]> {
       enriched: Boolean(transaction["description-en"]),
     };
   });
+
+  return sortByDateDesc(transactions);
 }
 
 export async function getParserRuns(): Promise<ParserRun[]> {
