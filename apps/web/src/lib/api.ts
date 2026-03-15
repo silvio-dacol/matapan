@@ -1,84 +1,105 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+
 import {
-  parseAccountBalancesResponse,
-  parseNetWorthResponse,
-  parseParserRunsResponse,
-  parseTransactionsResponse,
+  parseDatabaseSnapshot,
   type AccountBalance,
+  type DatabaseSnapshot,
   type NetWorthSeries,
   type ParserRun,
   type Transaction,
 } from "@/lib/contracts";
-import {
-  mockAccountBalancesResponse,
-  mockNetWorthResponse,
-  mockParserRunsResponse,
-  mockTransactionsResponse,
-} from "@/lib/mock-data";
 
-type ApiResource = "netWorth" | "accountBalances" | "transactions" | "parserRuns";
-
-const endpointDefaults: Record<ApiResource, string> = {
-  netWorth: "/api/v1/net-worth",
-  accountBalances: "/api/v1/accounts/balances",
-  transactions: "/api/v1/transactions",
-  parserRuns: "/api/v1/parser-runs",
-};
-
-const endpointEnvKeys: Record<ApiResource, string> = {
-  netWorth: "MATAPAN_API_NET_WORTH_PATH",
-  accountBalances: "MATAPAN_API_ACCOUNT_BALANCES_PATH",
-  transactions: "MATAPAN_API_TRANSACTIONS_PATH",
-  parserRuns: "MATAPAN_API_PARSER_RUNS_PATH",
-};
-
-function resolveEndpoint(resource: ApiResource): string | null {
-  const baseUrl = process.env.MATAPAN_API_BASE_URL?.trim();
-  if (!baseUrl) {
-    return null;
+function resolveDatabasePath(): string {
+  const configuredPath = process.env.MATAPAN_DATABASE_PATH?.trim();
+  if (configuredPath) {
+    return path.isAbsolute(configuredPath)
+      ? configuredPath
+      : path.resolve(process.cwd(), configuredPath);
   }
 
-  const configuredPath = process.env[endpointEnvKeys[resource]]?.trim();
-  const path = configuredPath && configuredPath.length > 0 ? configuredPath : endpointDefaults[resource];
-  return new URL(path, baseUrl).toString();
+  return path.resolve(process.cwd(), "..", "..", "database", "database.json");
 }
 
-async function fetchJson(resource: ApiResource): Promise<unknown> {
-  const endpoint = resolveEndpoint(resource);
-  if (!endpoint) {
-    return null;
+async function loadDatabaseSnapshot(): Promise<DatabaseSnapshot | null> {
+  const databasePath = resolveDatabasePath();
+
+  try {
+    const raw = await readFile(databasePath, "utf8");
+    if (!raw.trim()) {
+      return null;
+    }
+
+    return parseDatabaseSnapshot(JSON.parse(raw));
+  } catch (error) {
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      (error as { code?: string }).code === "ENOENT"
+    ) {
+      return null;
+    }
+
+    throw error;
   }
+}
 
-  const response = await fetch(endpoint, {
-    method: "GET",
-    headers: {
-      Accept: "application/json",
-    },
-    cache: "no-store",
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch ${resource} from ${endpoint}: HTTP ${response.status}`);
-  }
-
-  return response.json();
+function prettyAccountName(accountId: string): string {
+  return accountId
+    .toLowerCase()
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 export async function getNetWorthSeries(): Promise<NetWorthSeries> {
-  const payload = (await fetchJson("netWorth")) ?? mockNetWorthResponse;
-  return parseNetWorthResponse(payload);
+  const snapshot = await loadDatabaseSnapshot();
+  const baseCurrency = snapshot?.user_profile.base_currency ?? "EUR";
+
+  return {
+    baseCurrency,
+    points: [],
+  };
 }
 
 export async function getAccountBalances(): Promise<AccountBalance[]> {
-  const payload = (await fetchJson("accountBalances")) ?? mockAccountBalancesResponse;
-  return parseAccountBalancesResponse(payload);
+  const snapshot = await loadDatabaseSnapshot();
+  if (!snapshot) {
+    return [];
+  }
+
+  return snapshot.accounts.map((account) => ({
+    accountId: account.account_id,
+    accountName: prettyAccountName(account.account_id),
+    institution: account.institution,
+    currency: snapshot.user_profile.base_currency,
+    balance: 0,
+  }));
 }
 
 export async function getTransactions(): Promise<Transaction[]> {
-  const payload = (await fetchJson("transactions")) ?? mockTransactionsResponse;
-  return parseTransactionsResponse(payload);
+  const snapshot = await loadDatabaseSnapshot();
+  if (!snapshot) {
+    return [];
+  }
+
+  return snapshot.transactions.map((transaction) => {
+    const sign = transaction.type === "expense" || transaction.type === "fees" ? -1 : 1;
+
+    return {
+      id: transaction.txn_id,
+      bookingDate: transaction.date,
+      accountName: prettyAccountName(transaction.from_account_id),
+      description: transaction["description-en"] ?? transaction.description,
+      category: transaction.category ?? null,
+      amount: transaction.amount * sign,
+      currency: transaction.currency,
+      enriched: Boolean(transaction["description-en"]),
+    };
+  });
 }
 
 export async function getParserRuns(): Promise<ParserRun[]> {
-  const payload = (await fetchJson("parserRuns")) ?? mockParserRunsResponse;
-  return parseParserRunsResponse(payload);
+  return [];
 }

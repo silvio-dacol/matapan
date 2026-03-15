@@ -11,27 +11,18 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser.
 
-## Backend Integration
+## Data Source
 
-The UI reads data from backend endpoints when `MATAPAN_API_BASE_URL` is configured.
-Responses must match the envelope contracts under `src/lib/contracts.ts`.
+The UI reads data only from `database/database.json` in this repository.
 
 1. Copy `.env.example` to `.env.local`
-2. Set `MATAPAN_API_BASE_URL` to your backend base URL
-3. Optionally override endpoint paths with:
-	- `MATAPAN_API_NET_WORTH_PATH`
-	- `MATAPAN_API_ACCOUNT_BALANCES_PATH`
-	- `MATAPAN_API_TRANSACTIONS_PATH`
-	- `MATAPAN_API_PARSER_RUNS_PATH`
+2. Optionally set `MATAPAN_DATABASE_PATH` to override the database file path
 
-Default endpoint paths are:
+Default path resolution is:
 
-- `/api/v1/net-worth`
-- `/api/v1/accounts/balances`
-- `/api/v1/transactions`
-- `/api/v1/parser-runs`
+- `../../database/database.json` (relative to `apps/web`)
 
-If `MATAPAN_API_BASE_URL` is not set, the app falls back to local mock data.
+If the file is missing or empty, the dashboard shows "No data available yet".
 
 ## Validation
 
