@@ -3,6 +3,8 @@ use intesa_sanpaolo::{FileType, IntesaSanpaoloParser};
 use std::{env, fs};
 
 fn main() -> Result<()> {
+    utils::load_dotenv();
+
     // Usage:
     //   intesa_sanpaolo [file1.xlsx file2.xlsx ...] [database_path] [output_path]
     //
@@ -200,6 +202,16 @@ fn main() -> Result<()> {
     );
     println!("─────────────────────────────────────────");
     println!("✅ Database written to: {}", written.display());
+
+    // Rebuild the normalised database when FREECURRENCYAPI_KEY is available.
+    if let Ok(api_key) = std::env::var("FREECURRENCYAPI_KEY") {
+        println!("\n🔄 Syncing normalised database...");
+        let db_dir = std::path::Path::new(final_output_path);
+        match utils::sync_normalized_database_blocking(db_dir, &api_key) {
+            Ok(()) => println!("✅ database_normalized.json updated."),
+            Err(e) => eprintln!("⚠  FX sync failed (database_normalized.json not updated): {}", e),
+        }
+    }
 
     Ok(())
 }

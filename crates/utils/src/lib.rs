@@ -2,12 +2,22 @@ pub mod accounts;
 pub mod contract;
 pub mod database;
 pub mod description_enrichment;
+pub mod fx_rates;
+pub mod hicp;
 pub mod instruments;
+pub mod normalized_database;
 pub mod round_digits;
 pub mod pipeline;
 pub mod positions;
 pub mod rules;
 pub mod transactions;
+
+/// Loads the `.env` file from the current working directory (or any parent).
+/// Call this at the start of `main` so env vars like `FREECURRENCYAPI_KEY`
+/// are available. Silently does nothing if the file is not present.
+pub fn load_dotenv() {
+    let _ = dotenvy::dotenv();
+}
 
 pub mod pipelines {
     pub use crate::pipeline::*;
@@ -49,6 +59,14 @@ pub use crate::positions::{
 pub use crate::rules::{
     apply_rules, apply_rules_from_database_path, load_rules_from_database_path, Condition, Rule,
     RuleSet,
+};
+pub use crate::fx_rates::{
+    collect_months_and_currencies, load_fx_rates, lookup_rate, save_fx_rates, sync_fx_rates,
+    FxRateEntry,
+};
+pub use crate::hicp::{load_hicp, lookup_hicp, save_hicp, HicpEntry};
+pub use crate::normalized_database::{
+    build_normalized_database, sync_normalized_database, sync_normalized_database_blocking,
 };
 pub use crate::transactions::{
     build_transaction, dedup_transactions_by_date_amount_reference, find_duplicate_txn_ids,

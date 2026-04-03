@@ -17,6 +17,8 @@ fn find_csv_file() -> Option<PathBuf> {
 }
 
 fn main() -> Result<()> {
+    utils::load_dotenv();
+
     // Usage:
     //   ibkr_parser [csv_file] [database_path] [output_path]
     //
@@ -114,6 +116,16 @@ fn main() -> Result<()> {
     );
     println!("✓ Rules changed: {} transaction(s)", rules_changed);
     println!("✅ Database written to: {}", written.display());
+
+    // Rebuild the normalised database when FREECURRENCYAPI_KEY is available.
+    if let Ok(api_key) = std::env::var("FREECURRENCYAPI_KEY") {
+        println!("\n🔄 Syncing normalised database...");
+        let db_dir = std::path::Path::new(final_output_path);
+        match utils::sync_normalized_database_blocking(db_dir, &api_key) {
+            Ok(()) => println!("✅ database_normalized.json updated."),
+            Err(e) => eprintln!("⚠  FX sync failed (database_normalized.json not updated): {}", e),
+        }
+    }
 
     Ok(())
 }
