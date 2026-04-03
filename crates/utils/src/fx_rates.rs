@@ -1,4 +1,4 @@
-//! FX rate fetching, caching, and lookup using freecurrencyapi.com.
+﻿//! FX rate fetching, caching, and lookup using freecurrencyapi.com.
 //!
 //! Monthly averages are computed from rates on the 1st and 28th of each month
 //! and stored in `<database_dir>/fx_rates.json`.
@@ -9,7 +9,6 @@
 //! To convert an amount from SEK to EUR: `amount_eur = amount_sek / rate`.
 
 use anyhow::{anyhow, Context, Result};
-use freecurrencyapi::Freecurrencyapi;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{
@@ -105,37 +104,67 @@ pub fn lookup_rate(
 }
 
 // ---------------------------------------------------------------------------
-// API fetching
+// API fetching (direct reqwest â€” no third-party wrapper)
 // ---------------------------------------------------------------------------
 
-/// Fetches exchange rates for a single calendar date.
+/// Fetches exchange rates for a single calendar date directly from the
+/// freecurrencyapi.com v1 historical endpoint.
 ///
-/// The API is called with `base_currency` so the response values represent
-/// units of each requested currency per one unit of base.
-/// For example, base=EUR, currencies="SEK" → `{"SEK": 10.5}` means 10.5 SEK = 1 EUR.
+/// `base_currency` is the denominator. The returned map contains units of each
+/// requested currency per one unit of `base_currency`.
+/// The API may return data for the nearest available trading day when the
+/// requested date falls on a weekend or public holiday; either key is accepted.
 async fn fetch_rates_for_date(
-    client: &Freecurrencyapi,
+    client: &reqwest::Client,
+    api_key: &str,
     base_currency: &str,
     date: &str,
     currencies_param: &str,
 ) -> Result<HashMap<String, f64>> {
     let response = client
-        .historical(base_currency, date, currencies_param)
+        .get("https://api.freecurrencyapi.com/v1/historical")
+        .header("apikey", api_key)
+        .query(&[
+            ("base_currency", base_currency),
+            ("date", date),
+            ("currencies", currencies_param),
+        ])
+        .send()
         .await
-        .map_err(|e| anyhow!("freecurrencyapi call failed for {}: {:?}", date, e))?;
+        .with_context(|| format!("HTTP request failed for date {}", date))?;
 
-    // The library stores the raw JSON payload as a String in `response.data`.
-    let data: Value = serde_json::from_str(&response.data).with_context(|| {
-        format!(
-            "Failed to parse freecurrencyapi response data for date {}",
-            date
-        )
-    })?;
+    let status = response.status();
+    let body: Value = response
+        .json()
+        .await
+        .with_context(|| format!("Failed to parse JSON response for date {}", date))?;
 
-    // Shape: { "<date>": { "<CURRENCY>": <rate_f64>, ... } }
-    let day_data = data
-        .get(date)
-        .ok_or_else(|| anyhow!("No data key '{}' in API response", date))?;
+    if !status.is_success() {
+        let msg = body
+            .get("message")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown error");
+        return Err(anyhow!(
+            "freecurrencyapi returned HTTP {} for date {}: {}",
+            status,
+            date,
+            msg
+        ));
+    }
+
+    // Response shape: { "data": { "<actual_date>": { "<CURRENCY>": <f64>, ... } } }
+    // The actual date key may differ from the requested date (weekend/holiday rollover).
+    let day_data = body
+        .get("data")
+        .and_then(|d| d.as_object())
+        .and_then(|m| m.values().next())
+        .ok_or_else(|| {
+            anyhow!(
+                "Unexpected API response structure for date {} â€” body: {}",
+                date,
+                body
+            )
+        })?;
 
     let mut result = HashMap::new();
     if let Some(obj) = day_data.as_object() {
@@ -159,13 +188,13 @@ async fn fetch_rates_for_date(
 /// them, and appends the new entries to the cache file.
 ///
 /// # Arguments
-/// * `api_key`           – freecurrencyapi.com API key (set `FREECURRENCYAPI_KEY`).
-/// * `database_path`     – path to the database folder (or `database.json`, the
+/// * `api_key`           â€“ freecurrencyapi.com API key (set `FREECURRENCYAPI_KEY`).
+/// * `database_path`     â€“ path to the database folder (or `database.json`, the
 ///                         parent directory is used as the cache location).
-/// * `base_currency`     – the target/base currency code (e.g., `"EUR"`).
-/// * `currencies`        – source currencies to ensure are cached
+/// * `base_currency`     â€“ the target/base currency code (e.g., `"EUR"`).
+/// * `currencies`        â€“ source currencies to ensure are cached
 ///                         (e.g., `&["SEK", "USD", "CNY"]`).
-/// * `months`            – months in `"YYYY-MM"` format that must be available.
+/// * `months`            â€“ months in `"YYYY-MM"` format that must be available.
 ///
 /// Returns the full (including previously cached) list of [`FxRateEntry`] items.
 pub async fn sync_fx_rates(
@@ -177,15 +206,14 @@ pub async fn sync_fx_rates(
 ) -> Result<Vec<FxRateEntry>> {
     let mut cached = load_fx_rates(database_path)?;
 
-    // Build a set of (month, from_currency) pairs that are already cached so
-    // we can skip API calls for months that are fully covered.
+    // Build a set of (month, from_currency) pairs already cached.
     let cached_pairs: HashSet<(String, String)> = cached
         .iter()
         .filter(|e| e.to_currency == base_currency)
         .map(|e| (e.month.clone(), e.from_currency.clone()))
         .collect();
 
-    // Source currencies that differ from the base (no API call needed for same).
+    // Source currencies that differ from the base (same-currency rate is 1.0).
     let source_currencies: Vec<&str> = currencies
         .iter()
         .copied()
@@ -212,9 +240,7 @@ pub async fn sync_fx_rates(
         return Ok(cached);
     }
 
-    let client = Freecurrencyapi::new(api_key)
-        .map_err(|e| anyhow!("Failed to initialise freecurrencyapi client: {:?}", e))?;
-
+    let client = reqwest::Client::new();
     let mut newly_added = 0usize;
 
     for month in missing_months {
@@ -222,20 +248,19 @@ pub async fn sync_fx_rates(
         let date_28th = format!("{}-28", month);
 
         let rates_1st =
-            fetch_rates_for_date(&client, base_currency, &date_1st, &currencies_param).await;
+            fetch_rates_for_date(&client, api_key, base_currency, &date_1st, &currencies_param)
+                .await;
         let rates_28th =
-            fetch_rates_for_date(&client, base_currency, &date_28th, &currencies_param).await;
+            fetch_rates_for_date(&client, api_key, base_currency, &date_28th, &currencies_param)
+                .await;
 
         match (rates_1st, rates_28th) {
             (Ok(r1), Ok(r28)) => {
                 for &currency in &source_currencies {
-                    // Skip if this specific pair is already cached.
                     if cached_pairs.contains(&(month.clone(), currency.to_string())) {
                         continue;
                     }
                     if let (Some(&v1), Some(&v28)) = (r1.get(currency), r28.get(currency)) {
-                        // API returns units of `currency` per 1 base_currency.
-                        // We store exactly that as-is (10.4 SEK per 1 EUR).
                         let avg_rate = (v1 + v28) / 2.0;
                         cached.push(FxRateEntry {
                             month: month.clone(),
@@ -248,14 +273,10 @@ pub async fn sync_fx_rates(
                 }
             }
             (Err(e), _) => {
-                return Err(
-                    e.context(format!("Failed to fetch rates for 1st of {}", month))
-                );
+                return Err(e.context(format!("Failed to fetch rates for 1st of {}", month)));
             }
             (_, Err(e)) => {
-                return Err(
-                    e.context(format!("Failed to fetch rates for 28th of {}", month))
-                );
+                return Err(e.context(format!("Failed to fetch rates for 28th of {}", month)));
             }
         }
     }
@@ -274,9 +295,6 @@ pub async fn sync_fx_rates(
 /// Extracts all unique `"YYYY-MM"` months referenced by transactions and
 /// positions in a database [`Value`], along with every distinct non-base
 /// currency code found in those records.
-///
-/// Useful for determining which months and currencies to pass to
-/// [`sync_fx_rates`].
 pub fn collect_months_and_currencies(
     db: &Value,
     base_currency: &str,
@@ -284,7 +302,6 @@ pub fn collect_months_and_currencies(
     let mut months: HashSet<String> = HashSet::new();
     let mut currencies: HashSet<String> = HashSet::new();
 
-    // Transactions: date "YYYY-MM-DD", currency field.
     if let Some(txns) = db.get("transactions").and_then(|v| v.as_array()) {
         for txn in txns {
             if let Some(date) = txn.get("date").and_then(|v| v.as_str()) {
@@ -300,7 +317,6 @@ pub fn collect_months_and_currencies(
         }
     }
 
-    // Positions: as_of_date "YYYY-MM-DD", currency field.
     if let Some(positions) = db.get("positions").and_then(|v| v.as_array()) {
         for pos in positions {
             if let Some(date) = pos.get("as_of_date").and_then(|v| v.as_str()) {
@@ -318,7 +334,6 @@ pub fn collect_months_and_currencies(
 
     let mut months_vec: Vec<String> = months.into_iter().collect();
     months_vec.sort();
-
     let mut currencies_vec: Vec<String> = currencies.into_iter().collect();
     currencies_vec.sort();
 

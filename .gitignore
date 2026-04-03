@@ -11,3 +11,4 @@ database.json
 minpension.png
 !.env.example
 .env
+database_normalized.json
