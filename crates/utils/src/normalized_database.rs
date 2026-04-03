@@ -23,7 +23,7 @@ use std::{
 };
 use crate::{
     fx_rates::{collect_months_and_currencies, lookup_rate, sync_fx_rates, FxRateEntry},
-    hicp::{load_hicp, lookup_hicp, HicpEntry},
+    hicp::{load_hicp, lookup_hicp, sync_hicp, HicpEntry},
     round_digits::round_money,
 };
 
@@ -289,6 +289,13 @@ pub async fn sync_normalized_database(database_path: &Path, api_key: &str) -> Re
         .unwrap_or("EUR")
         .to_string();
 
+    let tax_residency = source_db
+        .get("user_profile")
+        .and_then(|p| p.get("tax_residency"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+
     // Collect months and currencies from the source database.
     let (months, currencies) = collect_months_and_currencies(&source_db, &base_currency);
 
@@ -296,8 +303,12 @@ pub async fn sync_normalized_database(database_path: &Path, api_key: &str) -> Re
     let currency_refs: Vec<&str> = currencies.iter().map(String::as_str).collect();
     let fx_rates = sync_fx_rates(api_key, db_dir, &base_currency, &currency_refs, &months).await?;
 
-    // Load HICP series (returns empty vec / all-1.0 while not yet integrated).
-    let hicp_entries = load_hicp(db_dir)?;
+    // Sync HICP series from Eurostat for the tax-residency country.
+    let hicp_entries = if tax_residency.is_empty() {
+        load_hicp(db_dir)?
+    } else {
+        sync_hicp(db_dir, &[tax_residency.as_str()], &months).await?
+    };
 
     // Build normalised database and write it.
     let normalised = build_normalized_database(&source_db, &fx_rates, &hicp_entries)?;
