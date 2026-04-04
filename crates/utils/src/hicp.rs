@@ -65,9 +65,13 @@ pub fn load_hicp(database_path: &Path) -> Result<Vec<HicpEntry>> {
 }
 
 /// Saves HICP entries to `<database_dir>/hicp_series.json`.
+///
+/// Entries are sorted by `(country, month)` before writing.
 pub fn save_hicp(database_path: &Path, entries: &[HicpEntry]) -> Result<()> {
     let path = hicp_path(database_path);
-    let json = serde_json::to_string_pretty(entries)?;
+    let mut sorted = entries.to_vec();
+    sorted.sort_by(|a, b| a.country.cmp(&b.country).then(a.month.cmp(&b.month)));
+    let json = serde_json::to_string_pretty(&sorted)?;
     fs::write(&path, json)
         .with_context(|| format!("Cannot write hicp_series.json at {:?}", path))?;
     Ok(())
@@ -209,6 +213,7 @@ pub async fn sync_hicp(
         .collect();
 
     if countries_needing_fetch.is_empty() {
+        save_hicp(database_path, &cached)?;
         return Ok(cached);
     }
 
@@ -237,9 +242,7 @@ pub async fn sync_hicp(
         }
     }
 
-    if newly_added > 0 {
-        save_hicp(database_path, &cached)?;
-    }
+    save_hicp(database_path, &cached)?;
 
     Ok(cached)
 }

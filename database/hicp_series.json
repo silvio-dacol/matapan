@@ -1,10 +1,5 @@
 [
   {
-    "month": "2025-12",
-    "country": "SE",
-    "value": 133.14
-  },
-  {
     "month": "2022-04",
     "country": "SE",
     "value": 116.78
@@ -213,5 +208,10 @@
     "month": "2025-11",
     "country": "SE",
     "value": 133.03
+  },
+  {
+    "month": "2025-12",
+    "country": "SE",
+    "value": 133.14
   }
 ]

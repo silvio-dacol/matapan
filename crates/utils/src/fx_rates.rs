@@ -66,9 +66,18 @@ pub fn load_fx_rates(database_path: &Path) -> Result<Vec<FxRateEntry>> {
 }
 
 /// Saves FX rate entries to `<database_dir>/fx_rates.json`.
+///
+/// Entries are sorted by `(from_currency, to_currency, month)` before writing.
 pub fn save_fx_rates(database_path: &Path, rates: &[FxRateEntry]) -> Result<()> {
     let path = fx_rates_path(database_path);
-    let json = serde_json::to_string_pretty(rates)?;
+    let mut sorted = rates.to_vec();
+    sorted.sort_by(|a, b| {
+        a.from_currency
+            .cmp(&b.from_currency)
+            .then(a.to_currency.cmp(&b.to_currency))
+            .then(a.month.cmp(&b.month))
+    });
+    let json = serde_json::to_string_pretty(&sorted)?;
     fs::write(&path, json)
         .with_context(|| format!("Cannot write fx_rates.json at {:?}", path))?;
     Ok(())
@@ -237,6 +246,7 @@ pub async fn sync_fx_rates(
         .collect();
 
     if missing_months.is_empty() {
+        save_fx_rates(database_path, &cached)?;
         return Ok(cached);
     }
 
