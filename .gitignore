@@ -9,3 +9,6 @@ database.json
 !.database.template.json
 !.rules.template.json
 minpension.png
+!.env.example
+.env
+database_normalized.json

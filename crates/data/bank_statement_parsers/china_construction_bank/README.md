@@ -15,7 +15,7 @@ Last update: February 2026
 
 <img src="./pics/3.png" alt="Image" width="300">
 
-4. Select the city where you opened the account (in my case it is Chengdu):
+4. Select the city where you opened the account (in this case my account was opened in Chengdu):
 
 <img src="./pics/4.png" alt="Image" width="300">
 
@@ -36,4 +36,6 @@ Last update: February 2026
 
 <img src="./pics/9.png" alt="Image" width="300">
 
-Note: If you see changes in the statement format, please open an issue or a pull request to update this parser.
+Note 1: The only email addresses that CCB accept are the ones from Chinese providers (like @qq.com).
+
+Note 2: If you see changes in the statement format, please open an issue or a pull request to update this parser.

@@ -463,6 +463,8 @@ pub fn run_parser_contract_cli<P>(
 where
     P: crate::contract::ParserContract,
 {
+    crate::load_dotenv();
+
     let input_files = discover_input_files_in_current_dir(contract.supported_input_formats())?;
 
     if input_files.is_empty() {
@@ -540,6 +542,17 @@ where
     ];
 
     print_pipeline_summary(&summary, &extra_lines);
+
+    // Rebuild the normalised database (amounts in base currency + exchange_rate / hicp fields)
+    // whenever the API key is available. Silently skip when the key is not set.
+    if let Ok(api_key) = std::env::var("FREECURRENCYAPI_KEY") {
+        println!("\n🔄 Syncing normalised database...");
+        let db_dir = std::path::Path::new(database_path);
+        match crate::normalized_database::sync_normalized_database_blocking(db_dir, &api_key) {
+            Ok(()) => println!("✅ database_normalized.json updated."),
+            Err(e) => eprintln!("⚠  FX sync failed (database_normalized.json not updated): {}", e),
+        }
+    }
 
     Ok(())
 }

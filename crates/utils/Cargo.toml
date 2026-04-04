@@ -10,3 +10,6 @@ serde_json = { version = "1.0", features = ["preserve_order"] }
 regex = "1"
 ai_client = { path = "../ai_client" }
 logger = { path = "../logger" }
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros"] }
+dotenvy = "0.15"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
