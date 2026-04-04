@@ -241,9 +241,11 @@ pub async fn sync_fx_rates(
     }
 
     let client = reqwest::Client::new();
+    let total_missing = missing_months.len();
     let mut newly_added = 0usize;
+    let mut rate_limited_month: Option<String> = None;
 
-    for month in missing_months {
+    'months: for month in &missing_months {
         let date_1st = format!("{}-01", month);
         let date_28th = format!("{}-28", month);
 
@@ -254,35 +256,123 @@ pub async fn sync_fx_rates(
             fetch_rates_for_date(&client, api_key, base_currency, &date_28th, &currencies_param)
                 .await;
 
-        match (rates_1st, rates_28th) {
+        // Detect HTTP 429 rate-limit: if both samples are exhausted, save
+        // whatever we have already cached and stop — no point burning more quota.
+        let is_rate_limited = |e: &anyhow::Error| e.to_string().contains("429");
+
+        // Merge the two sample dates: average when both are available, fall back
+        // to whichever single date succeeded, and stop immediately on 429.
+        let combined_rates: HashMap<String, f64> = match (rates_1st, rates_28th) {
             (Ok(r1), Ok(r28)) => {
+                let mut combined = HashMap::new();
                 for &currency in &source_currencies {
-                    if cached_pairs.contains(&(month.clone(), currency.to_string())) {
-                        continue;
-                    }
-                    if let (Some(&v1), Some(&v28)) = (r1.get(currency), r28.get(currency)) {
-                        let avg_rate = (v1 + v28) / 2.0;
-                        cached.push(FxRateEntry {
-                            month: month.clone(),
-                            from_currency: currency.to_string(),
-                            to_currency: base_currency.to_string(),
-                            rate: avg_rate,
-                        });
-                        newly_added += 1;
+                    match (r1.get(currency), r28.get(currency)) {
+                        (Some(&v1), Some(&v28)) => {
+                            combined.insert(currency.to_string(), (v1 + v28) / 2.0);
+                        }
+                        (Some(&v1), None) => {
+                            combined.insert(currency.to_string(), v1);
+                        }
+                        (None, Some(&v28)) => {
+                            combined.insert(currency.to_string(), v28);
+                        }
+                        _ => {}
                     }
                 }
+                combined
             }
-            (Err(e), _) => {
-                return Err(e.context(format!("Failed to fetch rates for 1st of {}", month)));
+            (Ok(r1), Err(e)) => {
+                if is_rate_limited(&e) {
+                    // 28th was rate-limited; use only the 1st result but stop after
+                    // this month to avoid wasting more quota.
+                    eprintln!(
+                        "⚠  FX warning: 28th-of-month fetch rate-limited for {}. Using 1st only.",
+                        month
+                    );
+                    rate_limited_month = Some(month.to_string());
+                    r1 // still cache what we got, then break below
+                } else {
+                    eprintln!(
+                        "⚠  FX warning: 28th-of-month fetch failed for {} ({}). Falling back to 1st only.",
+                        month, e
+                    );
+                    r1
+                }
             }
-            (_, Err(e)) => {
-                return Err(e.context(format!("Failed to fetch rates for 28th of {}", month)));
+            (Err(e), Ok(r28)) => {
+                if is_rate_limited(&e) {
+                    eprintln!(
+                        "⚠  FX warning: 1st-of-month fetch rate-limited for {}. Using 28th only.",
+                        month
+                    );
+                    rate_limited_month = Some(month.to_string());
+                    r28
+                } else {
+                    eprintln!(
+                        "⚠  FX warning: 1st-of-month fetch failed for {} ({}). Falling back to 28th only.",
+                        month, e
+                    );
+                    r28
+                }
             }
+            (Err(e1), Err(e2)) => {
+                // Both failed — if it's a rate-limit, save progress and stop.
+                if is_rate_limited(&e1) || is_rate_limited(&e2) {
+                    rate_limited_month = Some(month.to_string());
+                    if newly_added > 0 {
+                        save_fx_rates(database_path, &cached)?;
+                    }
+                    break 'months;
+                }
+                return Err(anyhow!(
+                    "Failed to fetch FX rates for {} — 1st: {}; 28th: {}",
+                    month,
+                    e1,
+                    e2
+                ));
+            }
+        };
+
+        for &currency in &source_currencies {
+            if cached_pairs.contains(&(month.to_string(), currency.to_string())) {
+                continue;
+            }
+            if let Some(&rate) = combined_rates.get(currency) {
+                cached.push(FxRateEntry {
+                    month: month.to_string(),
+                    from_currency: currency.to_string(),
+                    to_currency: base_currency.to_string(),
+                    rate,
+                });
+                newly_added += 1;
+            }
+        }
+
+        // Save after every successful month so progress survives future rate-limits.
+        if newly_added > 0 {
+            save_fx_rates(database_path, &cached)?;
+        }
+
+        // Stop fetching after a rate-limited single-date month.
+        if rate_limited_month.is_some() {
+            break 'months;
         }
     }
 
-    if newly_added > 0 {
-        save_fx_rates(database_path, &cached)?;
+    if let Some(ref blocked) = rate_limited_month {
+        let fetched = missing_months
+            .iter()
+            .position(|m| *m == blocked)
+            .unwrap_or(0);
+        let remaining = total_missing.saturating_sub(fetched);
+        return Err(anyhow!(
+            "API rate limit reached at {}. {}/{} missing months were cached this run; \
+             {} month(s) still pending — re-run to continue filling the cache.",
+            blocked,
+            fetched,
+            total_missing,
+            remaining
+        ));
     }
 
     Ok(cached)
