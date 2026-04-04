@@ -299,16 +299,32 @@ pub async fn sync_normalized_database(database_path: &Path, api_key: &str) -> Re
     // Collect months and currencies from the source database.
     let (months, currencies) = collect_months_and_currencies(&source_db, &base_currency);
 
-    // Sync exchange rates (fetches missing months from the API).
+    // Run FX and HICP syncs concurrently — they use independent APIs so
+    // neither blocks the other (e.g. an FX 429 won't prevent HICP from running).
     let currency_refs: Vec<&str> = currencies.iter().map(String::as_str).collect();
-    let fx_rates = sync_fx_rates(api_key, db_dir, &base_currency, &currency_refs, &months).await?;
-
-    // Sync HICP series from Eurostat for the tax-residency country.
-    let hicp_entries = if tax_residency.is_empty() {
-        load_hicp(db_dir)?
+    let hicp_countries: Vec<&str> = if tax_residency.is_empty() {
+        vec![]
     } else {
-        sync_hicp(db_dir, &[tax_residency.as_str()], &months).await?
+        vec![tax_residency.as_str()]
     };
+
+    let (fx_result, hicp_result) = tokio::join!(
+        sync_fx_rates(api_key, db_dir, &base_currency, &currency_refs, &months),
+        async {
+            if hicp_countries.is_empty() {
+                load_hicp(db_dir)
+            } else {
+                sync_hicp(db_dir, &hicp_countries, &months).await
+            }
+        }
+    );
+
+    // Surface HICP errors immediately (Eurostat is reliable; errors are unexpected).
+    let hicp_entries = hicp_result?;
+
+    // FX errors (e.g. rate-limit) are non-fatal for the HICP cache but still
+    // prevent building the normalised database — propagate after HICP is saved.
+    let fx_rates = fx_result?;
 
     // Build normalised database and write it.
     let normalised = build_normalized_database(&source_db, &fx_rates, &hicp_entries)?;

@@ -21,7 +21,7 @@
     "month": "2022-05",
     "from_currency": "SEK",
     "to_currency": "EUR",
-    "rate": 10.423380135550001
+    "rate": 10.42338013555
   },
   {
     "month": "2022-06",
@@ -51,7 +51,7 @@
     "month": "2022-10",
     "from_currency": "SEK",
     "to_currency": "EUR",
-    "rate": 10.887848379800001
+    "rate": 10.8878483798
   },
   {
     "month": "2022-11",
@@ -70,5 +70,65 @@
     "from_currency": "SEK",
     "to_currency": "EUR",
     "rate": 11.18278579455
+  },
+  {
+    "month": "2023-02",
+    "from_currency": "SEK",
+    "to_currency": "EUR",
+    "rate": 11.215365808449999
+  },
+  {
+    "month": "2023-03",
+    "from_currency": "SEK",
+    "to_currency": "EUR",
+    "rate": 11.1794188581
+  },
+  {
+    "month": "2023-04",
+    "from_currency": "SEK",
+    "to_currency": "EUR",
+    "rate": 11.3509115038
+  },
+  {
+    "month": "2023-05",
+    "from_currency": "SEK",
+    "to_currency": "EUR",
+    "rate": 11.4600739204
+  },
+  {
+    "month": "2023-06",
+    "from_currency": "SEK",
+    "to_currency": "EUR",
+    "rate": 11.6980387312
+  },
+  {
+    "month": "2023-07",
+    "from_currency": "SEK",
+    "to_currency": "EUR",
+    "rate": 11.70496698175
+  },
+  {
+    "month": "2023-08",
+    "from_currency": "SEK",
+    "to_currency": "EUR",
+    "rate": 11.7523678209
+  },
+  {
+    "month": "2023-09",
+    "from_currency": "SEK",
+    "to_currency": "EUR",
+    "rate": 11.721076587399999
+  },
+  {
+    "month": "2023-10",
+    "from_currency": "SEK",
+    "to_currency": "EUR",
+    "rate": 11.66649356305
+  },
+  {
+    "month": "2023-11",
+    "from_currency": "SEK",
+    "to_currency": "EUR",
+    "rate": 11.5781422526
   }
 ]
