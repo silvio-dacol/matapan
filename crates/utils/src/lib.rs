@@ -1,4 +1,5 @@
 pub mod accounts;
+pub mod balance_references;
 pub mod contract;
 pub mod database;
 pub mod description_enrichment;
@@ -35,6 +36,10 @@ pub mod rule_sets {
 pub use crate::accounts::{
     build_account, create_system_accounts, find_duplicate_account_ids,
     merge_accounts_with_deduplication, AccountInput,
+};
+pub use crate::balance_references::{
+    build_balance_reference, compute_monthly_balances,
+    merge_balance_references_with_deduplication, BalanceReferenceInput,
 };
 pub use crate::contract::ParserContract;
 pub use crate::database::{ensure_database_exists, read_database, write_database};

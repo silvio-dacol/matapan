@@ -18,10 +18,12 @@
 use anyhow::{anyhow, Context, Result};
 use serde_json::{Map, Value};
 use std::{
+    collections::BTreeMap,
     fs,
     path::{Path, PathBuf},
 };
 use crate::{
+    balance_references::compute_monthly_balances,
     fx_rates::{collect_months_and_currencies, lookup_rate, sync_fx_rates, FxRateEntry},
     hicp::{load_hicp, lookup_hicp, sync_hicp, HicpEntry},
     round_digits::round_money,
@@ -249,7 +251,115 @@ pub fn build_normalized_database(
         }
     }
 
+    // Build month_end_snapshots from balance_references + normalised transactions.
+    let snapshots = build_month_end_snapshots(&normalised, &base_currency);
+    normalised["month_end_snapshots"] = serde_json::Value::Array(snapshots);
+
     Ok(normalised)
+}
+
+/// Derives monthly end-of-balance snapshots from every entry in
+/// `balance_references`, using the already-normalised (base-currency)
+/// transactions that are present in `normalised_db`.
+///
+/// Each snapshot has the shape:
+/// ```json
+/// {
+///   "account_id": "SEB_SAVINGS",
+///   "month": "2024-03",
+///   "balance": 42500.00,
+///   "currency": "EUR",
+///   "source_reference_id": "SEB_SAVINGS-2024-03-31"
+/// }
+/// ```
+///
+/// When multiple references exist for the same account, the one whose date is
+/// closest to each target month is used (minimises accumulated rounding drift).
+/// Duplicate `(account_id, month)` pairs are merged by keeping the entry from
+/// the nearest reference.
+fn build_month_end_snapshots(normalised_db: &Value, base_currency: &str) -> Vec<Value> {
+    let refs = match normalised_db
+        .get("balance_references")
+        .and_then(|v| v.as_array())
+    {
+        Some(arr) => arr,
+        None => return vec![],
+    };
+
+    if refs.is_empty() {
+        return vec![];
+    }
+
+    let txns: &[Value] = normalised_db
+        .get("transactions")
+        .and_then(|v| v.as_array())
+        .map(Vec::as_slice)
+        .unwrap_or(&[]);
+
+    // Keyed by (account_id, month) → (balance, reference_id, ref_month).
+    // We keep only the entry produced by the reference whose month is closest
+    // to the target month, to minimise accumulated drift.
+    let mut best: BTreeMap<(String, String), (f64, String, String)> = BTreeMap::new();
+
+    for reference in refs {
+        let ref_id = reference
+            .get("reference_id")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        let ref_date = match reference.get("date").and_then(|v| v.as_str()) {
+            Some(d) if d.len() >= 7 => d,
+            _ => continue,
+        };
+        let ref_month = &ref_date[..7];
+
+        let monthly = match compute_monthly_balances(reference, txns) {
+            Ok(m) => m,
+            Err(_) => continue,
+        };
+
+        let account_id = match reference.get("account_id").and_then(|v| v.as_str()) {
+            Some(id) => id,
+            None => continue,
+        };
+
+        for (month, balance) in &monthly {
+            let key = (account_id.to_string(), month.clone());
+            let distance = month_distance(month, ref_month);
+
+            let replace = match best.get(&key) {
+                None => true,
+                Some((_, _, existing_ref_month)) => {
+                    month_distance(month, existing_ref_month) > distance
+                }
+            };
+
+            if replace {
+                best.insert(key, (*balance, ref_id.to_string(), ref_month.to_string()));
+            }
+        }
+    }
+
+    best.into_iter()
+        .map(|((account_id, month), (balance, ref_id, _))| {
+            serde_json::json!({
+                "account_id": account_id,
+                "month": month,
+                "balance": balance,
+                "currency": base_currency,
+                "source_reference_id": ref_id,
+            })
+        })
+        .collect()
+}
+
+/// Returns the absolute calendar-month distance between two `"YYYY-MM"` strings.
+fn month_distance(a: &str, b: &str) -> u32 {
+    fn to_months(s: &str) -> i32 {
+        let year: i32 = s.get(..4).and_then(|y| y.parse().ok()).unwrap_or(0);
+        let month: i32 = s.get(5..7).and_then(|m| m.parse().ok()).unwrap_or(0);
+        year * 12 + month
+    }
+    to_months(a).abs_diff(to_months(b))
 }
 
 /// Full pipeline: ensures FX rates are up to date, then rebuilds and saves

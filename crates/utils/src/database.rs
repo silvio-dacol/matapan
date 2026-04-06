@@ -6,7 +6,7 @@ use std::{
 };
 
 /// Ensures that database.json exists at the specified path.
-/// If it doesn't exist or is invalid JSON, initializes it from .database.template.json
+/// If it doesn't exist or is invalid JSON, initializes it from .database.example.json
 /// in the same directory.
 ///
 /// # Arguments
@@ -55,13 +55,13 @@ pub fn ensure_database_exists<P: AsRef<Path>>(database_path: P) -> Result<PathBu
     Ok(db_path)
 }
 
-/// Initializes database.json from .database.template.json.
+/// Initializes database.json from .database.example.json.
 fn initialize_from_template(db_path: &Path) -> Result<()> {
     let parent = db_path
         .parent()
         .ok_or_else(|| anyhow::anyhow!("Cannot determine parent directory of {:?}", db_path))?;
 
-    let template_path = parent.join(".database.template.json");
+    let template_path = parent.join(".database.example.json");
 
     // Read template to get user_profile and engine_version
     let mut template_file = File::open(&template_path)
@@ -83,7 +83,7 @@ fn initialize_from_template(db_path: &Path) -> Result<()> {
         "instruments": [],
         "positions": [],
         "transactions": [],
-        "recurring_templates": [],
+        "balance_references": [],
         "month_end_snapshots": []
     });
 
