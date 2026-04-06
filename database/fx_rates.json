@@ -1,5 +1,23 @@
 [
   {
+    "month": "2025-12",
+    "from_currency": "CNY",
+    "to_currency": "EUR",
+    "rate": 8.22818954665
+  },
+  {
+    "month": "2026-01",
+    "from_currency": "CNY",
+    "to_currency": "EUR",
+    "rate": 8.2679522546
+  },
+  {
+    "month": "2026-02",
+    "from_currency": "CNY",
+    "to_currency": "EUR",
+    "rate": 8.16827123405
+  },
+  {
     "month": "2022-04",
     "from_currency": "SEK",
     "to_currency": "EUR",
@@ -262,5 +280,11 @@
     "from_currency": "SEK",
     "to_currency": "EUR",
     "rate": 10.68804299495
+  },
+  {
+    "month": "2026-02",
+    "from_currency": "SEK",
+    "to_currency": "EUR",
+    "rate": 10.61632879525
   }
 ]

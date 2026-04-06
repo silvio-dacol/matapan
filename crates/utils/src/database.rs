@@ -78,7 +78,6 @@ fn initialize_from_template(db_path: &Path) -> Result<()> {
     let minimal_db = serde_json::json!({
         "engine_version": template_value.get("engine_version").unwrap_or(&serde_json::json!("0.1")),
         "user_profile": template_value.get("user_profile").unwrap_or(&serde_json::json!({})),
-        "hicp_series": [],
         "accounts": [],
         "instruments": [],
         "positions": [],
