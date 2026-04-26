@@ -66,8 +66,8 @@ pub use crate::rules::{
     RuleSet,
 };
 pub use crate::fx_rates::{
-    collect_months_and_currencies, load_fx_rates, lookup_rate, save_fx_rates, sync_fx_rates,
-    FxRateEntry,
+    collect_months_and_currencies, collect_months_and_fx_pairs, load_fx_rates, lookup_rate,
+    save_fx_rates, sync_fx_rates, sync_fx_rates_for_pairs, FxRateEntry,
 };
 pub use crate::hicp::{load_hicp, lookup_hicp, save_hicp, HicpEntry};
 pub use crate::normalized_database::{

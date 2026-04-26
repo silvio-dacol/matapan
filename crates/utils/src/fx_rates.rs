@@ -213,42 +213,59 @@ pub async fn sync_fx_rates(
     currencies: &[&str],
     months: &[String],
 ) -> Result<Vec<FxRateEntry>> {
+    let mut required_pairs = Vec::new();
+    for month in months {
+        for currency in currencies {
+            if *currency != base_currency {
+                required_pairs.push((month.clone(), (*currency).to_string()));
+            }
+        }
+    }
+
+    sync_fx_rates_for_pairs(api_key, database_path, base_currency, &required_pairs).await
+}
+
+/// Fetches and caches monthly average FX rates for the exact `(month,
+/// from_currency)` pairs required by the data.
+pub async fn sync_fx_rates_for_pairs(
+    api_key: &str,
+    database_path: &Path,
+    base_currency: &str,
+    required_pairs: &[(String, String)],
+) -> Result<Vec<FxRateEntry>> {
     let mut cached = load_fx_rates(database_path)?;
 
     // Build a set of (month, from_currency) pairs already cached.
-    let cached_pairs: HashSet<(String, String)> = cached
+    let mut cached_pairs: HashSet<(String, String)> = cached
         .iter()
         .filter(|e| e.to_currency == base_currency)
         .map(|e| (e.month.clone(), e.from_currency.clone()))
         .collect();
 
-    // Source currencies that differ from the base (same-currency rate is 1.0).
-    let source_currencies: Vec<&str> = currencies
-        .iter()
-        .copied()
-        .filter(|&c| c != base_currency)
-        .collect();
+    let mut missing_by_month: HashMap<String, Vec<String>> = HashMap::new();
+    for (month, currency) in required_pairs {
+        if currency == base_currency {
+            continue;
+        }
 
-    if source_currencies.is_empty() {
-        return Ok(cached);
+        let pair = (month.clone(), currency.clone());
+        if cached_pairs.contains(&pair) {
+            continue;
+        }
+
+        let month_currencies = missing_by_month.entry(month.clone()).or_default();
+        if !month_currencies.iter().any(|existing| existing == currency) {
+            month_currencies.push(currency.clone());
+        }
     }
 
-    let currencies_param = source_currencies.join(",");
-
-    // Collect months where at least one currency pair is missing.
-    let missing_months: Vec<&String> = months
-        .iter()
-        .filter(|m| {
-            source_currencies
-                .iter()
-                .any(|c| !cached_pairs.contains(&(m.to_string(), c.to_string())))
-        })
-        .collect();
-
-    if missing_months.is_empty() {
+    if missing_by_month.is_empty() {
         save_fx_rates(database_path, &cached)?;
         return Ok(cached);
     }
+
+    let mut missing_months: Vec<String> = missing_by_month.keys().cloned().collect();
+    missing_months.sort();
 
     let client = reqwest::Client::new();
     let total_missing = missing_months.len();
@@ -256,6 +273,11 @@ pub async fn sync_fx_rates(
     let mut rate_limited_month: Option<String> = None;
 
     'months: for month in &missing_months {
+        let source_currencies = missing_by_month
+            .get(month)
+            .cloned()
+            .unwrap_or_default();
+        let currencies_param = source_currencies.join(",");
         let date_1st = format!("{}-01", month);
         let date_28th = format!("{}-28", month);
 
@@ -275,8 +297,8 @@ pub async fn sync_fx_rates(
         let combined_rates: HashMap<String, f64> = match (rates_1st, rates_28th) {
             (Ok(r1), Ok(r28)) => {
                 let mut combined = HashMap::new();
-                for &currency in &source_currencies {
-                    match (r1.get(currency), r28.get(currency)) {
+                for currency in &source_currencies {
+                    match (r1.get(currency.as_str()), r28.get(currency.as_str())) {
                         (Some(&v1), Some(&v28)) => {
                             combined.insert(currency.to_string(), (v1 + v28) / 2.0);
                         }
@@ -343,17 +365,19 @@ pub async fn sync_fx_rates(
             }
         };
 
-        for &currency in &source_currencies {
-            if cached_pairs.contains(&(month.to_string(), currency.to_string())) {
+        for currency in &source_currencies {
+            let pair = (month.to_string(), currency.to_string());
+            if cached_pairs.contains(&pair) {
                 continue;
             }
-            if let Some(&rate) = combined_rates.get(currency) {
+            if let Some(&rate) = combined_rates.get(currency.as_str()) {
                 cached.push(FxRateEntry {
                     month: month.to_string(),
                     from_currency: currency.to_string(),
                     to_currency: base_currency.to_string(),
                     rate,
                 });
+                cached_pairs.insert(pair);
                 newly_added += 1;
             }
         }
@@ -372,7 +396,7 @@ pub async fn sync_fx_rates(
     if let Some(ref blocked) = rate_limited_month {
         let fetched = missing_months
             .iter()
-            .position(|m| *m == blocked)
+            .position(|m| m == blocked)
             .unwrap_or(0);
         let remaining = total_missing.saturating_sub(fetched);
         return Err(anyhow!(
@@ -392,26 +416,27 @@ pub async fn sync_fx_rates(
 // Utility: collect required months from a database JSON
 // ---------------------------------------------------------------------------
 
-/// Extracts all unique `"YYYY-MM"` months referenced by transactions and
-/// positions in a database [`Value`], along with every distinct non-base
-/// currency code found in those records.
-pub fn collect_months_and_currencies(
+/// Extracts all unique `"YYYY-MM"` months referenced by transactions,
+/// positions, and balance references in a database [`Value`], along with the
+/// exact non-base `(month, currency)` pairs they require for FX conversion.
+pub fn collect_months_and_fx_pairs(
     db: &Value,
     base_currency: &str,
-) -> (Vec<String>, Vec<String>) {
+) -> (Vec<String>, Vec<(String, String)>) {
     let mut months: HashSet<String> = HashSet::new();
-    let mut currencies: HashSet<String> = HashSet::new();
+    let mut required_pairs: HashSet<(String, String)> = HashSet::new();
 
     if let Some(txns) = db.get("transactions").and_then(|v| v.as_array()) {
         for txn in txns {
             if let Some(date) = txn.get("date").and_then(|v| v.as_str()) {
                 if date.len() >= 7 {
-                    months.insert(date[..7].to_string());
-                }
-            }
-            if let Some(cur) = txn.get("currency").and_then(|v| v.as_str()) {
-                if cur != base_currency {
-                    currencies.insert(cur.to_string());
+                    let month = date[..7].to_string();
+                    months.insert(month.clone());
+                    if let Some(cur) = txn.get("currency").and_then(|v| v.as_str()) {
+                        if cur != base_currency {
+                            required_pairs.insert((month, cur.to_string()));
+                        }
+                    }
                 }
             }
         }
@@ -421,12 +446,29 @@ pub fn collect_months_and_currencies(
         for pos in positions {
             if let Some(date) = pos.get("as_of_date").and_then(|v| v.as_str()) {
                 if date.len() >= 7 {
-                    months.insert(date[..7].to_string());
+                    let month = date[..7].to_string();
+                    months.insert(month.clone());
+                    if let Some(cur) = pos.get("currency").and_then(|v| v.as_str()) {
+                        if cur != base_currency {
+                            required_pairs.insert((month, cur.to_string()));
+                        }
+                    }
                 }
             }
-            if let Some(cur) = pos.get("currency").and_then(|v| v.as_str()) {
-                if cur != base_currency {
-                    currencies.insert(cur.to_string());
+        }
+    }
+
+    if let Some(references) = db.get("balance_references").and_then(|v| v.as_array()) {
+        for reference in references {
+            if let Some(date) = reference.get("date").and_then(|v| v.as_str()) {
+                if date.len() >= 7 {
+                    let month = date[..7].to_string();
+                    months.insert(month.clone());
+                    if let Some(cur) = reference.get("currency").and_then(|v| v.as_str()) {
+                        if cur != base_currency {
+                            required_pairs.insert((month, cur.to_string()));
+                        }
+                    }
                 }
             }
         }
@@ -434,8 +476,96 @@ pub fn collect_months_and_currencies(
 
     let mut months_vec: Vec<String> = months.into_iter().collect();
     months_vec.sort();
+    let mut required_pairs_vec: Vec<(String, String)> = required_pairs.into_iter().collect();
+    required_pairs_vec.sort();
+
+    (months_vec, required_pairs_vec)
+}
+
+/// Extracts all unique `"YYYY-MM"` months referenced by transactions and
+/// positions in a database [`Value`], along with every distinct non-base
+/// currency code found in those records.
+pub fn collect_months_and_currencies(
+    db: &Value,
+    base_currency: &str,
+) -> (Vec<String>, Vec<String>) {
+    let (months_vec, required_pairs) = collect_months_and_fx_pairs(db, base_currency);
+    let currencies: HashSet<String> = required_pairs
+        .into_iter()
+        .map(|(_, currency)| currency)
+        .collect();
     let mut currencies_vec: Vec<String> = currencies.into_iter().collect();
     currencies_vec.sort();
 
     (months_vec, currencies_vec)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn collect_months_and_fx_pairs_keeps_exact_required_pairs() {
+        let db = json!({
+            "transactions": [
+                {
+                    "date": "2024-08-09",
+                    "currency": "SEK"
+                }
+            ],
+            "positions": [],
+            "balance_references": [
+                {
+                    "date": "2025-10-10",
+                    "currency": "CNY"
+                },
+                {
+                    "date": "2025-11-01",
+                    "currency": "EUR"
+                }
+            ]
+        });
+
+        let (months, required_pairs) = collect_months_and_fx_pairs(&db, "EUR");
+
+        assert_eq!(
+            months,
+            vec![
+                "2024-08".to_string(),
+                "2025-10".to_string(),
+                "2025-11".to_string()
+            ]
+        );
+        assert_eq!(
+            required_pairs,
+            vec![
+                ("2024-08".to_string(), "SEK".to_string()),
+                ("2025-10".to_string(), "CNY".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn collect_months_and_currencies_includes_balance_references() {
+        let db = json!({
+            "transactions": [],
+            "positions": [],
+            "balance_references": [
+                {
+                    "date": "2025-10-10",
+                    "currency": "CNY"
+                },
+                {
+                    "date": "2025-11-01",
+                    "currency": "EUR"
+                }
+            ]
+        });
+
+        let (months, currencies) = collect_months_and_currencies(&db, "EUR");
+
+        assert_eq!(months, vec!["2025-10".to_string(), "2025-11".to_string()]);
+        assert_eq!(currencies, vec!["CNY".to_string()]);
+    }
 }

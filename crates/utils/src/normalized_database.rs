@@ -24,7 +24,7 @@ use std::{
 };
 use crate::{
     balance_references::compute_monthly_balances,
-    fx_rates::{collect_months_and_currencies, lookup_rate, sync_fx_rates, FxRateEntry},
+    fx_rates::{collect_months_and_fx_pairs, lookup_rate, sync_fx_rates_for_pairs, FxRateEntry},
     hicp::{load_hicp, lookup_hicp, sync_hicp, HicpEntry},
     round_digits::round_money,
 };
@@ -182,6 +182,63 @@ fn normalise_position(
     Ok(())
 }
 
+/// Normalises a single balance reference object in-place.
+///
+/// Adds `exchange_rate` and `hicp` fields, converts `amount` to the base
+/// currency, and updates `currency` to `base_currency`.
+/// Returns an error if the required FX rate is missing from the cache.
+fn normalise_balance_reference(
+    reference: &mut Map<String, Value>,
+    fx_rates: &[FxRateEntry],
+    hicp_entries: &[HicpEntry],
+    base_currency: &str,
+    tax_residency: &str,
+) -> Result<()> {
+    let currency = reference
+        .get("currency")
+        .and_then(|v| v.as_str())
+        .unwrap_or(base_currency)
+        .to_string();
+
+    let date = reference
+        .get("date")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+
+    let month = if date.len() >= 7 { &date[..7] } else { "" };
+
+    let rate = lookup_rate(fx_rates, month, &currency, base_currency).ok_or_else(|| {
+        let reference_id = reference
+            .get("reference_id")
+            .and_then(|v| v.as_str())
+            .unwrap_or("<unknown>");
+        anyhow!(
+            "Missing FX rate for {}/{} in month {} (balance reference {}). \
+             Run sync_fx_rates first.",
+            currency,
+            base_currency,
+            month,
+            reference_id
+        )
+    })?;
+
+    let hicp = lookup_hicp(hicp_entries, month, tax_residency);
+
+    if let Some(amount_val) = reference.get("amount").and_then(|v| v.as_f64()) {
+        reference.insert("amount".to_string(), Value::from(to_base(amount_val, rate)));
+    }
+
+    reference.insert("exchange_rate".to_string(), Value::from(rate));
+    reference.insert("hicp".to_string(), Value::from(hicp));
+    reference.insert(
+        "currency".to_string(),
+        Value::String(base_currency.to_string()),
+    );
+
+    Ok(())
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -241,6 +298,24 @@ pub fn build_normalized_database(
         for pos in positions.iter_mut() {
             if let Some(obj) = pos.as_object_mut() {
                 normalise_position(
+                    obj,
+                    fx_rates,
+                    hicp_entries,
+                    &base_currency,
+                    &tax_residency,
+                )?;
+            }
+        }
+    }
+
+    // Normalise balance references.
+    if let Some(references) = normalised
+        .get_mut("balance_references")
+        .and_then(|v| v.as_array_mut())
+    {
+        for reference in references.iter_mut() {
+            if let Some(obj) = reference.as_object_mut() {
+                normalise_balance_reference(
                     obj,
                     fx_rates,
                     hicp_entries,
@@ -406,12 +481,11 @@ pub async fn sync_normalized_database(database_path: &Path, api_key: &str) -> Re
         .unwrap_or("")
         .to_string();
 
-    // Collect months and currencies from the source database.
-    let (months, currencies) = collect_months_and_currencies(&source_db, &base_currency);
+    // Collect HICP months and the exact FX month/currency pairs required by the source database.
+    let (months, required_fx_pairs) = collect_months_and_fx_pairs(&source_db, &base_currency);
 
     // Run FX and HICP syncs concurrently — they use independent APIs so
     // neither blocks the other (e.g. an FX 429 won't prevent HICP from running).
-    let currency_refs: Vec<&str> = currencies.iter().map(String::as_str).collect();
     let hicp_countries: Vec<&str> = if tax_residency.is_empty() {
         vec![]
     } else {
@@ -419,7 +493,7 @@ pub async fn sync_normalized_database(database_path: &Path, api_key: &str) -> Re
     };
 
     let (fx_result, hicp_result) = tokio::join!(
-        sync_fx_rates(api_key, db_dir, &base_currency, &currency_refs, &months),
+        sync_fx_rates_for_pairs(api_key, db_dir, &base_currency, &required_fx_pairs),
         async {
             if hicp_countries.is_empty() {
                 load_hicp(db_dir)
@@ -463,4 +537,74 @@ pub fn sync_normalized_database_blocking(database_path: &Path, api_key: &str) ->
         .build()
         .context("Failed to build Tokio runtime for FX sync")?;
     rt.block_on(sync_normalized_database(database_path, api_key))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn build_normalized_database_converts_balance_references_to_base_currency() {
+        let source_db = json!({
+            "user_profile": {
+                "base_currency": "EUR",
+                "tax_residency": "SE"
+            },
+            "transactions": [
+                {
+                    "date": "2025-11-05",
+                    "from_account_id": "ALIPAY_WALLET",
+                    "to_account_id": "EXTERNAL_PAYEE",
+                    "amount": 8.1,
+                    "currency": "CNY",
+                    "txn_id": "t-1"
+                }
+            ],
+            "positions": [],
+            "balance_references": [
+                {
+                    "reference_id": "ALIPAY_WALLET-2025-10-10",
+                    "account_id": "ALIPAY_WALLET",
+                    "date": "2025-10-10",
+                    "amount": 81.0,
+                    "currency": "CNY"
+                }
+            ]
+        });
+
+        let fx_rates = vec![
+            FxRateEntry {
+                month: "2025-10".to_string(),
+                from_currency: "CNY".to_string(),
+                to_currency: "EUR".to_string(),
+                rate: 8.1,
+            },
+            FxRateEntry {
+                month: "2025-11".to_string(),
+                from_currency: "CNY".to_string(),
+                to_currency: "EUR".to_string(),
+                rate: 8.1,
+            },
+        ];
+        let hicp_entries = vec![HicpEntry {
+            month: "2025-10".to_string(),
+            country: "SE".to_string(),
+            value: 132.0,
+        }];
+
+        let normalised = build_normalized_database(&source_db, &fx_rates, &hicp_entries).unwrap();
+
+        let reference = &normalised["balance_references"][0];
+        assert_eq!(reference["amount"], json!(10.0));
+        assert_eq!(reference["currency"], json!("EUR"));
+        assert_eq!(reference["exchange_rate"], json!(8.1));
+        assert_eq!(reference["hicp"], json!(132.0));
+
+        let snapshot = &normalised["month_end_snapshots"][1];
+        assert_eq!(snapshot["account_id"], json!("ALIPAY_WALLET"));
+        assert_eq!(snapshot["month"], json!("2025-11"));
+        assert_eq!(snapshot["balance"], json!(9.0));
+        assert_eq!(snapshot["currency"], json!("EUR"));
+    }
 }
