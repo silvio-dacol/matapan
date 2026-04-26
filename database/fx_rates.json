@@ -1,6 +1,258 @@
 [
   {
     "month": "2022-04",
+    "from_currency": "CNY",
+    "to_currency": "EUR",
+    "rate": 6.99482024265
+  },
+  {
+    "month": "2022-05",
+    "from_currency": "CNY",
+    "to_currency": "EUR",
+    "rate": 7.076829636299999
+  },
+  {
+    "month": "2022-06",
+    "from_currency": "CNY",
+    "to_currency": "EUR",
+    "rate": 7.09085602415
+  },
+  {
+    "month": "2022-07",
+    "from_currency": "CNY",
+    "to_currency": "EUR",
+    "rate": 6.93260268985
+  },
+  {
+    "month": "2022-08",
+    "from_currency": "CNY",
+    "to_currency": "EUR",
+    "rate": 6.88749476305
+  },
+  {
+    "month": "2022-09",
+    "from_currency": "CNY",
+    "to_currency": "EUR",
+    "rate": 6.9320019652
+  },
+  {
+    "month": "2022-10",
+    "from_currency": "CNY",
+    "to_currency": "EUR",
+    "rate": 7.102044604
+  },
+  {
+    "month": "2022-11",
+    "from_currency": "CNY",
+    "to_currency": "EUR",
+    "rate": 7.32263872795
+  },
+  {
+    "month": "2022-12",
+    "from_currency": "CNY",
+    "to_currency": "EUR",
+    "rate": 7.4170153585
+  },
+  {
+    "month": "2023-01",
+    "from_currency": "CNY",
+    "to_currency": "EUR",
+    "rate": 7.379570535399999
+  },
+  {
+    "month": "2023-02",
+    "from_currency": "CNY",
+    "to_currency": "EUR",
+    "rate": 7.37887772365
+  },
+  {
+    "month": "2023-03",
+    "from_currency": "CNY",
+    "to_currency": "EUR",
+    "rate": 7.3896003942
+  },
+  {
+    "month": "2023-04",
+    "from_currency": "CNY",
+    "to_currency": "EUR",
+    "rate": 7.5791195931
+  },
+  {
+    "month": "2023-05",
+    "from_currency": "CNY",
+    "to_currency": "EUR",
+    "rate": 7.57841175485
+  },
+  {
+    "month": "2023-06",
+    "from_currency": "CNY",
+    "to_currency": "EUR",
+    "rate": 7.77085523485
+  },
+  {
+    "month": "2023-07",
+    "from_currency": "CNY",
+    "to_currency": "EUR",
+    "rate": 7.90223277265
+  },
+  {
+    "month": "2023-08",
+    "from_currency": "CNY",
+    "to_currency": "EUR",
+    "rate": 7.889113257
+  },
+  {
+    "month": "2023-09",
+    "from_currency": "CNY",
+    "to_currency": "EUR",
+    "rate": 7.76924820835
+  },
+  {
+    "month": "2023-10",
+    "from_currency": "CNY",
+    "to_currency": "EUR",
+    "rate": 7.7263983245
+  },
+  {
+    "month": "2023-11",
+    "from_currency": "CNY",
+    "to_currency": "EUR",
+    "rate": 7.794013918399999
+  },
+  {
+    "month": "2023-12",
+    "from_currency": "CNY",
+    "to_currency": "EUR",
+    "rate": 7.81809093995
+  },
+  {
+    "month": "2024-01",
+    "from_currency": "CNY",
+    "to_currency": "EUR",
+    "rate": 7.80997304545
+  },
+  {
+    "month": "2024-02",
+    "from_currency": "CNY",
+    "to_currency": "EUR",
+    "rate": 7.802569193
+  },
+  {
+    "month": "2024-04",
+    "from_currency": "CNY",
+    "to_currency": "EUR",
+    "rate": 7.75549973335
+  },
+  {
+    "month": "2024-05",
+    "from_currency": "CNY",
+    "to_currency": "EUR",
+    "rate": 7.7933503239
+  },
+  {
+    "month": "2024-06",
+    "from_currency": "CNY",
+    "to_currency": "EUR",
+    "rate": 7.8209968299
+  },
+  {
+    "month": "2024-07",
+    "from_currency": "CNY",
+    "to_currency": "EUR",
+    "rate": 7.8048345151
+  },
+  {
+    "month": "2024-12",
+    "from_currency": "CNY",
+    "to_currency": "EUR",
+    "rate": 7.63302139145
+  },
+  {
+    "month": "2025-01",
+    "from_currency": "CNY",
+    "to_currency": "EUR",
+    "rate": 7.5608808455
+  },
+  {
+    "month": "2025-02",
+    "from_currency": "CNY",
+    "to_currency": "EUR",
+    "rate": 7.5399334777
+  },
+  {
+    "month": "2025-03",
+    "from_currency": "CNY",
+    "to_currency": "EUR",
+    "rate": 7.71262907175
+  },
+  {
+    "month": "2025-04",
+    "from_currency": "CNY",
+    "to_currency": "EUR",
+    "rate": 8.08567844235
+  },
+  {
+    "month": "2025-05",
+    "from_currency": "CNY",
+    "to_currency": "EUR",
+    "rate": 8.1417015928
+  },
+  {
+    "month": "2025-06",
+    "from_currency": "CNY",
+    "to_currency": "EUR",
+    "rate": 8.289514707950001
+  },
+  {
+    "month": "2025-07",
+    "from_currency": "CNY",
+    "to_currency": "EUR",
+    "rate": 8.386639654949999
+  },
+  {
+    "month": "2025-08",
+    "from_currency": "CNY",
+    "to_currency": "EUR",
+    "rate": 8.3451703286
+  },
+  {
+    "month": "2025-09",
+    "from_currency": "CNY",
+    "to_currency": "EUR",
+    "rate": 8.357419281550001
+  },
+  {
+    "month": "2025-10",
+    "from_currency": "CNY",
+    "to_currency": "EUR",
+    "rate": 8.3135338805
+  },
+  {
+    "month": "2025-11",
+    "from_currency": "CNY",
+    "to_currency": "EUR",
+    "rate": 8.22335932965
+  },
+  {
+    "month": "2025-12",
+    "from_currency": "CNY",
+    "to_currency": "EUR",
+    "rate": 8.22818954665
+  },
+  {
+    "month": "2026-01",
+    "from_currency": "CNY",
+    "to_currency": "EUR",
+    "rate": 8.2679522546
+  },
+  {
+    "month": "2026-02",
+    "from_currency": "CNY",
+    "to_currency": "EUR",
+    "rate": 8.16827123405
+  },
+  {
+    "month": "2022-04",
     "from_currency": "SEK",
     "to_currency": "EUR",
     "rate": 10.3710884374
@@ -262,5 +514,263 @@
     "from_currency": "SEK",
     "to_currency": "EUR",
     "rate": 10.68804299495
+  },
+  {
+    "month": "2026-02",
+    "from_currency": "SEK",
+    "to_currency": "EUR",
+    "rate": 10.61632879525
+  },
+  {
+    "month": "2022-04",
+    "from_currency": "USD",
+    "to_currency": "EUR",
+    "rate": 1.07753476795
+  },
+  {
+    "month": "2022-05",
+    "from_currency": "USD",
+    "to_currency": "EUR",
+    "rate": 1.06352781625
+  },
+  {
+    "month": "2022-06",
+    "from_currency": "USD",
+    "to_currency": "EUR",
+    "rate": 1.0587614588
+  },
+  {
+    "month": "2022-07",
+    "from_currency": "USD",
+    "to_currency": "EUR",
+    "rate": 1.03101222595
+  },
+  {
+    "month": "2022-08",
+    "from_currency": "USD",
+    "to_currency": "EUR",
+    "rate": 1.0099485691
+  },
+  {
+    "month": "2022-09",
+    "from_currency": "USD",
+    "to_currency": "EUR",
+    "rate": 0.98297534675
+  },
+  {
+    "month": "2022-10",
+    "from_currency": "USD",
+    "to_currency": "EUR",
+    "rate": 0.98846036185
+  },
+  {
+    "month": "2022-11",
+    "from_currency": "USD",
+    "to_currency": "EUR",
+    "rate": 1.0110731403
+  },
+  {
+    "month": "2022-12",
+    "from_currency": "USD",
+    "to_currency": "EUR",
+    "rate": 1.05781881645
+  },
+  {
+    "month": "2023-01",
+    "from_currency": "USD",
+    "to_currency": "EUR",
+    "rate": 1.0788507134
+  },
+  {
+    "month": "2023-02",
+    "from_currency": "USD",
+    "to_currency": "EUR",
+    "rate": 1.07946578585
+  },
+  {
+    "month": "2023-03",
+    "from_currency": "USD",
+    "to_currency": "EUR",
+    "rate": 1.07536253115
+  },
+  {
+    "month": "2023-04",
+    "from_currency": "USD",
+    "to_currency": "EUR",
+    "rate": 1.09989531655
+  },
+  {
+    "month": "2023-05",
+    "from_currency": "USD",
+    "to_currency": "EUR",
+    "rate": 1.08456004085
+  },
+  {
+    "month": "2023-06",
+    "from_currency": "USD",
+    "to_currency": "EUR",
+    "rate": 1.0837942194
+  },
+  {
+    "month": "2023-07",
+    "from_currency": "USD",
+    "to_currency": "EUR",
+    "rate": 1.09739017245
+  },
+  {
+    "month": "2023-08",
+    "from_currency": "USD",
+    "to_currency": "EUR",
+    "rate": 1.09192191965
+  },
+  {
+    "month": "2023-09",
+    "from_currency": "USD",
+    "to_currency": "EUR",
+    "rate": 1.0669119454
+  },
+  {
+    "month": "2023-10",
+    "from_currency": "USD",
+    "to_currency": "EUR",
+    "rate": 1.056741619
+  },
+  {
+    "month": "2023-11",
+    "from_currency": "USD",
+    "to_currency": "EUR",
+    "rate": 1.07958660275
+  },
+  {
+    "month": "2023-12",
+    "from_currency": "USD",
+    "to_currency": "EUR",
+    "rate": 1.09761810615
+  },
+  {
+    "month": "2024-01",
+    "from_currency": "USD",
+    "to_currency": "EUR",
+    "rate": 1.0941095714
+  },
+  {
+    "month": "2024-02",
+    "from_currency": "USD",
+    "to_currency": "EUR",
+    "rate": 1.08559686755
+  },
+  {
+    "month": "2024-04",
+    "from_currency": "USD",
+    "to_currency": "EUR",
+    "rate": 1.0722332758
+  },
+  {
+    "month": "2024-05",
+    "from_currency": "USD",
+    "to_currency": "EUR",
+    "rate": 1.0785438429999998
+  },
+  {
+    "month": "2024-06",
+    "from_currency": "USD",
+    "to_currency": "EUR",
+    "rate": 1.07865680465
+  },
+  {
+    "month": "2024-07",
+    "from_currency": "USD",
+    "to_currency": "EUR",
+    "rate": 1.0738137929
+  },
+  {
+    "month": "2024-12",
+    "from_currency": "USD",
+    "to_currency": "EUR",
+    "rate": 1.04884640975
+  },
+  {
+    "month": "2025-01",
+    "from_currency": "USD",
+    "to_currency": "EUR",
+    "rate": 1.0392953312
+  },
+  {
+    "month": "2025-02",
+    "from_currency": "USD",
+    "to_currency": "EUR",
+    "rate": 1.0372369161
+  },
+  {
+    "month": "2025-03",
+    "from_currency": "USD",
+    "to_currency": "EUR",
+    "rate": 1.0607333365999998
+  },
+  {
+    "month": "2025-04",
+    "from_currency": "USD",
+    "to_currency": "EUR",
+    "rate": 1.1104535287
+  },
+  {
+    "month": "2025-05",
+    "from_currency": "USD",
+    "to_currency": "EUR",
+    "rate": 1.1266301297
+  },
+  {
+    "month": "2025-06",
+    "from_currency": "USD",
+    "to_currency": "EUR",
+    "rate": 1.1358471423
+  },
+  {
+    "month": "2025-07",
+    "from_currency": "USD",
+    "to_currency": "EUR",
+    "rate": 1.1702513377
+  },
+  {
+    "month": "2025-08",
+    "from_currency": "USD",
+    "to_currency": "EUR",
+    "rate": 1.1636499095
+  },
+  {
+    "month": "2025-09",
+    "from_currency": "USD",
+    "to_currency": "EUR",
+    "rate": 1.17162561865
+  },
+  {
+    "month": "2025-10",
+    "from_currency": "USD",
+    "to_currency": "EUR",
+    "rate": 1.16939925395
+  },
+  {
+    "month": "2025-11",
+    "from_currency": "USD",
+    "to_currency": "EUR",
+    "rate": 1.1588836716
+  },
+  {
+    "month": "2025-12",
+    "from_currency": "USD",
+    "to_currency": "EUR",
+    "rate": 1.16896437655
+  },
+  {
+    "month": "2026-01",
+    "from_currency": "USD",
+    "to_currency": "EUR",
+    "rate": 1.18631745815
+  },
+  {
+    "month": "2026-02",
+    "from_currency": "USD",
+    "to_currency": "EUR",
+    "rate": 1.18300720345
   }
 ]

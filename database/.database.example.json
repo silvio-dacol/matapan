@@ -874,6 +874,21 @@
       "txn_id": "INTESA-0eca0c2f974c758aad366e16"
     }
   ],
-  "recurring_templates": [],
+  "balance_references": [
+    {
+      "reference_id": "NB_CHECKING-2026-01-30",
+      "account_id": "NB_CHECKING",
+      "date": "2026-01-30",
+      "amount": 15234.56,
+      "currency": "SEK"
+    },
+    {
+      "reference_id": "MT_CHECKING-2026-01-31",
+      "account_id": "MT_CHECKING",
+      "date": "2026-01-31",
+      "amount": 4812.33,
+      "currency": "EUR"
+    }
+  ],
   "month_end_snapshots": []
 }

@@ -1,4 +1,5 @@
 pub mod accounts;
+pub mod balance_references;
 pub mod contract;
 pub mod database;
 pub mod description_enrichment;
@@ -36,6 +37,10 @@ pub use crate::accounts::{
     build_account, create_system_accounts, find_duplicate_account_ids,
     merge_accounts_with_deduplication, AccountInput,
 };
+pub use crate::balance_references::{
+    build_balance_reference, compute_monthly_balances,
+    merge_balance_references_with_deduplication, BalanceReferenceInput,
+};
 pub use crate::contract::ParserContract;
 pub use crate::database::{ensure_database_exists, read_database, write_database};
 pub use crate::description_enrichment::{
@@ -61,8 +66,8 @@ pub use crate::rules::{
     RuleSet,
 };
 pub use crate::fx_rates::{
-    collect_months_and_currencies, load_fx_rates, lookup_rate, save_fx_rates, sync_fx_rates,
-    FxRateEntry,
+    collect_months_and_currencies, collect_months_and_fx_pairs, load_fx_rates, lookup_rate,
+    save_fx_rates, sync_fx_rates, sync_fx_rates_for_pairs, FxRateEntry,
 };
 pub use crate::hicp::{load_hicp, lookup_hicp, save_hicp, HicpEntry};
 pub use crate::normalized_database::{

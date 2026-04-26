@@ -218,7 +218,6 @@ pub async fn sync_hicp(
     }
 
     let client = reqwest::Client::new();
-    let mut newly_added = 0usize;
 
     for &country in &countries_needing_fetch {
         let data = fetch_hicp_country(&client, country)
@@ -235,7 +234,6 @@ pub async fn sync_hicp(
                     country: country.to_string(),
                     value,
                 });
-                newly_added += 1;
             }
             // Months not present in the API response (e.g. future months) are
             // silently skipped; lookup_hicp will fall back to 1.0.
