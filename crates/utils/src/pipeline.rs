@@ -88,6 +88,26 @@ impl PipelineSummary {
     }
 }
 
+#[derive(Debug, Clone, Copy, Default)]
+pub struct MergeStatsSummary {
+    pub system_accounts_added: usize,
+    pub system_accounts_skipped: usize,
+    pub accounts_added: usize,
+    pub accounts_skipped: usize,
+    pub instruments_added: usize,
+    pub instruments_skipped: usize,
+    pub positions_added: usize,
+    pub positions_skipped: usize,
+    pub transactions_added: usize,
+    pub transactions_skipped: usize,
+}
+
+impl MergeStatsSummary {
+    pub fn has_added_transactions(&self) -> bool {
+        self.transactions_added > 0
+    }
+}
+
 pub fn discover_input_files(args: &[String], formats: &[InputFormat]) -> Result<InputDiscovery> {
     if formats.is_empty() {
         return Err(anyhow!(
@@ -141,7 +161,7 @@ pub fn run_parser_pipeline<F>(
     mut post_merge_hook: Option<F>,
 ) -> Result<PipelineSummary>
 where
-    F: FnMut(&mut Value) -> Result<()>,
+    F: FnMut(&mut Value, &MergeStatsSummary) -> Result<()>,
 {
     let template = crate::read_database(database_path)?;
 
@@ -165,8 +185,21 @@ where
     let (mut merged, txn_stats) =
         crate::merge_transactions_with_deduplication(db_after_positions, entities.transactions)?;
 
+    let merge_stats = MergeStatsSummary {
+        system_accounts_added: sys_added,
+        system_accounts_skipped: sys_skipped,
+        accounts_added: acc_stats.added,
+        accounts_skipped: acc_stats.skipped,
+        instruments_added: inst_stats.added,
+        instruments_skipped: inst_stats.skipped,
+        positions_added: pos_stats.added,
+        positions_skipped: pos_stats.skipped,
+        transactions_added: txn_stats.added,
+        transactions_skipped: txn_stats.skipped,
+    };
+
     if let Some(hook) = post_merge_hook.as_mut() {
-        hook(&mut merged)?;
+        hook(&mut merged, &merge_stats)?;
     }
 
     if options.sort_transactions_by_date {
@@ -421,7 +454,6 @@ pub fn run_parser_pipeline_with_policy(
     policy: &PipelinePolicy,
 ) -> Result<(PipelineSummary, PolicyEffects)> {
     let mut effects = PolicyEffects::default();
-
     let summary = run_parser_pipeline(
         database_path,
         output_path,
@@ -430,13 +462,10 @@ pub fn run_parser_pipeline_with_policy(
             include_system_accounts: policy.include_system_accounts,
             sort_transactions_by_date: policy.sort_transactions_by_date,
         },
-        Some(|db: &mut Value| {
-            if policy.enrich_description_en {
-                effects.description_en_updated = crate::enrich_descriptions_to_english(db)?;
-            }
-
-            if policy.apply_rules {
-                effects.rules_changed = crate::apply_rules_from_database_path(db, database_path)?;
+        Some(|db: &mut Value, merge_stats: &MergeStatsSummary| {
+            // Skip transaction-level post-processing when the merge did not add transactions.
+            if !merge_stats.has_added_transactions() {
+                return Ok(());
             }
 
             effects.dedup_removed = match policy.dedup_strategy {
@@ -447,6 +476,14 @@ pub fn run_parser_pipeline_with_policy(
                 }
                 DedupStrategy::StrictSignature => 0,
             };
+
+            if policy.apply_rules {
+                effects.rules_changed = crate::apply_rules_from_database_path(db, database_path)?;
+            }
+
+            if policy.enrich_description_en {
+                effects.description_en_updated = crate::enrich_descriptions_to_english(db)?;
+            }
 
             Ok(())
         }),
