@@ -252,6 +252,12 @@
     "rate": 8.16827123405
   },
   {
+    "month": "2026-04",
+    "from_currency": "CNY",
+    "to_currency": "EUR",
+    "rate": 7.988339852099999
+  },
+  {
     "month": "2022-04",
     "from_currency": "SEK",
     "to_currency": "EUR",
@@ -520,6 +526,12 @@
     "from_currency": "SEK",
     "to_currency": "EUR",
     "rate": 10.61632879525
+  },
+  {
+    "month": "2026-04",
+    "from_currency": "SEK",
+    "to_currency": "EUR",
+    "rate": 10.88304711925
   },
   {
     "month": "2022-04",
