@@ -1,13 +1,12 @@
 # How to make a statement
 
 Updated by: Silvio Da Col
-Last update: February 2026
+Last update: May 2026
 
 1. Access your account on the browser via https://www.revolut.com.
-2. Click on your profile icon at the top-right corner.
-3. Select **Account Statements**.
-4. Select **Excel**.
-5. Select **Generate**.
+2. Select **Statement**.
+3. Select **Excel**.
+4. Select **Generate**.
 
 ![Image](./pics/1.png)
 

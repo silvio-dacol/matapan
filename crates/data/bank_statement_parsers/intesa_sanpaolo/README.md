@@ -1,7 +1,7 @@
 # How to make a statement
 
 Updated by: Silvio Da Col
-Last update: February 2026
+Last update: May 2026
 
 1. Access your Intesa Sanpaolo online banking account via the web at https://www.intesasanpaolo.com/
 2. Click either on your **Conto** (Account) or on your **Patrimonio** (Worth) from the main dashboard.
