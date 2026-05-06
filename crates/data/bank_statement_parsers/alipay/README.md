@@ -25,13 +25,3 @@ Last update: February 2026
 <img src="./pics/5.png" alt="Image" width="300">
 
 Note: If you see changes in the statement format, please open an issue or a pull request to update this parser.
-
-## Parser Notes (for contributors)
-
-- `src/main.rs`: CLI entrypoint using the shared `utils::ParserContract` pipeline.
-- `src/lib.rs`: parser facade + merge helpers exposed by the crate.
-- `src/accounts.rs`: maps Alipay wallet account metadata to normalized accounts.
-- `src/transactions.rs`: parses CSV rows into normalized transactions.
-
-- This parser currently focuses on wallet cashflows (`accounts` + `transactions`).
-- Pipeline behavior is profile-driven via `utils::PipelineProfile::Default` in the CLI entrypoint.
