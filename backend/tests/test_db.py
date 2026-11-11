@@ -203,13 +203,40 @@ def test_checkpoint_migration_preserves_imported_evidence(tmp_path):
                 )
             )
             before = {
-                table: connection.execute(text(f"SELECT * FROM {table}")).all()
-                for table in ("import_batches", "transactions", "import_rows")
+                "import_batches": connection.execute(
+                    text("SELECT id, account_id, file_hash, status FROM import_batches")
+                ).all(),
+                "transactions": connection.execute(
+                    text("SELECT id, account_id, amount, fingerprint FROM transactions")
+                ).all(),
+                "import_rows": connection.execute(
+                    text(
+                        "SELECT id, batch_id, decision, transaction_id, balance_id FROM import_rows"
+                    )
+                ).all(),
             }
         command.upgrade(config, "head")
         with engine.connect() as connection:
-            for table, records in before.items():
-                assert connection.execute(text(f"SELECT * FROM {table}")).all() == records
+            after = {
+                "import_batches": connection.execute(
+                    text("SELECT id, account_id, file_hash, status FROM import_batches")
+                ).all(),
+                "transactions": connection.execute(
+                    text("SELECT id, account_id, amount, fingerprint FROM transactions")
+                ).all(),
+                "import_rows": connection.execute(
+                    text(
+                        "SELECT id, batch_id, decision, transaction_id, balance_id FROM import_rows"
+                    )
+                ).all(),
+            }
+            assert after == before
+            assert (
+                connection.execute(
+                    text("SELECT posted_offset FROM transactions WHERE id = 'transaction'")
+                ).scalar_one()
+                is None
+            )
             assert connection.execute(
                 text("SELECT amount, source_timestamp, effective_at FROM account_balances")
             ).one() == ("90.12345678", "2025-01-03 10:01:00", None)

@@ -1,5 +1,6 @@
 """Persistent previews, reviewed row matching, provenance, and atomic commits."""
 
+import unicodedata
 from collections import Counter, defaultdict
 from datetime import timedelta
 from decimal import localcontext
@@ -9,7 +10,14 @@ from sqlalchemy.orm import Session
 
 from matapan.db import utc_now
 from matapan.importers.revolut import PARSER_ID, PARSER_VERSION, Statement, parse_statement
-from matapan.models import Account, AccountBalance, ImportBatch, ImportRow, Transaction
+from matapan.models import (
+    Account,
+    AccountBalance,
+    ImportBatch,
+    ImportRow,
+    ManualTransactionSource,
+    Transaction,
+)
 
 PREVIEW_LIFETIME = timedelta(minutes=30)
 
@@ -45,6 +53,39 @@ def match_candidates(session: Session, batch: ImportBatch, rows: list[ImportRow]
         )
         for candidate in candidates:
             matches[candidate.fingerprint].append(candidate)
+    manual_rows = [
+        row for row in rows if row.fingerprint and row.posted_at and row.amount is not None
+    ]
+    manual_candidates = (
+        session.scalars(
+            select(Transaction)
+            .join(ManualTransactionSource, ManualTransactionSource.transaction_id == Transaction.id)
+            .where(
+                Transaction.account_id == batch.account_id,
+                Transaction.currency_code == batch.currency_code,
+                Transaction.product == batch.product,
+                Transaction.amount.in_({row.amount for row in manual_rows}),
+            )
+        ).all()
+        if manual_rows
+        else []
+    )
+    for row in manual_rows:
+        normalized = " ".join(
+            unicodedata.normalize("NFKC", row.source_description).casefold().split()
+        )
+        for candidate in manual_candidates:
+            candidate_description = " ".join(
+                unicodedata.normalize("NFKC", candidate.source_description).casefold().split()
+            )
+            if (
+                candidate.posted_at.date() == row.posted_at.date()
+                and candidate.amount == row.amount
+                and candidate_description == normalized
+            ):
+                matches[row.fingerprint].append(candidate)
+    for key in matches:
+        matches[key].sort(key=lambda item: item.id)
     return matches
 
 

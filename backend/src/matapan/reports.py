@@ -5,7 +5,13 @@ from datetime import date
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from matapan.models import Account, AccountBalance
+from matapan.models import Account, AccountBalance, BalanceResolution
+
+
+def balance_group_key(account_id: str, observations: list[AccountBalance]) -> str:
+    import hashlib
+
+    return hashlib.sha256(",".join(sorted(item.id for item in observations)).encode()).hexdigest()
 
 
 def account_report(session: Session, account: Account, as_of: date) -> dict:
@@ -61,12 +67,38 @@ def account_report(session: Session, account: Account, as_of: date) -> dict:
     report["observation_ids"] = [observation.id for observation in observations]
     amounts = {observation.amount for observation in observations}
     if len(amounts) != 1:
-        report["balance_status"] = "conflicted"
-        report["issues"] = [
-            "Conflicting balance observations exist for this date. "
-            "The source observations are preserved; no amount has been selected."
-        ]
-        return report
+        group_key = balance_group_key(account.id, observations)
+        resolution = session.scalar(
+            select(BalanceResolution)
+            .where(
+                BalanceResolution.account_id == account.id,
+                BalanceResolution.group_key == group_key,
+            )
+            .order_by(BalanceResolution.created_at.desc(), BalanceResolution.id.desc())
+        )
+        selected = next(
+            (
+                item
+                for item in observations
+                if resolution and item.id == resolution.selected_balance_id
+            ),
+            None,
+        )
+        if selected:
+            observations = [selected]
+            report["observation_ids"] = [selected.id]
+            report["resolution"] = {
+                "id": resolution.id,
+                "selected_balance_id": selected.id,
+                "reason": resolution.reason,
+            }
+        else:
+            report["balance_status"] = "conflicted"
+            report["issues"] = [
+                "Conflicting balance observations exist for this date. "
+                "The source observations are preserved; no amount has been selected."
+            ]
+            return report
 
     report.update(
         status="partial",

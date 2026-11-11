@@ -12,13 +12,14 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal, localcontext
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from sqlalchemy import select, update
+from sqlalchemy import or_, select, update
 from sqlalchemy.orm import Session
 
 from matapan.imports import ImportProblem
 from matapan.models import (
     Account,
     AccountBalance,
+    BalanceResolution,
     ImportBatch,
     ImportRow,
     Reconciliation,
@@ -59,7 +60,27 @@ def checkpoints(session: Session, account: Account) -> list[list[AccountBalance]
         .order_by(AccountBalance.effective_at, AccountBalance.recorded_at, AccountBalance.id)
     ):
         grouped[balance.effective_at].append(balance)
-    return list(grouped.values())
+    result = []
+    for group in grouped.values():
+        if len({item.amount for item in group}) > 1:
+            from matapan.reports import balance_group_key
+
+            key = balance_group_key(account.id, group)
+            selection = session.scalar(
+                select(BalanceResolution)
+                .where(
+                    BalanceResolution.account_id == account.id, BalanceResolution.group_key == key
+                )
+                .order_by(BalanceResolution.created_at.desc(), BalanceResolution.id.desc())
+            )
+            selected = next(
+                (item for item in group if selection and item.id == selection.selected_balance_id),
+                None,
+            )
+            if selected:
+                group = [selected]
+        result.append(group)
+    return result
 
 
 def current_pairs(session: Session, account: Account) -> set[tuple[str, str]]:
@@ -114,16 +135,32 @@ def movements(session: Session, account: Account, start: datetime, end: datetime
             .where(
                 Transaction.account_id == account.id,
                 Transaction.currency_code == account.currency_code,
+                or_(
+                    Transaction.product == "Manual",
+                    Transaction.id.in_(
+                        select(ImportRow.transaction_id)
+                        .where(ImportRow.transaction_id.is_not(None), ImportRow.decision != "skip")
+                        .distinct()
+                    ),
+                ),
             )
             .order_by(Transaction.posted_at, Transaction.id)
         )
     )
-    if not account.statement_timezone:
+    if not account.statement_timezone and (not rows or any(not row.posted_offset for row in rows)):
         result["issues"].append("Confirm the statement timezone before calculating movements.")
         return result
-    zone = timezone(account.statement_timezone)
+    zone = timezone(account.statement_timezone) if account.statement_timezone else None
     for row in rows:
-        candidates = source_instants(row.posted_at, zone)
+        candidates = (
+            {
+                datetime.fromisoformat(
+                    f"{row.posted_at.isoformat()}{row.posted_offset}"
+                ).astimezone(UTC)
+            }
+            if row.posted_offset
+            else source_instants(row.posted_at, zone)
+        )
         relevant = [instant for instant in candidates if start < instant <= end]
         if len(candidates) != 1:
             if relevant or (
@@ -153,8 +190,19 @@ def movements(session: Session, account: Account, start: datetime, end: datetime
         .where(ImportBatch.account_id == account.id, ImportBatch.status == "committed")
         .order_by(ImportRow.id)
     ):
-        local = source.posted_at or source.started_at
-        if local is None or not any(start < value <= end for value in source_instants(local, zone)):
+        local = source.corrected_posted_at or source.posted_at or source.started_at
+        local_instants = (
+            {
+                datetime.fromisoformat(f"{local.isoformat()}{source.corrected_offset}").astimezone(
+                    UTC
+                )
+            }
+            if local is not None and source.corrected_offset
+            else source_instants(local, zone)
+            if local is not None
+            else set()
+        )
+        if local is None or not any(start < value <= end for value in local_instants):
             continue
         if (
             source.currency_code != account.currency_code

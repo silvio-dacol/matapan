@@ -396,3 +396,84 @@ def test_pending_rows_never_create_booked_movements(client, revolut_account, mak
     assert plan["balance"] is None
     assert commit(client, plan).status_code == 200
     assert transactions(client, revolut_account) == []
+
+
+def test_committed_duplicate_decision_can_be_revised_and_restored(
+    client, revolut_account, make_csv
+):
+    plan = preview(client, revolut_account, make_csv({"Balance": ""}))
+    assert commit(client, plan, include_balance=False).status_code == 200
+    row = next(item for item in plan["rows"] if item["classification"] == "new")
+    assert len(transactions(client, revolut_account)) == 1
+    skipped = client.post(
+        f"/api/v1/import-rows/{row['id']}/review",
+        json={
+            "action": "skip",
+            "reason": "This source row was reviewed as an accidental duplicate",
+        },
+    )
+    assert skipped.status_code == 200, skipped.text
+    assert transactions(client, revolut_account) == []
+    restored = client.post(
+        f"/api/v1/import-rows/{row['id']}/review",
+        json={"action": "keep_separate", "reason": "Restore the reviewed movement"},
+    )
+    assert restored.status_code == 200, restored.text
+    assert len(transactions(client, revolut_account)) == 1
+    history = client.get(f"/api/v1/import-rows/{row['id']}/decision-history").json()
+    assert [item["action"] for item in history] == ["skip", "keep_separate"]
+
+
+def test_manual_movement_is_reviewable_and_linked_import_keeps_provenance(
+    client, revolut_account, make_csv
+):
+    added = client.post(
+        f"/api/v1/accounts/{revolut_account['id']}/transactions/manual",
+        json={
+            "posted_at": "2025-01-03T10:01:00+01:00",
+            "amount": "-10.00",
+            "description": "Synthetic merchant",
+            "reason": "Cash receipt entered manually",
+        },
+    )
+    assert added.status_code == 200, added.text
+    assert added.json()["source"] == "manual"
+    plan = preview(client, revolut_account, make_csv({"Balance": ""}))
+    row = next(item for item in plan["rows"] if item["classification"] == "possible_duplicate")
+    assert row["candidate_transactions"][0]["id"] == added.json()["id"]
+    result = commit(
+        client,
+        plan,
+        [
+            {
+                "row_id": row["id"],
+                "action": "link_duplicate",
+                "transaction_id": added.json()["id"],
+            }
+        ],
+        include_balance=False,
+    )
+    assert result.status_code == 200, result.text
+    activity = transactions(client, revolut_account)
+    assert len(activity) == 1
+    assert activity[0]["source"] == "manual"
+    assert activity[0]["manual_reason"] == "Cash receipt entered manually"
+    assert len(activity[0]["import_row_ids"]) == 1
+
+
+def test_import_row_time_correction_keeps_original_source_timestamp(
+    client, revolut_account, make_csv
+):
+    plan = preview(client, revolut_account, make_csv({"Balance": ""}))
+    assert commit(client, plan, include_balance=False).status_code == 200
+    row = next(item for item in plan["rows"] if item["classification"] == "new")
+    corrected = client.post(
+        f"/api/v1/import-rows/{row['id']}/correct-time",
+        json={"posted_at": "2025-01-03T11:01:00+02:00", "reason": "Verified against bank receipt"},
+    )
+    assert corrected.status_code == 200, corrected.text
+    with client.app.state.sessions() as session:
+        source = session.get(ImportRow, row["id"])
+        assert source.posted_at.isoformat(sep=" ") == "2025-01-03 10:01:00"
+        assert source.corrected_posted_at.isoformat(sep=" ") == "2025-01-03 11:01:00"
+        assert source.corrected_offset == "+02:00"

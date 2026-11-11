@@ -2,8 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { api, calendarDate, errorMessage, money, today } from "./api";
 import type { Account, AccountReport } from "./api";
 import ImportPanel from "./ImportPanel";
-import { AccountForm, BalanceForm } from "./AccountForms";
-import { Activity, BalanceHistory } from "./AccountRecords";
+import { AccountForm, BalanceForm, ManualMovementForm } from "./AccountForms";
+import { Activity, BalanceHistory, ImportHistory } from "./AccountRecords";
 import { Notice } from "./Notice";
 import ReconciliationPanel from "./ReconciliationPanel";
 
@@ -27,7 +27,7 @@ function Workspace({
   const [reportError, setReportError] = useState("");
   const [loading, setLoading] = useState(true);
   const [revision, setRevision] = useState(0);
-  const [panel, setPanel] = useState<"import" | "balance" | null>(null);
+  const [panel, setPanel] = useState<"import" | "balance" | "movement" | null>(null);
   const [message, setMessage] = useState("");
   const [reconBusy, setReconBusy] = useState(false);
   const refresh = useCallback(() => setRevision((value) => value + 1), []);
@@ -92,6 +92,9 @@ function Workspace({
           >
             Confirm balance
           </button>
+          <button disabled={panel !== null || reconBusy} onClick={() => setPanel("movement")}>
+            Add movement
+          </button>
           <button
             className="primary"
             disabled={panel !== null || reconBusy || !eligible}
@@ -120,6 +123,8 @@ function Workspace({
           }}
         />
       )}
+      {panel === "movement" && <ManualMovementForm account={account} onCancel={() => setPanel(null)}
+        onSaved={() => { setPanel(null); refresh(); setMessage("Manual movement saved with its source and reason."); }} />}
       {panel === "import" && (
         <ImportPanel
           account={account}
@@ -253,6 +258,9 @@ function Workspace({
               </ul>
             </details>
           )}
+          {currentReport?.resolution && (
+            <p className="form-note">Balance selection recorded: {currentReport.resolution.reason}</p>
+          )}
         </section>
       </div>
       {!eligible && (
@@ -263,7 +271,8 @@ function Workspace({
       )}
       <Activity account={account} revision={revision} />
       <ReconciliationPanel account={account} revision={revision} asOf={asOf} disabled={panel !== null || reconBusy} onChanged={refresh} onBusy={setReconBusy} />
-      <BalanceHistory account={account} revision={revision} />
+      <ImportHistory account={account} revision={revision} />
+      <BalanceHistory account={account} revision={revision} report={currentReport} onResolved={refresh} />
     </>
   );
 }

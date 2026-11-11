@@ -2,7 +2,8 @@
 
 The local backend provides FastAPI, SQLite/SQLAlchemy, Alembic migrations, accounts,
 dated/timed balance confirmations, reviewed Revolut CSV imports, transaction lists,
-checkpoint projections, and reviewed reconciliation adjustments.
+manual movements, import history and review corrections, checkpoint projections,
+and reviewed reconciliation adjustments.
 The [frontend account workspace](../frontend/README.md)
 provides account creation, import review, activity, and manual balance confirmation.
 
@@ -65,6 +66,7 @@ Available endpoints:
 | GET | `/api/v1/accounts/{id}` | Read an account |
 | DELETE | `/api/v1/accounts/{id}` | Delete an empty account; linked records return `409` |
 | POST / GET | `/api/v1/accounts/{id}/cash-balances` | Confirm / list manual balances |
+| POST | `/api/v1/accounts/{id}/balance-resolution` | Select a conflicting balance while preserving all observations |
 | GET | `/api/v1/accounts/{id}/report?as_of=YYYY-MM-DD` | Read the latest usable dated cash evidence |
 | PUT | `/api/v1/accounts/{id}/statement-timezone` | Explicitly map local export timestamps to an IANA timezone |
 | GET | `/api/v1/accounts/{id}/projection?at=ISO_TIMESTAMP` | Calculate from the latest timed confirmed checkpoint |
@@ -72,6 +74,11 @@ Available endpoints:
 | POST | `/api/v1/reconciliations/{id}/accept-adjustment` | Approve the current proposed ghost amount, including zero retirement |
 | POST | `/api/v1/reconciliations/{id}/reverse-adjustment` | Retire an active ghost while retaining its audit history |
 | GET | `/api/v1/accounts/{id}/transactions` | Read canonical movements and import provenance |
+| POST | `/api/v1/accounts/{id}/transactions/manual` | Add a signed movement with explicit time, source, and reason |
+| GET | `/api/v1/accounts/{id}/import-history` | Review prior import batches and row decisions |
+| POST | `/api/v1/import-rows/{id}/review` | Revise a committed duplicate decision with a reason |
+| GET | `/api/v1/import-rows/{id}/decision-history` | Read append-only row decision history |
+| POST | `/api/v1/import-rows/{id}/correct-time` | Correct a row's timestamp and explicit offset while preserving source time |
 | POST | `/api/v1/imports/preview` | Upload a CSV and review rows and balance evidence |
 | GET | `/api/v1/imports/{id}` | Refresh a preview and its current duplicate candidates |
 | POST | `/api/v1/imports/{id}/commit` | Explicitly approve an import plan |

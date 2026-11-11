@@ -29,6 +29,22 @@ export interface Balance {
   effective_offset: string | null;
 }
 
+export interface ImportHistoryBatch {
+  id: string;
+  status: string;
+  created_at: string;
+  committed_at: string | null;
+  observed_start: string | null;
+  observed_end: string | null;
+  parser_id: string;
+  warnings: string[];
+  rows: { id: string; row_number: number; classification: string;
+    decision: string | null; transaction_id: string | null;
+    description: string; amount: string | null; posted_at: string | null;
+    corrected_posted_at: string | null; corrected_offset: string | null;
+    candidates: { id: string; description: string; amount: string }[] }[];
+}
+
 export interface AccountReport {
   account_id: string;
   currency_code: string;
@@ -45,6 +61,7 @@ export interface AccountReport {
   observation_ids: string[];
   carried_forward: boolean;
   issues: string[];
+  resolution: { id: string; selected_balance_id: string; reason: string } | null;
 }
 
 export interface Transaction {
@@ -54,12 +71,15 @@ export interface Transaction {
   product: string;
   transaction_type: string;
   posted_at: string;
+  posted_offset: string | null;
   started_at: string;
   amount: string;
   source_amount: string;
   fee: string;
   source_description: string;
   import_row_ids: string[];
+  source: "import" | "manual";
+  manual_reason: string | null;
 }
 
 export type Classification =
@@ -253,6 +273,23 @@ export const api = {
     request<Balance[]>(
       `/api/v1/accounts/${id}/cash-balances?limit=10&offset=${offset}`,
     ),
+  resolveBalance: (id: string, selected_balance_id: string, reason: string) =>
+    request<AccountReport>(`/api/v1/accounts/${id}/balance-resolution`,
+      json({ selected_balance_id, reason })),
+  importHistory: (id: string) =>
+    request<ImportHistoryBatch[]>(`/api/v1/accounts/${id}/import-history`),
+  reviewImportRow: (id: string, action: "keep_separate" | "link_duplicate" | "skip",
+    reason: string, transaction_id?: string) =>
+    request<{ row_id: string; decision: string; transaction_id: string | null }>(
+      `/api/v1/import-rows/${id}/review`,
+      json({ action, reason, ...(transaction_id ? { transaction_id } : {}) })),
+  importRowDecisionHistory: (id: string) =>
+    request<{ id: string; previous_action: string | null; previous_transaction_id: string | null;
+      action: string; transaction_id: string | null; reason: string; created_at: string }[]>(
+      `/api/v1/import-rows/${id}/decision-history`),
+  correctImportTime: (id: string, posted_at: string, reason: string) =>
+    request<{ row_id: string; corrected_posted_at: string; corrected_offset: string }>(
+      `/api/v1/import-rows/${id}/correct-time`, json({ posted_at, reason })),
   confirmBalance: (
     id: string,
     body: {
@@ -263,6 +300,9 @@ export const api = {
       effective_at?: string;
     },
   ) => request<Balance>(`/api/v1/accounts/${id}/cash-balances`, json(body)),
+  createManualMovement: (id: string, body: { posted_at: string; amount: string;
+    description: string; reason: string }) =>
+    request<Transaction>(`/api/v1/accounts/${id}/transactions/manual`, json(body)),
   statementTimezone: (id: string, zone: string) =>
     request<Account>(`/api/v1/accounts/${id}/statement-timezone`, {
       ...json({ statement_timezone: zone }), method: "PUT",

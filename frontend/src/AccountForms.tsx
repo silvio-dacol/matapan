@@ -243,3 +243,38 @@ export function BalanceForm({
     </section>
   );
 }
+
+export function ManualMovementForm({ account, onCancel, onSaved }: {
+  account: Account; onCancel: () => void; onSaved: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    setBusy(true); setError("");
+    try {
+      await api.createManualMovement(account.id, {
+        posted_at: `${String(data.get("time"))}:00${String(data.get("offset"))}`,
+        amount: String(data.get("amount")), description: String(data.get("description")).trim(),
+        reason: String(data.get("reason")).trim(),
+      });
+      onSaved();
+    } catch (failure) { setError(errorMessage(failure)); }
+    finally { setBusy(false); }
+  }
+  return <section className="panel form-panel" aria-labelledby="movement-title">
+    <div className="section-heading"><div><span className="eyebrow">MANUAL ACTIVITY</span>
+      <h2 id="movement-title">Add a movement</h2></div></div>
+    <p className="muted">This records a movement with manual provenance. It does not change a confirmed balance.</p>
+    <form onSubmit={submit}><fieldset disabled={busy} className="form-grid">
+      <label>Signed amount ({account.currency_code})<input name="amount" required inputMode="decimal" pattern="-?(0|[1-9][0-9]*)(\\.[0-9]{1,8})?" /></label>
+      <label>Date and time<input name="time" type="datetime-local" step="60" required /></label>
+      <label>UTC offset<input name="offset" defaultValue={localOffset()} required pattern="[+-][0-9]{2}:[0-9]{2}" /></label>
+      <label className="wide">Description<input name="description" required maxLength={500} /></label>
+      <label className="wide">Why is this movement being added?<textarea name="reason" required maxLength={500} rows={2} /></label>
+      <div className="button-row wide"><button className="primary" type="submit">Save movement</button>
+        <button type="button" onClick={onCancel}>Cancel</button></div>
+    </fieldset>{error && <Notice error>{error}</Notice>}</form>
+  </section>;
+}

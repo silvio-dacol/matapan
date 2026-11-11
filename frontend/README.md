@@ -36,6 +36,12 @@ select a different local backend address before starting Vite.
 5. If history is incomplete or a balance is missing, select **Confirm balance**.
    Enter the actual amount, date, optional note, and explicit confirmation.
    Monetary input uses decimal text, never floating-point conversions.
+6. Use **Add movement** for a manually recorded signed transaction. Supply its
+   date/time, UTC offset, description, and reason. A matching later import appears
+   for duplicate review; linking it keeps both the manual and import provenance.
+7. Use **Import history** to inspect prior batches. Revise row decisions with a
+   reason, inspect their audit trail, or correct an ambiguous row time with an
+   explicit UTC offset. The original imported timestamp remains preserved.
 
 The report date selects dated evidence through the backend. The activity list
 shows all imported dates with pagination. Balance evidence retains historical
@@ -49,7 +55,8 @@ review to avoid changing the destination account midway through the work.
 - **Source reported** identifies a Revolut running balance at its original local
   timestamp; it is not presented as a verified end-of-day balance.
 - **Conflicting evidence** leaves the amount unavailable and preserves all
-  observations. Selecting a winning observation is not yet supported by the API.
+  observations. Select an observation from **Balance evidence** and record why;
+  the decision itself is retained for later review.
 - An earlier observation is explicitly carried forward, rather than described
   as confirmed for a later date. Missing evidence is unavailable, never zero.
 - History coverage remains unverified even after a balance confirmation. The UI
@@ -81,10 +88,10 @@ balance. A newly inserted intermediate checkpoint requires retirement of an old
 spanning ghost before reviewing the new intervals.
 
 Missing timezone mappings, ambiguous/nonexistent daylight-saving times, or conflicting
-confirmations at one instant block the affected calculations. Coverage remains
-unverified even after accepting a ghost. Manual transaction entry, conflict/time
-correction, brokerage, FX, consolidated net worth, authentication, and self-hosted
-production packaging remain subsequent work.
+confirmations at one instant block the affected calculations. Correct an ambiguous
+import row from **Import history**, with a verified local time and offset. Coverage
+remains unverified even after accepting a ghost. Brokerage, FX, consolidated net
+worth, authentication, and self-hosted production packaging remain subsequent work.
 The development and preview servers bind to loopback.
 
 ## Verification

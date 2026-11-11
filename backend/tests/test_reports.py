@@ -58,6 +58,21 @@ def test_conflicting_observations_are_preserved_and_not_selected(client, account
     assert {balance["amount"] for balance in balances} == {"100.00", "200.00"}
 
 
+def test_conflict_resolution_selects_one_observation_and_keeps_both(client, account, save_balance):
+    first = save_balance("100.00")
+    second = save_balance("200.00")
+    response = client.post(
+        f"/api/v1/accounts/{account['id']}/balance-resolution",
+        json={"selected_balance_id": second["id"], "reason": "Checked the bank app"},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["amount"] == "200.00"
+    assert response.json()["observation_ids"] == [second["id"]]
+    assert {
+        item["id"] for item in client.get(f"/api/v1/accounts/{account['id']}/cash-balances").json()
+    } == {first["id"], second["id"]}
+
+
 def test_equal_observations_retain_all_provenance_without_a_conflict(client, account, save_balance):
     first = save_balance("100")
     second = save_balance("100.00")

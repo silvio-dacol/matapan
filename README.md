@@ -36,7 +36,7 @@ Keep real bank exports outside Git; tests should use synthetic or anonymized sam
 
 ## Progress recap
 
-Updated **2026-10-15**, including the checkpoint/reconciliation implementation.
+Updated **2026-11-11**, including the reconciliation review lifecycle.
 Matapan currently provides the first working account-import slice. It is **not yet
 the complete MVP** defined by [architecture v0.6](docs/mvp_architecture.md).
 The slice names below follow [the implementation guide](docs/mvp_code_structure.md);
@@ -45,8 +45,8 @@ they do not imply that all architecture milestones are complete.
 ### What is implemented
 
 - **Local backend and persistence:** FastAPI, SQLite/SQLAlchemy, exact decimal
-  money storage, and incremental Alembic migrations (`0001_account_balances` and
-  `0002_revolut_imports`). Startup checks the migration revision; existing data is
+  money storage, and incremental Alembic migrations through `0004_review_decisions`.
+  Startup checks the migration revision; existing data is
   preserved rather than recreated.
 - **Accounts:** create, list, and read accounts; delete empty accounts through the
   API. Accounts with balances, transactions, or import history cannot be deleted.
@@ -65,8 +65,8 @@ they do not imply that all architecture milestones are complete.
 - **Dated cash reporting:** account activity and source provenance, manual dated
   balance confirmation, and as-of reports. Missing balances remain unknown;
   future evidence is excluded from past reports. Conflicting observations are
-  retained and make the value unavailable; older evidence is labeled as carried
-  forward. Account cash is shown as a partial financial picture.
+  retained until the user selects which to use; the reason is kept in review
+  history. Older evidence is labeled as carried forward. Account cash is partial.
 - **Timed checkpoints and reconciliation (Slice 2):** confirm a booked balance
   with a date, time, and UTC offset; explicitly configure the timezone of imported
   statement timestamps. The first timed confirmation provides the baseline, and
@@ -80,7 +80,9 @@ they do not imply that all architecture milestones are complete.
 - **Working frontend:** a React/TypeScript account workspace with account creation,
   statement upload, duplicate and invalid-row review, import confirmation and
   cancellation, paginated activity, dated reports, and manual balance confirmation.
-  The layout supports desktop and mobile. This is implemented beyond the
+  It now includes import history, reversible row decisions with audit history,
+  per-row time correction, and manual movement entry with source reason. The layout
+  supports desktop and mobile. This is implemented beyond the
   placeholders mentioned in the original repository guidance.
 - **Documentation and checks:** backend/frontend setup instructions, step-by-step
   [API](docs/easy_backend_api_use.md) and
@@ -93,28 +95,14 @@ The core of **Slice 2: reconciliation** is implemented. Remaining limitations an
 subsequent work, in the guide's suggested order:
 
 1. **Remaining reconciliation limitations:** legacy date-only observations retain
-   their original semantics and are not assigned invented times. Timed calculations
-   require an explicit statement timezone; ambiguous/nonexistent daylight-saving
-   timestamps block the calculation, with per-row time correction still to be
-   implemented. Conflicting confirmations at the same instant block approval;
-   explicit conflict resolution remains work below. History coverage stays
-   unverified, even when a ghost makes the arithmetic match. Before the first
-   timed confirmation the projected balance is unavailable, not zero. The existing
-   dated report remains an evidence view; use **Calculate from checkpoint** for
-   transaction-derived balances. Manual transaction entry remains proposed below.
-2. **Observation and review lifecycle:** allow explicit selection/resolution of
-   conflicting balance evidence while retaining originals; make duplicate decisions
-   reversible with an audit trail; provide an import-history view and clearer
-   coverage/reconciliation diagnostics. The current preview refresh and activity
-   provenance do not constitute the full history/review experience.
-   **Manual transaction entry is also a proposed addition:** let the user add a
-   dated movement to a selected account with an exact signed amount, matching
-   currency, description, and explicit manual provenance. This is not implemented
-   and is not an explicit requirement of architecture v0.6. Keep it distinct from
-   balance confirmation and synthetic reconciliation adjustments. A later import
-   of a matching movement must offer duplicate review and preserve both origins
-   if linked. Manual movements must not silently change a confirmed balance or
-   imply complete history; corrections should retain an audit trail.
+   their original semantics and are not assigned invented times. Imported timed
+   calculations require an explicit statement timezone. History coverage stays
+   unverified, even when a ghost makes the arithmetic match. Before the first timed
+   confirmation the projected balance is unavailable, not zero. The existing dated
+   report remains an evidence view; use **Calculate from checkpoint** for
+   transaction-derived balances.
+2. **Observation and review lifecycle:** improve coverage and reconciliation
+   diagnostics so users can see import gaps and understand unresolved intervals.
 3. **Brokerage (Slice 3):** verify a representative Interactive Brokers export and
    implement preview/review/import for securities, dated holdings/valuations, and
    separate currency cash balances. Treat aggregate equity/NAV as reconciliation
@@ -171,6 +159,9 @@ the account/import journey and recovery paths on desktop and mobile.
 See [backend checks](backend/README.md) and
 [frontend checks](frontend/README.md) for commands and environment requirements.
 Only synthetic fixtures and disposable test databases should be used for checks.
+
+Verification of the review lifecycle update on **2026-11-11**: backend **107 passed**,
+frontend production build and strict TypeScript checks passed, and Ruff lint passed.
 
 # When updating the version
 

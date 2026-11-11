@@ -74,6 +74,40 @@ class AccountBalance(Base):
     effective_offset: Mapped[str | None] = mapped_column(String(6), nullable=True)
 
 
+class BalanceResolution(Base):
+    """Append-only user selections for otherwise conflicting balance evidence."""
+
+    __tablename__ = "balance_resolutions"
+    __table_args__ = (
+        Index("ix_balance_resolution_group", "account_id", "group_key", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("accounts.id", ondelete="RESTRICT"))
+    group_key: Mapped[str] = mapped_column(String(64))
+    selected_balance_id: Mapped[str] = mapped_column(ForeignKey("account_balances.id"))
+    reason: Mapped[str] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utc_now)
+
+
+class ImportDecisionAudit(Base):
+    """Append-only history for changes to a committed import row's review decision."""
+
+    __tablename__ = "import_decision_audit"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    row_id: Mapped[str] = mapped_column(ForeignKey("import_rows.id", ondelete="RESTRICT"))
+    previous_action: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    previous_transaction_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    action: Mapped[str] = mapped_column(String(24))
+    transaction_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    previous_posted_at: Mapped[datetime | None] = mapped_column(DateTime(), nullable=True)
+    posted_at: Mapped[datetime | None] = mapped_column(DateTime(), nullable=True)
+    previous_posted_offset: Mapped[str | None] = mapped_column(String(6), nullable=True)
+    posted_offset: Mapped[str | None] = mapped_column(String(6), nullable=True)
+    reason: Mapped[str] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utc_now)
+
+
 class Reconciliation(Base):
     __tablename__ = "reconciliations"
     __table_args__ = (
@@ -157,6 +191,7 @@ class Transaction(Base):
     product: Mapped[str] = mapped_column(String(20))
     transaction_type: Mapped[str] = mapped_column(String(64))
     posted_at: Mapped[datetime] = mapped_column(DateTime())
+    posted_offset: Mapped[str | None] = mapped_column(String(6), nullable=True)
     started_at: Mapped[datetime] = mapped_column(DateTime())
     amount: Mapped[Decimal] = mapped_column(ExactDecimal())
     source_amount: Mapped[Decimal] = mapped_column(ExactDecimal())
@@ -181,6 +216,8 @@ class ImportRow(Base):
     transaction_type: Mapped[str] = mapped_column(String(64))
     source_description: Mapped[str] = mapped_column(String(500))
     posted_at: Mapped[datetime | None] = mapped_column(DateTime(), nullable=True)
+    corrected_posted_at: Mapped[datetime | None] = mapped_column(DateTime(), nullable=True)
+    corrected_offset: Mapped[str | None] = mapped_column(String(6), nullable=True)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(), nullable=True)
     amount: Mapped[Decimal | None] = mapped_column(ExactDecimal(), nullable=True)
     source_amount: Mapped[Decimal | None] = mapped_column(ExactDecimal(), nullable=True)
@@ -191,3 +228,12 @@ class ImportRow(Base):
     decided_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
     transaction_id: Mapped[str | None] = mapped_column(ForeignKey("transactions.id"), nullable=True)
     balance_id: Mapped[str | None] = mapped_column(ForeignKey("account_balances.id"), nullable=True)
+
+
+class ManualTransactionSource(Base):
+    __tablename__ = "manual_transaction_sources"
+    transaction_id: Mapped[str] = mapped_column(
+        ForeignKey("transactions.id", ondelete="RESTRICT"), primary_key=True
+    )
+    reason: Mapped[str] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utc_now)
