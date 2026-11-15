@@ -15,7 +15,7 @@ dependencies = [
     "uvicorn>=0.34,<1",
     "SQLAlchemy>=2.0.38,<2.1",
     "alembic>=1.14,<2",
-    "tzdata>=2025.1",
+    "tzdata>=2026.6",
 ]
 
 [project.optional-dependencies]

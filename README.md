@@ -5,7 +5,20 @@ The local account workspace supports account creation, reviewed Revolut CSV
 imports, imported transactions with provenance, dated cash reports, and manual
 balance confirmation when imported history is incomplete.
 
-Start the backend using [backend/README.md](backend/README.md), then open a second
+For a one-command start that sets up both servers and opens the workspace in the
+default browser, run the launcher from the repository root (Python 3.12+ and
+Node.js 20.19+ or 22.12+):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\start-dev.ps1
+```
+
+It creates `backend/.venv` and `frontend/node_modules` on first run, applies
+pending migrations without touching existing data, and starts both servers.
+Press Ctrl+C in its window to stop them.
+
+To start the pieces manually, run the backend using
+[backend/README.md](backend/README.md), then open a second
 PowerShell terminal from the repository root (Node.js 20.19+ or 22.12+):
 
 ```powershell
