@@ -1,0 +1,3 @@
+[submodule "backend/src/matapan/importers"]
+	path = backend/src/matapan/importers
+	url = https://github.com/silvio-dacol/institution-statement-parser.git
