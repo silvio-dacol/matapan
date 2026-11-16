@@ -149,10 +149,11 @@ merging institutions. Institution membership does not by itself mean that an
 importer for that institution is supported. This update is planned, not implemented.
 
 **After the MVP:** additional institution adapters (SEB, Intesa Sanpaolo, China
-Construction Bank, Alipay, and WeChat), broader export variants, transfer linking,
-categorization, cash-flow/performance analytics, inflation, recurring imports, and
-optional AI. Export-download notes in `docs/importers/` do not mean those adapters
-exist. These are later extensions, not prerequisites for the first complete MVP.
+Construction Bank, Alipay, and WeChat), feature so that people can use it like Splitwise,
+broader export variants, transfer linking, categorization, cash-flow/performance analytics, 
+inflation, recurring imports, and optional AI. Export-download notes in `docs/importers/` 
+do not mean those adapters exist. 
+These are later extensions, not prerequisites for the first complete MVP.
 
 ### Verification of the current slice
 
