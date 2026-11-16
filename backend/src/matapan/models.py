@@ -41,6 +41,13 @@ class Account(Base):
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utc_now)
 
 
+class AppSetting(Base):
+    __tablename__ = "app_settings"
+
+    key: Mapped[str] = mapped_column(String(80), primary_key=True)
+    value: Mapped[str] = mapped_column(String(200))
+
+
 class AccountBalance(Base):
     __tablename__ = "account_balances"
     __table_args__ = (

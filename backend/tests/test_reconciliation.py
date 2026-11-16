@@ -366,6 +366,96 @@ def test_timezone_change_invalidates_reviewed_evidence(client, revolut_account, 
     assert approve(client, old).status_code == 409
 
 
+def test_matapan_timezone_is_used_and_changes_require_review(client, revolut_account, make_csv):
+    account = revolut_account
+    assert client.get("/api/v1/settings/timezone").json() == {"default_statement_timezone": None}
+    assert (
+        client.put(
+            "/api/v1/settings/timezone",
+            json={"default_statement_timezone": "Not/A_Timezone"},
+        ).status_code
+        == 422
+    )
+    assert (
+        client.put(
+            "/api/v1/settings/timezone",
+            json={"default_statement_timezone": "UTC"},
+        ).status_code
+        == 200
+    )
+    checkpoint(client, account, "100", "2025-01-01T00:00:00Z")
+    checkpoint(client, account, "120", "2025-01-02T00:00:00Z")
+    import_rows(
+        client, account, make_csv({"Completed Date": "2025-01-01 00:30:00", "Amount": "10"})
+    )
+    initial = periods(client, account)[0]
+    assert initial["evidence"]["statement_timezone"] == "UTC"
+    assert initial["evidence"]["statement_timezone_source"] == "matapan"
+    accepted = approve(client, initial).json()
+    assert accepted["state"] == "reconciled"
+
+    changed = client.put(
+        "/api/v1/settings/timezone",
+        json={"default_statement_timezone": "Europe/Zurich"},
+    )
+    assert changed.status_code == 200
+    revised = periods(client, account)[0]
+    assert revised["state"] == "needs_review"
+    assert Decimal(revised["required_adjustment"]) == 20
+    assert any(item["code"] == "approval_needs_review" for item in revised["coverage_diagnostics"])
+    assert approve(client, accepted).status_code == 409
+
+
+def test_reconciliation_explains_unverified_and_unobserved_intervals(client, account):
+    checkpoint(client, account, "100", "2025-01-01T00:00:00Z")
+    checkpoint(client, account, "125", "2025-02-01T00:00:00Z")
+    response = client.put(
+        "/api/v1/settings/timezone",
+        json={"default_statement_timezone": "UTC"},
+    )
+    assert response.status_code == 200
+    period = periods(client, account)[0]
+    codes = {item["code"] for item in period["coverage_diagnostics"]}
+    assert {"coverage_unverified", "no_import_rows", "unresolved_difference"} <= codes
+    assert period["coverage"] == "unverified"
+
+
+def test_reconciliation_labels_activity_gaps_without_claiming_missing_transactions(
+    client, revolut_account, make_csv
+):
+    account = revolut_account
+    zone(client, account)
+    checkpoint(client, account, "100", "2025-01-01T00:00:00Z")
+    checkpoint(client, account, "125", "2025-02-01T00:00:00Z")
+    import_rows(client, account, make_csv({"Completed Date": "2025-01-05 10:00:00"}))
+    import_rows(client, account, make_csv({"Completed Date": "2025-01-20 10:00:00"}))
+    period = periods(client, account)[0]
+    gaps = [
+        item for item in period["coverage_diagnostics"] if item["code"] == "no_observed_activity"
+    ]
+    assert len(gaps) == 1
+    assert "2025-01-06 through 2025-01-19" in gaps[0]["message"]
+    assert "not proof of missing transactions" in gaps[0]["action"]
+
+
+def test_account_timezone_override_takes_precedence_over_matapan_default(
+    client, revolut_account, make_csv
+):
+    client.put("/api/v1/settings/timezone", json={"default_statement_timezone": "UTC"})
+    zone(client, revolut_account, "Europe/Zurich")
+    checkpoint(client, revolut_account, "100", "2025-01-02T23:30:00Z")
+    checkpoint(client, revolut_account, "110", "2025-01-03T01:00:00Z")
+    import_rows(
+        client,
+        revolut_account,
+        make_csv({"Completed Date": "2025-01-03 01:00:00", "Amount": "10"}),
+    )
+    period = periods(client, revolut_account)[0]
+    assert period["evidence"]["statement_timezone"] == "Europe/Zurich"
+    assert period["evidence"]["statement_timezone_source"] == "account"
+    assert period["movement_count"] == 1
+
+
 def test_adjustment_write_failure_rolls_back_previous_approval(client, account, monkeypatch):
     from sqlalchemy import event
 

@@ -4,7 +4,7 @@ from decimal import Decimal
 
 import pytest
 
-from matapan.importers.revolut import MAX_FILE_BYTES, StatementError, parse_statement
+from matapan.importers.parsers.revolut import MAX_FILE_BYTES, StatementError, parse_statement
 
 
 def test_mixed_products_and_fees_are_parsed_without_merging(revolut_csv):

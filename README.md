@@ -49,7 +49,7 @@ Keep real bank exports outside Git; tests should use synthetic or anonymized sam
 
 ## Progress recap
 
-Updated **2026-11-11**, including the reconciliation review lifecycle.
+Updated **2026-11-16**, including timezone settings and reconciliation diagnostics.
 Matapan currently provides the first working account-import slice. It is **not yet
 the complete MVP** defined by [architecture v0.6](docs/mvp_architecture.md).
 The slice names below follow [the implementation guide](docs/mvp_code_structure.md);
@@ -81,15 +81,23 @@ they do not imply that all architecture milestones are complete.
   retained until the user selects which to use; the reason is kept in review
   history. Older evidence is labeled as carried forward. Account cash is partial.
 - **Timed checkpoints and reconciliation (Slice 2):** confirm a booked balance
-  with a date, time, and UTC offset; explicitly configure the timezone of imported
-  statement timestamps. The first timed confirmation provides the baseline, and
-  later balances can be calculated from accepted movements after that checkpoint.
+  with a date, time, and UTC offset; configure Matapan's default IANA timezone for
+  imported statement timestamps, with an optional account override. The first
+  timed confirmation provides the baseline, and later balances can be calculated
+  from accepted movements after that checkpoint.
   Consecutive checkpoints expose gaps and proposed synthetic "ghost" adjustments.
   Creation, revision, and retirement require approval and preserve evidence and
   audit history. New imports recalculate proposals automatically and mark changed
   approvals as needing review. Zero residual ghosts can be retired on confirmation.
   Ghosts remain separate from real activity and are never added to the confirmed
   balance. A new migration adds these records without replacing existing data.
+- **Reconciliation limits and review diagnostics:** date-only observations retain
+  their original meaning; balances before the first timed checkpoint remain
+  unavailable; dated reports remain evidence views. Checkpoint intervals show why
+  history coverage is unverified, skipped and pending rows, source running-balance
+  gaps, observed activity gaps between imports, unresolved differences, and
+  approvals that need review. Observed activity gaps are explicitly not presented
+  as proof that transactions are missing.
 - **Working frontend:** a React/TypeScript account workspace with account creation,
   statement upload, duplicate and invalid-row review, import confirmation and
   cancellation, paginated activity, dated reports, and manual balance confirmation.
@@ -104,34 +112,25 @@ they do not imply that all architecture milestones are complete.
 
 ### What still needs to be done
 
-The core of **Slice 2: reconciliation** is implemented. Remaining limitations and
-subsequent work, in the guide's suggested order:
+The core of **Slice 2: reconciliation** is implemented. Remaining work, in the
+guide's suggested order:
 
-1. **Remaining reconciliation limitations:** legacy date-only observations retain
-   their original semantics and are not assigned invented times. Imported timed
-   calculations require an explicit statement timezone. History coverage stays
-   unverified, even when a ghost makes the arithmetic match. Before the first timed
-   confirmation the projected balance is unavailable, not zero. The existing dated
-   report remains an evidence view; use **Calculate from checkpoint** for
-   transaction-derived balances.
-2. **Observation and review lifecycle:** improve coverage and reconciliation
-   diagnostics so users can see import gaps and understand unresolved intervals.
-3. **Brokerage (Slice 3):** verify a representative Interactive Brokers export and
+1. **Brokerage (Slice 3):** verify a representative Interactive Brokers export and
    implement preview/review/import for securities, dated holdings/valuations, and
    separate currency cash balances. Treat aggregate equity/NAV as reconciliation
    evidence so it cannot be counted again alongside cash and positions. No broker
    importer is implemented yet.
-4. **Multi-currency net worth (Slice 4):** reporting-currency settings, dated FX with
+2. **Multi-currency net worth (Slice 4):** reporting-currency settings, dated FX with
    explicit source and rounding rules, manual assets/liabilities and their dated
    valuations, and consolidated cash + investments + assets - liabilities. Add
    component drill-down, meaningful historical comparisons, freshness and
    actionable reliability warnings. Current account cash reports are not a
    consolidated net-worth report.
-5. **Safe self-hosted release:** private access/authentication appropriate to the
+3. **Safe self-hosted release:** private access/authentication appropriate to the
    deployment, Docker/Compose packaging, persistent storage configuration, and
    documented, tested consistent backup/restore. Current development servers bind
    to loopback; production deployment is not complete.
-6. **Complete MVP acceptance coverage:** extend tests for the new features,
+4. **Complete MVP acceptance coverage:** extend tests for the new features,
    including late-import adjustment revision, no double-counted cash/NAV,
    multi-currency valuation, preserved correction history, and restored-report
    reproducibility. Use architecture sections 8, 13.9, and 14.9 as the acceptance

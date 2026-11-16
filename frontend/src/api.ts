@@ -174,6 +174,8 @@ export interface Reconciliation {
   closing: Checkpoint;
   state: "reconciled" | "unresolved" | "needs_review" | "blocked" | "superseded";
   current: boolean;
+  coverage: "unverified";
+  coverage_diagnostics: { code: string; message: string; action: string }[];
   movement_count: number;
   real_total: string;
   expected_close: string | null;
@@ -188,6 +190,7 @@ export interface Reconciliation {
     pending_rows: number;
     excluded_rows: number;
     statement_timezone: string | null;
+    statement_timezone_source: "account" | "matapan" | "unset";
   };
   history: { id: string; amount: string; state: string; action: string; reason: string;
     approved_at: string; actor: string; replaces_id: string | null }[];
@@ -303,9 +306,15 @@ export const api = {
   createManualMovement: (id: string, body: { posted_at: string; amount: string;
     description: string; reason: string }) =>
     request<Transaction>(`/api/v1/accounts/${id}/transactions/manual`, json(body)),
-  statementTimezone: (id: string, zone: string) =>
+  statementTimezone: (id: string, zone: string | null) =>
     request<Account>(`/api/v1/accounts/${id}/statement-timezone`, {
       ...json({ statement_timezone: zone }), method: "PUT",
+    }),
+  matapanTimezone: () =>
+    request<{ default_statement_timezone: string | null }>("/api/v1/settings/timezone"),
+  setMatapanTimezone: (zone: string) =>
+    request<{ default_statement_timezone: string }>("/api/v1/settings/timezone", {
+      ...json({ default_statement_timezone: zone }), method: "PUT",
     }),
   reconciliations: (id: string) =>
     request<Reconciliation[]>(`/api/v1/accounts/${id}/reconciliations`),

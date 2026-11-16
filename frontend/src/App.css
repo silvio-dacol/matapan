@@ -1330,3 +1330,6 @@ th,
 .adjustment-review { border: 0; padding: 16px 0; display: grid; gap: 16px; min-width: 0; }
 .projection-form, .projection-result { margin-top: 24px; }
 .reconciliation-panel code { overflow-wrap: anywhere; white-space: normal; }
+.coverage-diagnostics { display: grid; gap: 10px; padding-left: 20px; }
+.coverage-diagnostics li strong, .coverage-diagnostics li span { display: block; }
+.coverage-diagnostics li span { color: var(--muted, #626c65); margin-top: 3px; }

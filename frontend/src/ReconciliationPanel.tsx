@@ -38,10 +38,13 @@ function PeriodReview({ period, disabled, onChanged, onBusy }: {
       <div><dt>Proposed ghost amount</dt><dd>{money(period.required_adjustment, period.currency_code)}</dd></div>
     </dl>
     {period.state === "needs_review" && <Notice>New evidence changed this reconciliation. Review and confirm the proposed ghost amount; the previous approval is preserved.</Notice>}
+    <ul className="coverage-diagnostics">{period.coverage_diagnostics.map((item) =>
+      <li key={item.code}><strong>{item.message}</strong><span>{item.action}</span></li>)}</ul>
     <ul className="muted">{period.issues.map((issue) => <li key={issue}>{issue}</li>)}</ul>
     <details>
-      <summary>Statement coverage and duplicate decisions</summary>
-      <p>Statement timezone: {period.evidence.statement_timezone || "Not confirmed"}. Pending/non-booked rows: {period.evidence.pending_rows}. Skipped rows: {period.evidence.excluded_rows}.</p>
+      <summary>Import evidence and row decisions</summary>
+      <p>Timestamp convention: {period.evidence.statement_timezone || "Not set"} ({period.evidence.statement_timezone_source === "account" ? "account override" : period.evidence.statement_timezone_source === "matapan" ? "Matapan default" : "required"}). Pending/non-booked rows: {period.evidence.pending_rows}. Skipped rows: {period.evidence.excluded_rows}.</p>
+      <p>Observed transaction dates show where rows exist. The CSV has no declared statement period, so they cannot establish full coverage.</p>
       {period.evidence.imports.length === 0 && <p>No imported source rows in this interval.</p>}
       {period.evidence.imports.map((batch) => <div key={batch.id} className="evidence-details">
         <code>{batch.id}</code>
@@ -79,8 +82,10 @@ export default function ReconciliationPanel({ account, revision, asOf, disabled,
   onChanged: () => void; onBusy: (busy: boolean) => void;
 }) {
   const [periods, setPeriods] = useState<Reconciliation[]>([]);
-  const [zone, setZone] = useState(account.statement_timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC");
+  const [zone, setZone] = useState(account.statement_timezone || "");
   const [savedZone, setSavedZone] = useState(account.statement_timezone);
+  const [defaultZone, setDefaultZone] = useState("");
+  const [savedDefaultZone, setSavedDefaultZone] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -91,7 +96,14 @@ export default function ReconciliationPanel({ account, revision, asOf, disabled,
   useEffect(() => {
     let active = true;
     setLoading(true); setError(""); setPeriods([]);
-    api.reconciliations(account.id).then((result) => { if (active) setPeriods(result); })
+    Promise.all([api.reconciliations(account.id), api.matapanTimezone()])
+      .then(([result, settings]) => {
+        if (active) {
+          setPeriods(result);
+          setDefaultZone(settings.default_statement_timezone || "");
+          setSavedDefaultZone(settings.default_statement_timezone);
+        }
+      })
       .catch((failure) => { if (active) setError(errorMessage(failure)); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
@@ -107,8 +119,16 @@ export default function ReconciliationPanel({ account, revision, asOf, disabled,
   async function saveZone(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setBusy(true); onBusy(true); setError("");
     try {
-      const updated = await api.statementTimezone(account.id, zone.trim());
+      const updated = await api.statementTimezone(account.id, zone.trim() || null);
       setSavedZone(updated.statement_timezone); onChanged();
+    } catch (failure) { setError(errorMessage(failure)); }
+    finally { setBusy(false); onBusy(false); }
+  }
+  async function saveDefaultZone(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); setBusy(true); onBusy(true); setError("");
+    try {
+      const updated = await api.setMatapanTimezone(defaultZone.trim());
+      setSavedDefaultZone(updated.default_statement_timezone); onChanged();
     } catch (failure) { setError(errorMessage(failure)); }
     finally { setBusy(false); onBusy(false); }
   }
@@ -123,14 +143,23 @@ export default function ReconciliationPanel({ account, revision, asOf, disabled,
     <div className="section-heading"><div><span className="eyebrow">CHECKPOINTS AND GAPS</span><h2 id="reconciliation-title">Balance reconciliation</h2></div>
       <button disabled={disabled || busy} onClick={() => setRetry((value) => value + 1)}>Refresh reconciliation</button>
     </div>
-    <p className="muted">Your first timed confirmation establishes the reference balance. Later checkpoints reveal unexplained differences. New imports automatically recalculate proposals; approval is always yours.</p>
+    <p className="muted">Your first timed confirmation establishes the reference balance. Before then, a calculated balance is unavailable rather than zero. Date-only observations keep their original date-only meaning and remain in the evidence report; Matapan does not assign them invented times. Later checkpoints reveal unexplained differences. New imports automatically recalculate proposals; approval is always yours.</p>
+    <form onSubmit={saveDefaultZone}>
+      <fieldset disabled={disabled || busy} className="form-grid">
+        <label>Matapan default timezone
+          <input value={defaultZone} onChange={(event) => setDefaultZone(event.target.value)} required maxLength={100} placeholder="Europe/Zurich" />
+        </label>
+        <div className="button-row"><button type="submit">Save Matapan timezone</button></div>
+        <p className="form-note wide">Used for imported local timestamps when an account has no override. Choose an IANA timezone. Matapan does not infer it from file metadata. Changing it recalculates proposals and may require review. Saved: {savedDefaultZone || "Not set"}.</p>
+      </fieldset>
+    </form>
     <form onSubmit={saveZone}>
       <fieldset disabled={disabled || busy} className="form-grid">
-        <label>Statement timezone
-          <input value={zone} onChange={(event) => setZone(event.target.value)} required maxLength={100} placeholder="Europe/Zurich" />
+        <label>Account-specific timezone override
+          <input value={zone} onChange={(event) => setZone(event.target.value)} maxLength={100} placeholder={savedDefaultZone || "Use Matapan default"} />
         </label>
-        <div className="button-row"><button type="submit">Confirm statement timezone</button></div>
-        <p className="form-note wide">Confirm the timezone used by the timestamps in your exports. It is not inferred from your computer. Saved: {savedZone || "Not confirmed"}. Changing it requires fresh review of affected adjustments.</p>
+        <div className="button-row"><button type="submit">{zone.trim() ? "Save account override" : "Use Matapan default"}</button></div>
+        <p className="form-note wide">An override takes precedence over Matapan's default for this account. Existing override: {savedZone || "None"}. Changing it recalculates proposals and may require review.</p>
       </fieldset>
     </form>
     <form onSubmit={calculate} className="projection-form">

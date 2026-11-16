@@ -10,7 +10,7 @@ from alembic import command
 from fastapi.testclient import TestClient
 
 from matapan.db import migration_config
-from matapan.importers.revolut import HEADERS
+from matapan.importers.parsers.revolut import HEADERS
 from matapan.main import create_app
 
 

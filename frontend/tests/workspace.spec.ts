@@ -82,8 +82,8 @@ test("confirms timed references and reviews a ghost through late imports to zero
     await expect(page.locator(".balance-value")).toContainText(amount);
   }
   await timedBalance("100", "2025-01-01");
-  await page.getByLabel("Statement timezone", { exact: true }).fill("UTC");
-  await page.getByRole("button", { name: "Confirm statement timezone", exact: true }).click();
+  await page.getByLabel("Matapan default timezone", { exact: true }).fill("UTC");
+  await page.getByRole("button", { name: "Save Matapan timezone", exact: true }).click();
   await expect(page.getByText("Saved: UTC", { exact: false })).toBeVisible();
   await timedBalance("190", "2025-02-01");
   const period = page.locator(".reconciliation-period");

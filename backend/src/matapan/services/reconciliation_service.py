@@ -19,6 +19,7 @@ from matapan.imports import ImportProblem
 from matapan.models import (
     Account,
     AccountBalance,
+    AppSetting,
     BalanceResolution,
     ImportBatch,
     ImportRow,
@@ -35,6 +36,14 @@ def timezone(name: str) -> ZoneInfo:
         raise ImportProblem(
             422, "Use a valid IANA statement timezone, such as Europe/Zurich."
         ) from error
+
+
+def effective_timezone(session: Session, account: Account) -> tuple[str | None, str]:
+    """Resolve an account override before the Matapan-wide convention."""
+    if account.statement_timezone:
+        return account.statement_timezone, "account"
+    setting = session.get(AppSetting, "default_statement_timezone")
+    return (setting.value, "matapan") if setting else (None, "unset")
 
 
 def lock_account(session: Session, account_id: str) -> Account:
@@ -127,8 +136,30 @@ def source_instants(local: datetime, zone: ZoneInfo) -> set[datetime]:
     return candidates
 
 
-def movements(session: Session, account: Account, start: datetime, end: datetime) -> dict:
-    result = {"movements": [], "issues": [], "imports": [], "excluded_rows": 0, "pending_rows": 0}
+def movements(
+    session: Session,
+    account: Account,
+    start: datetime,
+    end: datetime,
+    zone_name: str | None,
+) -> dict:
+    result = {
+        "movements": [],
+        "issues": [],
+        "imports": [],
+        "excluded_rows": 0,
+        "pending_rows": 0,
+        "diagnostics": [
+            {
+                "code": "coverage_unverified",
+                "message": (
+                    "History coverage is unverified. A matching balance does not prove that "
+                    "every transaction was imported."
+                ),
+                "action": "Use source statements and import history to review the interval.",
+            }
+        ],
+    }
     rows = list(
         session.scalars(
             select(Transaction)
@@ -147,10 +178,34 @@ def movements(session: Session, account: Account, start: datetime, end: datetime
             .order_by(Transaction.posted_at, Transaction.id)
         )
     )
-    if not account.statement_timezone and (not rows or any(not row.posted_offset for row in rows)):
+    source_rows = list(
+        session.scalars(
+            select(ImportRow)
+            .join(ImportBatch, ImportBatch.id == ImportRow.batch_id)
+            .where(ImportBatch.account_id == account.id, ImportBatch.status == "committed")
+        )
+    )
+    needs_timezone = any(not row.posted_offset for row in rows) or any(
+        not source.corrected_offset
+        and (source.corrected_posted_at or source.posted_at or source.started_at)
+        for source in source_rows
+        if source.currency_code == account.currency_code
+        and source.product == account.revolut_product
+    )
+    if not zone_name and (not rows or needs_timezone):
         result["issues"].append("Confirm the statement timezone before calculating movements.")
+        result["diagnostics"].append(
+            {
+                "code": "timezone_required",
+                "message": (
+                    "Local statement timestamps need a timezone before Matapan can place "
+                    "movements against timed checkpoints."
+                ),
+                "action": "Set Matapan's default timezone or an account-specific override.",
+            }
+        )
         return result
-    zone = timezone(account.statement_timezone) if account.statement_timezone else None
+    zone = timezone(zone_name) if zone_name else None
     for row in rows:
         candidates = (
             {
@@ -190,6 +245,11 @@ def movements(session: Session, account: Account, start: datetime, end: datetime
         .where(ImportBatch.account_id == account.id, ImportBatch.status == "committed")
         .order_by(ImportRow.id)
     ):
+        if (
+            source.currency_code != account.currency_code
+            or source.product != account.revolut_product
+        ):
+            continue
         local = source.corrected_posted_at or source.posted_at or source.started_at
         local_instants = (
             {
@@ -203,11 +263,6 @@ def movements(session: Session, account: Account, start: datetime, end: datetime
             else set()
         )
         if local is None or not any(start < value <= end for value in local_instants):
-            continue
-        if (
-            source.currency_code != account.currency_code
-            or source.product != account.revolut_product
-        ):
             continue
         result["excluded_rows"] += int(source.decision == "skip")
         result["pending_rows"] += int(source.source_state != "COMPLETED")
@@ -229,6 +284,106 @@ def movements(session: Session, account: Account, start: datetime, end: datetime
             }
         )
     result["imports"] = list(batches.values())
+    result["diagnostics"] = [
+        {
+            "code": "coverage_unverified",
+            "message": (
+                "The Revolut CSV has no declared statement period. Observed transaction dates "
+                "show where rows exist, but cannot prove that all activity was imported."
+            ),
+            "action": (
+                "Use source statements to review this interval; do not treat a zero difference "
+                "as proof of complete history."
+            ),
+        }
+    ]
+    if not batches:
+        result["diagnostics"].append(
+            {
+                "code": "no_import_rows",
+                "message": (
+                    "No matching imported source rows were observed inside this "
+                    "checkpoint interval."
+                ),
+                "action": (
+                    "Check import history and add any available statement covering this interval."
+                ),
+            }
+        )
+    if result["pending_rows"]:
+        result["diagnostics"].append(
+            {
+                "code": "pending_rows",
+                "message": (
+                    f"{result['pending_rows']} pending or non-booked source row(s) fall in this "
+                    "interval and were not counted as movements."
+                ),
+                "action": "Review the source rows and import a later booked statement if needed.",
+            }
+        )
+    if result["excluded_rows"]:
+        result["diagnostics"].append(
+            {
+                "code": "skipped_rows",
+                "message": (
+                    f"{result['excluded_rows']} source row(s) were skipped and were not counted "
+                    "as movements."
+                ),
+                "action": "Review the row decision history if any skipped row should be included.",
+            }
+        )
+    if any(
+        "Running balances show a movement gap" in warning
+        for batch in batches.values()
+        for warning in batch["warnings"]
+    ):
+        result["diagnostics"].append(
+            {
+                "code": "running_balance_gap",
+                "message": "A source running balance did not match the visible movement sequence.",
+                "action": (
+                    "Review source row ordering, duplicate decisions, and statement coverage "
+                    "before resolving the difference."
+                ),
+            }
+        )
+    if batches and zone is not None:
+        interval_start = start.astimezone(zone).date()
+        interval_end = end.astimezone(zone).date()
+        ranges = []
+        for batch in batches.values():
+            if not batch["observed_start"] or not batch["observed_end"]:
+                continue
+            first = datetime.fromisoformat(batch["observed_start"]).date()
+            last = datetime.fromisoformat(batch["observed_end"]).date()
+            first, last = max(first, interval_start), min(last, interval_end)
+            if first <= last:
+                ranges.append((first, last))
+        ranges.sort()
+        merged = []
+        for first, last in ranges:
+            if merged and first <= merged[-1][1] + timedelta(days=1):
+                merged[-1] = (merged[-1][0], max(merged[-1][1], last))
+            else:
+                merged.append((first, last))
+        for (_, previous_end), (next_start, _) in zip(merged, merged[1:], strict=False):
+            gap_start, gap_end = previous_end + timedelta(days=1), next_start - timedelta(days=1)
+            if gap_start <= gap_end:
+                result["diagnostics"].append(
+                    {
+                        "code": "no_observed_activity",
+                        "message": (
+                            "No imported transaction rows were observed from "
+                            f"{gap_start.isoformat()} "
+                            f"through {gap_end.isoformat()} between the recorded activity ranges."
+                        ),
+                        "action": (
+                            "This is an activity gap, not proof of missing transactions: the CSV "
+                            "does not declare statement coverage. Check available source "
+                            "statements."
+                        ),
+                    }
+                )
     return result
 
 
@@ -248,7 +403,8 @@ def evaluate(session: Session, account: Account, period: Reconciliation) -> dict
     opening = session.get(AccountBalance, period.opening_balance_id)
     closing = session.get(AccountBalance, period.closing_balance_id)
     current = (opening.id, closing.id) in current_pairs(session, account)
-    evidence = movements(session, account, opening.effective_at, closing.effective_at)
+    zone_name, timezone_source = effective_timezone(session, account)
+    evidence = movements(session, account, opening.effective_at, closing.effective_at, zone_name)
     issues = evidence["issues"]
     if not current:
         issues.append(
@@ -289,7 +445,8 @@ def evaluate(session: Session, account: Account, period: Reconciliation) -> dict
         endpoint_observations=[
             [checkpoint_view(item) for item in group] for group in endpoint_groups
         ],
-        statement_timezone=account.statement_timezone,
+        statement_timezone=zone_name,
+        statement_timezone_source=timezone_source,
         current=current,
     )
     history = adjustments(session, period.id)
@@ -318,6 +475,46 @@ def evaluate(session: Session, account: Account, period: Reconciliation) -> dict
         state = "needs_review"
     if issues:
         state = "blocked" if current else "superseded"
+    diagnostics = list(evidence["diagnostics"])
+    if issues:
+        diagnostics.append(
+            {
+                "code": "calculation_blocked",
+                "message": "Matapan could not safely calculate this checkpoint interval.",
+                "action": (
+                    "Resolve the listed timezone, checkpoint, or timestamp issue before "
+                    "approving an adjustment."
+                ),
+            }
+        )
+    elif difference != 0:
+        diagnostics.append(
+            {
+                "code": "unresolved_difference",
+                "message": (
+                    "The confirmed closing balance differs from the calculated balance by "
+                    f"{format(difference, 'f')} {period.currency_code}."
+                ),
+                "action": (
+                    "Investigate imports and row decisions, then confirm the proposed synthetic "
+                    "adjustment only if appropriate."
+                ),
+            }
+        )
+    if state == "needs_review":
+        diagnostics.append(
+            {
+                "code": "approval_needs_review",
+                "message": (
+                    "The evidence or timezone convention changed after the last adjustment "
+                    "decision."
+                ),
+                "action": (
+                    "Review the revised movements and amount before confirming or retiring the "
+                    "prior adjustment."
+                ),
+            }
+        )
     return {
         "id": period.id,
         "currency_code": period.currency_code,
@@ -325,6 +522,7 @@ def evaluate(session: Session, account: Account, period: Reconciliation) -> dict
         "closing": evidence["closing"],
         "state": state,
         "coverage": "unverified",
+        "coverage_diagnostics": diagnostics,
         "current": current,
         "movement_count": len(evidence["movements"]),
         "real_total": format(total, "f"),
@@ -434,7 +632,8 @@ def projection(session: Session, account: Account, at: datetime) -> dict:
     if at == checkpoint.effective_at:
         result.update(amount=format(checkpoint.amount, "f"), status="confirmed")
         return result
-    evidence = movements(session, account, checkpoint.effective_at, at)
+    zone_name, _ = effective_timezone(session, account)
+    evidence = movements(session, account, checkpoint.effective_at, at, zone_name)
     if evidence["issues"]:
         result["issues"] = evidence["issues"]
         return result

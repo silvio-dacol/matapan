@@ -9,7 +9,7 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from matapan.db import utc_now
-from matapan.importers.revolut import PARSER_ID, PARSER_VERSION, Statement, parse_statement
+from matapan.importers.parsers.revolut import PARSER_ID, PARSER_VERSION, Statement, parse_statement
 from matapan.models import (
     Account,
     AccountBalance,

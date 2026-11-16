@@ -38,10 +38,11 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from matapan import __version__, imports
 from matapan.db import database_url, make_engine, require_current_schema, utc_now
-from matapan.importers.revolut import MAX_FILE_BYTES, StatementError
+from matapan.importers.parsers.revolut import MAX_FILE_BYTES, StatementError
 from matapan.models import (
     Account,
     AccountBalance,
+    AppSetting,
     BalanceResolution,
     ImportBatch,
     ImportDecisionAudit,
@@ -192,7 +193,20 @@ class BalanceRead(BaseModel):
 
 
 class StatementTimezone(RequestModel):
-    statement_timezone: str = Field(min_length=1, max_length=100)
+    statement_timezone: str | None = Field(default=None, max_length=100)
+
+    @field_validator("statement_timezone", mode="before")
+    @classmethod
+    def blank_override_is_unset(cls, value):
+        return value.strip() or None if isinstance(value, str) else value
+
+
+class MatapanTimezoneRead(BaseModel):
+    default_statement_timezone: str | None
+
+
+class MatapanTimezoneUpdate(RequestModel):
+    default_statement_timezone: str = Field(min_length=1, max_length=100)
 
 
 class AdjustmentDecision(RequestModel):
@@ -450,11 +464,35 @@ def create_app(url: str | None = None) -> FastAPI:
     def set_statement_timezone(
         account_id: UUID, payload: StatementTimezone, session: DatabaseSession
     ):
-        reconciliation.timezone(payload.statement_timezone)
+        if payload.statement_timezone:
+            reconciliation.timezone(payload.statement_timezone)
         account = reconciliation.lock_account(session, str(account_id))
         account.statement_timezone = payload.statement_timezone
         session.commit()
         return account
+
+    @application.get(
+        "/api/v1/settings/timezone", response_model=MatapanTimezoneRead, tags=["Settings"]
+    )
+    def read_matapan_timezone(session: DatabaseSession):
+        setting = session.get(AppSetting, "default_statement_timezone")
+        return {"default_statement_timezone": setting.value if setting else None}
+
+    @application.put(
+        "/api/v1/settings/timezone", response_model=MatapanTimezoneRead, tags=["Settings"]
+    )
+    def set_matapan_timezone(payload: MatapanTimezoneUpdate, session: DatabaseSession):
+        reconciliation.timezone(payload.default_statement_timezone)
+        setting = session.get(AppSetting, "default_statement_timezone")
+        if setting is None:
+            setting = AppSetting(
+                key="default_statement_timezone", value=payload.default_statement_timezone
+            )
+            session.add(setting)
+        else:
+            setting.value = payload.default_statement_timezone
+        session.commit()
+        return {"default_statement_timezone": setting.value}
 
     @application.get("/api/v1/accounts/{account_id}/reconciliations", tags=["Reconciliation"])
     def list_reconciliations(account_id: UUID, session: DatabaseSession):
