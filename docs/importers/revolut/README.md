@@ -1,6 +1,6 @@
 # How to make a statement
 
-Updated by: Silvio Da Col
+Updated by: @silvio-dacol
 Last update: May 2026
 
 1. Access your account on the browser via https://www.revolut.com.

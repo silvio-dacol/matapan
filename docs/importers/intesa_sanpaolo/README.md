@@ -1,6 +1,6 @@
 # How to make a statement
 
-Updated by: Silvio Da Col
+Updated by: @silvio-dacol
 Last update: May 2026
 
 1. Access your Intesa Sanpaolo online banking account via the web at https://www.intesasanpaolo.com/
